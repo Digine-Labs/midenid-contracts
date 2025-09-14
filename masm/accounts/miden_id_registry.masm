@@ -1,0 +1,65 @@
+use.miden::account
+use.std::sys
+# Storage
+# SLOT[0] - Treasury address
+# SLOT[1] - Register fee
+# SLOT[10] - map(name->owner)
+# SLOT[11] - map(owner->name)
+
+export.get_addr_by_name
+    # Args: NAME_WORD
+    exec._get_addr_by_name
+end
+
+export.get_name_by_addr
+    # Args: ADDR
+    exec._get_name_by_addr
+end
+
+export.set
+    # Expects: [ADDR, NAME, NAME, ADDR]
+    #           first pair for name->addr, second pair for addr->name
+    exec._set_addr_by_name
+    # => [NAME, ADDR]
+    exec._set_name_by_addr
+    # => []
+    exec.sys::truncate_stack
+end
+
+
+proc._get_addr_by_name
+    # Args: Name
+    push.10
+    # => [index]
+    exec.account::get_map_item
+    # => [VALUE]
+end
+
+proc._get_name_by_addr
+    push.11
+    # => [index]
+    exec.account::get_map_item
+    # => [VALUE]
+end
+
+proc._set_addr_by_name
+    # Stack: [ADDR, NAME]
+    # Reorder to [NAME, ADDR]
+    swapw
+    # Writes NAME -> ADDR to map at slot 10
+    push.10
+    # After push: [10, NAME, ADDR] => [index, key, value]
+    exec.account::set_map_item
+    # => []
+end
+
+proc._set_name_by_addr
+    # Stack: [NAME, ADDR]
+    # Reorder to [ADDR, NAME]
+    swapw
+    # Writes ADDR -> NAME to map at slot 11
+    push.11
+    # After push: [11, ADDR, NAME] => [index, key, value]
+    exec.account::set_map_item
+    # => []
+end

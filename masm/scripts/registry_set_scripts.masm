@@ -1,0 +1,13 @@
+use.external_contract::miden_id_registry_contract
+use.std::sys
+
+begin
+    # Provide both pairs expected by set:
+    # [ADDR, NAME, NAME, ADDR]
+    push.1.2.3.4        # ADDR
+    push.0.0.0.0        # NAME
+    push.0.0.0.0        # NAME (for reverse map)
+    push.1.2.3.4        # ADDR (for reverse map)
+    call.miden_id_registry_contract::set
+    exec.sys::truncate_stack
+end
