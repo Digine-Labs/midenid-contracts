@@ -1,10 +1,30 @@
 use.miden::account
 use.std::sys
+
+const.ALREADY_INITIALIZED="Already initialized"
 # Storage
-# SLOT[0] - Treasury address
-# SLOT[1] - Register fee
+# SLOT[0] - initialized flag
+# SLOT[1] - Treasury Address
+# SLOT[2] - Fee
 # SLOT[10] - map(name->owner)
 # SLOT[11] - map(owner->name)
+
+# Inputs
+# [TREASURY, FEE]
+export.init
+    exec._assert_initialized
+    # [TREASURY, FEE]
+    push.1 push.0 
+    # [1, 0, T, F]
+    exec.account::set_item 
+    # [OLD_VALUE, T, F]
+    drop
+    # [T, F]
+
+    push.1 exec.account::set_item dropw
+    # [FEE]
+    push.2 exec.account::set_item dropw
+end
 
 export.get_addr_by_name
     # Args: NAME_WORD
@@ -16,6 +36,7 @@ export.get_name_by_addr
     exec._get_name_by_addr
 end
 
+# TODO: Set this function proc instead of public
 export.set
     # Expects: [ADDR, NAME, NAME, ADDR]
     #           first pair for name->addr, second pair for addr->name
@@ -24,6 +45,16 @@ export.set
     exec._set_name_by_addr
     # => []
     exec.sys::truncate_stack
+end
+
+# No effect on stack
+proc._assert_initialized
+    push.0
+    # [0]
+    exec.account::get_item
+    # [VALUE]
+    assertz.err=ALREADY_INITIALIZED
+    # []
 end
 
 
