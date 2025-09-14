@@ -2,8 +2,9 @@ use.external_contract::miden_id_registry_contract
 use.std::sys
 
 begin
-    push.1.2.3.4        # ADDR
-    push.0.0.0.50       # fee
+    push.0.0.0.50          # fee
+    push.0.0.0.1234        # ADDR
+
     call.miden_id_registry_contract::init
     exec.sys::truncate_stack
 end

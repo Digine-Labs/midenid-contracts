@@ -14,11 +14,11 @@ const.ALREADY_INITIALIZED="Already initialized"
 export.init
     exec._assert_initialized
     # [TREASURY, FEE]
-    push.1 push.0 
+
+    # Set initialized
+    push.0.0.0.1 push.0 
     # [1, 0, T, F]
-    exec.account::set_item 
-    # [OLD_VALUE, T, F]
-    drop
+    exec.account::set_item dropw
     # [T, F]
 
     push.1 exec.account::set_item dropw

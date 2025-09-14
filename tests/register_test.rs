@@ -195,6 +195,14 @@ async fn init_with_script() -> Result<(), ClientError> {
         let count: Word = account.account().storage().get_item(0).unwrap().into();
         let val = count.get(3).unwrap().as_int();
         assert_eq!(val, 1);
+
+        let treasury: Word = account.account().storage().get_item(1).unwrap().into();
+        let val = treasury.get(3).unwrap().as_int(); // 0.0.0.1234
+        assert_eq!(val, 1234);
+
+        let fee: Word = account.account().storage().get_item(2).unwrap().into();
+        let val = fee.get(3).unwrap().as_int(); // 0.0.0.50
+        assert_eq!(val, 50);
     }
 
     Ok(())
