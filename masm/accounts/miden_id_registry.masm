@@ -9,8 +9,10 @@ const.ALREADY_INITIALIZED="Already initialized"
 # SLOT[10] - map(name->owner)
 # SLOT[11] - map(owner->name)
 
+# Not: Stack orneklerinde [felt, VALUE], kucuk harfle yazilanlar tek felt demek buyuk harf WORD yani 4 felt
+
 # Inputs
-# [TREASURY, FEE]
+# [TREASURY, FEE] -> total 8 elements, 2 words
 export.init
     exec._assert_initialized
     # [TREASURY, FEE]
@@ -79,7 +81,7 @@ proc._set_addr_by_name
     swapw
     # Writes NAME -> ADDR to map at slot 10
     push.10
-    # After push: [10, NAME, ADDR] => [index, key, value]
+    # After push: [10, NAME, ADDR] => [index, key, VALUE]
     exec.account::set_map_item
     # => []
 end
