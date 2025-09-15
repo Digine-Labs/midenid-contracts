@@ -1,5 +1,5 @@
 # install miden-node
-cargo install miden-node --version 0.10.*
+cargo install miden-node --version 0.11.*
 
 mkdir node-data
 

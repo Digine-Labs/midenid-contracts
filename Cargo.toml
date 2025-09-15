@@ -5,9 +5,9 @@ edition = "2024"
 default-run = "midenid-contracts"
 
 [dependencies]
-miden-client = { version = "=0.10", features = ["testing", "tonic", "sqlite"] }
-miden-lib = { version = "=0.10.0", default-features = false }
-miden-objects = { version = "=0.10.0", default-features = false }
+miden-client = { version = "=0.11.2", features = ["testing", "tonic", "sqlite"] }
+miden-lib = { version = "=0.11.2", default-features = false }
+miden-objects = { version = "=0.11.2", default-features = false }
 miden-crypto = { version = "0.15.6" }
 miden-assembly = "=0.16.2"
 rand = { version = "0.9" }

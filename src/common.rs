@@ -166,14 +166,18 @@ pub async fn create_no_auth_component() -> Result<AccountComponent, Error> {
 pub async fn create_public_immutable_contract(
     client: &mut Client,
     account_code: &String,
-    storage_slots: Vec<StorageSlot>
 ) -> Result<(Account, Word), ClientError> {
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
 
     let counter_component = AccountComponent::compile(
         account_code.clone(),
         assembler.clone(),
-        storage_slots,
+        vec![StorageSlot::Value([
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(0),
+        ])],
     )
     .unwrap()
     .with_supports_all_types();

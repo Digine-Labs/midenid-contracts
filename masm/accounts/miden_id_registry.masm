@@ -1,11 +1,13 @@
 use.miden::account
+use.miden::note
 use.std::sys
 
 const.ALREADY_INITIALIZED="Already initialized"
 # Storage
 # SLOT[0] - initialized flag
-# SLOT[1] - Treasury Address
-# SLOT[2] - Fee
+# SLOT[1] - Owner_prefix
+# SLOT[2] - Owner_suffix
+# SLOT[3] - Fee
 # SLOT[10] - map(name->owner)
 # SLOT[11] - map(owner->name)
 
@@ -16,7 +18,9 @@ const.ALREADY_INITIALIZED="Already initialized"
 export.init
     exec._assert_initialized
     # [TREASURY, FEE]
-
+    exec.note::get_sender # Note da degilse context revert atiyor. Ama yinede 0,0 donerse check etmek  lazim
+    debug.stack.8
+    
     # Set initialized
     push.0.0.0.1 push.0 
     # [1, 0, T, F]
@@ -47,6 +51,16 @@ export.set
     exec._set_name_by_addr
     # => []
     exec.sys::truncate_stack
+end
+
+# Input: []
+# Output: []
+proc._assert_only_owner
+    # TODO
+    exec.note::get_sender
+    # [addr_prefix, addr_suffix, ...]
+    
+    nop
 end
 
 # No effect on stack

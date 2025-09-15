@@ -29,15 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -------------------------------------------------------------------------
     // STEP 1 – Deploy the counter contract
     // -------------------------------------------------------------------------
-    let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
+    let counter_code = fs::read_to_string(Path::new("./masm/accounts/miden_id_registry.masm")).unwrap();
 
     let (counter_contract, counter_seed) =
-        create_public_immutable_contract(&mut client, &counter_code,  vec![StorageSlot::Value([
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(0),
-        ])]).await?;
+        create_public_immutable_contract(&mut client, &counter_code).await?;
 
     client
         .add_account(&counter_contract, Some(counter_seed), false)
