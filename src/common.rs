@@ -197,6 +197,7 @@ pub async fn create_public_immutable_contract(
 }
 
 // Waits for note
+// TODO: Burda hata var tx broadcast oluyor explorerda var ama wait bitmiyor
 pub async fn wait_for_note(
     client: &mut Client<FilesystemKeyStore<rand::prelude::StdRng>>,
     account_id: &Account,
