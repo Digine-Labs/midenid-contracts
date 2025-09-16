@@ -1,14 +1,13 @@
 use midenid_contracts::common::{
-    create_basic_account, create_public_immutable_contract, create_public_note, wait_for_note,
+    create_basic_account, create_public_immutable_contract, create_public_note, wait_for_note, instantiate_client, create_library
 };
 
 use miden_client_tools::{
-    create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
+    create_tx_script, delete_keystore_and_store,
 };
 
 use miden_client::{
-    ClientError, Word, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint,
-    transaction::TransactionRequestBuilder,
+    account::{Address, AddressInterface, AccountIdAddress}, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint, transaction::TransactionRequestBuilder, ClientError, Word
 };
 use miden_objects::account::NetworkId;
 use std::{fs, path::Path};
@@ -19,7 +18,7 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     delete_keystore_and_store(None).await;
 
     let endpoint = Endpoint::localhost();
-    let mut client = instantiate_client(endpoint.clone(), None).await.unwrap();
+    let mut client = instantiate_client().await.unwrap();
 
     let keystore = FilesystemKeyStore::new("./keystore".into()).unwrap();
 
@@ -29,12 +28,16 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     // STEP 1: Create Basic User Account
     // -------------------------------------------------------------------------
-    let (alice_account, _) = create_basic_account(&mut client, keystore.clone())
+    let alice_account = create_basic_account(&mut client, keystore.clone())
         .await
         .unwrap();
     println!(
         "alice account id: {:?}",
-        alice_account.id().to_bech32(NetworkId::Testnet)
+        Address::from(AccountIdAddress::new(
+            alice_account.id(),
+            AddressInterface::Unspecified
+        ))
+        .to_bech32(NetworkId::Testnet)
     );
 
     // -------------------------------------------------------------------------
@@ -48,7 +51,11 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
             .unwrap();
     println!(
         "contract id: {:?}",
-        counter_contract.id().to_bech32(NetworkId::Testnet)
+        Address::from(AccountIdAddress::new(
+            counter_contract.id(),
+            AddressInterface::Unspecified
+        ))
+        .to_bech32(NetworkId::Testnet)
     );
 
     client
@@ -60,15 +67,12 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     // STEP 3: Prepare & Create the Note
     // -------------------------------------------------------------------------
     let note_code = fs::read_to_string(Path::new("./masm/notes/init_registry_note.masm")).unwrap();
-    let account_code = fs::read_to_string(Path::new("./masm/accounts/miden_id_registry.masm")).unwrap();
-
-    let library_path = "external_contract::miden_id_registry_contract";
-    let library = create_library(account_code, library_path).unwrap();
+    //let account_code = fs::read_to_string(Path::new("./masm/accounts/miden_id_registry.masm")).unwrap();
 
     let note_assets = NoteAssets::new(vec![]).unwrap();
-
+    let ext_lib = create_library(registry_code, "external_contract::miden_id_registry_contract").unwrap();
     let increment_note =
-        create_public_note(&mut client, note_code, library, alice_account, note_assets)
+        create_public_note(&mut client, &ext_lib, note_code, alice_account, note_assets)
             .await
             .unwrap();
 
@@ -77,16 +81,13 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     // STEP 4: Consume the Note
     // -------------------------------------------------------------------------
-    wait_for_note(&mut client, None, &increment_note)
+    wait_for_note(&mut client, &counter_contract, &increment_note)
         .await
         .unwrap();
 
-    let script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm")).unwrap();
-    let tx_script = create_tx_script(script_code, None).unwrap();
 
     let consume_custom_req = TransactionRequestBuilder::new()
         .authenticated_input_notes([(increment_note.id(), None)])
-        .custom_script(tx_script)
         .build()
         .unwrap();
 
@@ -103,7 +104,7 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
 
     delete_keystore_and_store(None).await;
 
-    let mut client = instantiate_client(endpoint, None).await.unwrap();
+    let mut client = instantiate_client().await.unwrap();
 
     client
         .import_account_by_id(counter_contract.id())
