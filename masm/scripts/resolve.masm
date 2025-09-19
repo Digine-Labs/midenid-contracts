@@ -1,2 +1,9 @@
+use.miden_id::registry
+use.std::sys
+
+begin
+
+end
+
 # TODO
 # This script for resolving name utilities

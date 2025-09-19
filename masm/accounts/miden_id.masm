@@ -10,6 +10,8 @@ const.TOKEN_SUFFIX_ZERO="Token suffix zero"
 const.ZERO_ASSET_RECEIVED="Paid zero tokens"
 const.SUB_OVERFLOW="Sub overflow"
 const.WRONG_AMOUNT_PAID="Paid amount less than"
+const.NAME_ALREADY_REGISTERED="Name already registry"
+const.ID_ALREADY_ASSIGNED="ID already assigned to a name"
 
 # Storage
 # If storage type is word, it holds 4 felts
@@ -18,6 +20,8 @@ const.WRONG_AMOUNT_PAID="Paid amount less than"
 # [1:2]: owner_prefix, owner_suffix
 # [3]: PRICE -> TODO: it can fit into felt 
 # [7:8]: payment_token_prefix, payment_token_suffix -> Actually its faucet id
+# [9]: NAME -> id map
+# [10]: id -> NAME map
 
 # Input: [PRICE, payment_token_prefix, payment_token_suffix]
 # Output: []
@@ -38,65 +42,120 @@ export.init
     # []
 end
 
-# Input: []
+# Input: [NAME] -> Also payment must be included in note
 # Output: []
-proc._assert_initialized
-    push.0
-    # [0]
-    exec.get_item
-    # [INITIALIZED_FLAG]
-    drop drop drop
-    # [initialized_flag]
-    assertz.err=ALREADY_INITIALIZED
-    # []
-end
-
-# Input: []
-# Output: []
-proc._set_initialized
-    push.1.0
-    # [0, 1]
-    exec.set_item
-    # [OLD_WORD]
-    dropw
-end
-
-# Input: []
-# Output: []
-proc._assert_only_owner
+export.register_name
+    exec._validate_payment
+    # [NAME]
     exec.get_sender
-    # [sender_prefix, sender_suffix]
-    push.1
-    # [1, sender_prefix, sender_suffix]
-    exec.get_item
-    # [OWNER_WORD, sender_prefix, sender_suffix]
-    drop drop
-    # [owner_prefix, owner_suffix, sender_prefix, sender_suffix]
-    swap.4
-    # [sender_suffix, owner_suffix, sender_prefix, owner_prefix]
-    assert_eq.err=OWNER_SUFFIX_MISMATCH
-    assert_eq.err=OWNER_PREFIX_MISMATCH
+    # [caller_prefix, caller_suffix, NAME]
+    exec._register_name
     # []
 end
 
-# Input: [owner_prefix, owner_suffix]
+# Input: [NAME]
 # Output: []
-proc._update_owner
-    push.0.0.0
-    # [0, 0, 0, owner_prefix, owner_suffix]
-    push.1
-    # [1, 0, 0, 0, owner_prefix, owner_suffix]
-    exec.set_item
-    # [OLD_ITEM, owner_suffix]
-    dropw
-    # [owner_suffix]
-    push.0.0.0
-    # [0, 0, 0, owner_suffix]
-    push.2
-    # [2, 0, 0, 0, owner_suffix]
-    exec.set_item
-    # [OLD_ITEM]
-    dropw
+proc._register_name
+    exec.get_sender
+    # [caller_prefix, caller_suffix, NAME]
+    dupw.2
+    # [NAME, caller_prefix, caller_suffix, NAME]
+    dup.2
+    # [caller_suffix, NAME, caller_prefix, caller_suffix, NAME]
+    dup.2
+    # [caller_prefix, caller_suffix, NAME, caller_prefix, caller_suffix, NAME]
+    exec._assert_id_not_registered
+    # [NAME, caller_prefix, caller_suffix, NAME]
+    exec._assert_name_not_registered
+    # [caller_prefix, caller_suffix, NAME]
+    exec._set_name_by_id
+    # [caller_prefix, caller_suffix, NAME]
+    exec._set_id_by_name
+    # []
+end
+
+# Input: [NAME]
+# Output: []
+proc._assert_name_not_registered
+    push.9
+    # [9, NAME]
+    exec.get_map_item
+    # [ID]
+    push.0.0.0.0
+    # [0, 0, 0, 0, ID]
+    eqw
+    # [ID==0, 0, 0, 0, 0, ID]
+    assert.err=NAME_ALREADY_REGISTERED
+    # [0, 0, 0, 0, ID]
+    dropw dropw
+end
+
+# Input: [id_prefix, id_suffix]
+# Output: []
+proc._assert_id_not_registered
+    push.10
+    # [10, id_prefix, id_suffix]
+    exec.get_map_item
+    # [NAME]
+    push.0.0.0.0
+    # [0, 0, 0, 0, NAME]
+    eqw
+    # [NAME==0, 0, 0, 0, 0, NAME]
+    assert.err=ID_ALREADY_ASSIGNED
+    dropw dropw
+end
+
+# Input: [id_prefix, id_suffix]
+# Output: [NAME]
+proc._get_name_by_id
+    push.0.0
+    # [0, 0, id_prefix, id_suffix]
+    push.10
+    # [10, 0, 0, id_prefix, id_suffix]
+    exec.get_map_item
+    # [NAME]
+end
+
+# Input: [id_prefix, id_suffix, NAME]
+# Output: [id_prefix, id_suffix, NAME]
+proc._set_name_by_id
+    dupw.2
+    # [NAME, id_prefix, id_suffix, NAME]
+    dup.2 dup.2
+    # [id_prefix, id_suffix, NAME, id_prefix, id_suffix, NAME]
+    push.0.0
+    # [0, 0, id_prefix, id_suffix, NAME, id_prefix, id_suffix, NAME]
+    push.10
+    # [10, 0, 0, id_prefix, id_suffix, NAME, id_prefix, id_suffix, NAME]
+    exec.set_map_item
+    # [OLD_MAP_ROOT, OLD_MAP_VALUE, id_prefix, id_suffix, NAME]
+    dropw dropw
+    # [id_prefix, id_suffix, NAME]
+end
+
+# Input: [id_prefix, id_suffix, NAME]
+# Output: []
+proc._set_id_by_name
+    push.0.0
+    # [0, 0, id_prefix, id_suffix, NAME]
+    dupw.4
+    # [NAME, 0, 0, id_prefix, id_suffix, NAME]
+    push.9
+    # [9, NAME, 0, 0, id_prefix, id_suffix, NAME]
+    exec.set_map_item
+    # [OLD_MAP_ROOT, OLD_MAP_VALUE, NAME]
+    dropw dropw dropw
+end
+
+# Input: [NAME]
+# Output: [id_prefix, id_suffix]
+proc._get_id_by_name
+    push.9
+    # [9, NAME]
+    exec.get_map_item
+    # [0, 0, id_prefix, id_suffix]
+    drop drop
+    # [id_prefix, id_suffix]
 end
 
 # Input: [PRICE]
@@ -186,4 +245,65 @@ proc._validate_payment
     # [price =< result]
     assert.err=WRONG_AMOUNT_PAID
     # []
+end
+
+# Input: []
+# Output: []
+proc._assert_initialized
+    push.0
+    # [0]
+    exec.get_item
+    # [INITIALIZED_FLAG]
+    drop drop drop
+    # [initialized_flag]
+    assertz.err=ALREADY_INITIALIZED
+    # []
+end
+
+# Input: []
+# Output: []
+proc._set_initialized
+    push.1.0
+    # [0, 1]
+    exec.set_item
+    # [OLD_WORD]
+    dropw
+end
+
+# Input: []
+# Output: []
+proc._assert_only_owner
+    exec.get_sender
+    # [sender_prefix, sender_suffix]
+    push.1
+    # [1, sender_prefix, sender_suffix]
+    exec.get_item
+    # [OWNER_WORD, sender_prefix, sender_suffix]
+    drop drop
+    # [owner_prefix, owner_suffix, sender_prefix, sender_suffix]
+    swap.4
+    # [sender_suffix, owner_suffix, sender_prefix, owner_prefix]
+    assert_eq.err=OWNER_SUFFIX_MISMATCH
+    assert_eq.err=OWNER_PREFIX_MISMATCH
+    # []
+end
+
+# Input: [owner_prefix, owner_suffix]
+# Output: []
+proc._update_owner
+    push.0.0.0
+    # [0, 0, 0, owner_prefix, owner_suffix]
+    push.1
+    # [1, 0, 0, 0, owner_prefix, owner_suffix]
+    exec.set_item
+    # [OLD_ITEM, owner_suffix]
+    dropw
+    # [owner_suffix]
+    push.0.0.0
+    # [0, 0, 0, owner_suffix]
+    push.2
+    # [2, 0, 0, 0, owner_suffix]
+    exec.set_item
+    # [OLD_ITEM]
+    dropw
 end
