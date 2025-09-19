@@ -16,7 +16,7 @@ const.WRONG_AMOUNT_PAID="Paid amount less than"
 # Uppercase means word, lowercase means felt
 # 0: initialized flag
 # [1:2]: owner_prefix, owner_suffix
-# [3]: PRICE
+# [3]: PRICE -> TODO: it can fit into felt 
 # [7:8]: payment_token_prefix, payment_token_suffix -> Actually its faucet id
 
 # Input: [PRICE, payment_token_prefix, payment_token_suffix]
