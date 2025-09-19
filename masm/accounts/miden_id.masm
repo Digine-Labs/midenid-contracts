@@ -54,6 +54,35 @@ export.register_name
 end
 
 # Input: [NAME]
+# Output: [id_prefix, id_suffix]
+export.get_id_by_name
+    exec._get_id_by_name
+end
+
+# Input: [id_prefix, id_suffix]
+# Output: [NAME]
+export.get_name_by_id
+    exec._get_name_by_id
+end
+
+# Input: [NAME]
+# Output: [1 or 0]
+export.is_taken
+    push.9
+    # [9, NAME]
+    exec.get_map_item
+    # [ID_WORD]
+    push.0.0.0.0
+    # [0, 0, 0, 0, ID_WORD]
+    eqw
+    # [ID_WORD == 0, 0, 0, 0, 0, ID_WORD]
+    swap.5
+    # [ID_WORD, 0, 0, 0, 0, ID_WORD == 0]
+    dropw dropw
+    # [ID_WORD == 0]
+end
+
+# Input: [NAME]
 # Output: []
 proc._register_name
     exec.get_sender
