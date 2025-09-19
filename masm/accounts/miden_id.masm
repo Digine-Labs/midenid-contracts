@@ -19,9 +19,9 @@ const.ID_ALREADY_ASSIGNED="ID already assigned to a name"
 # 0: initialized flag
 # [1:2]: owner_prefix, owner_suffix
 # [3]: PRICE -> TODO: it can fit into felt 
-# [7:8]: payment_token_prefix, payment_token_suffix -> Actually its faucet id
 # [9]: NAME -> id map
 # [10]: id -> NAME map
+# [11]: payment_token_prefix, payment_token_suffix -> Actually its faucet id
 
 # Input: [PRICE, payment_token_prefix, payment_token_suffix]
 # Output: []
@@ -211,18 +211,10 @@ end
 # Input: [token_prefix, token_suffix]
 # Output: []
 proc._set_payment_token
-    push.0.0.0
-    # [0, 0, 0, token_prefix, token_suffix]
-    push.7
-    # [7, 0, 0, token_prefix, token_suffix]
-    exec.set_item
-    # [OLD_VALUE, token_suffix]
-    dropw
-    # [token_suffix]
-    push.0.0.0
-    # [0, 0, 0, token_suffix]
-    push.8
-    # [8, 0, 0, 0, token_suffix]
+    push.0.0
+    # [0, 0, token_prefix, token_suffix]
+    push.11
+    # [11, 0, 0, token_prefix, token_suffix]
     exec.set_item
     # [OLD_VALUE]
     dropw
@@ -249,8 +241,8 @@ end
 # Input: []
 # Output: [balance]
 proc._get_balance
-    push.7
-    # [7]
+    push.11
+    # [11]
     exec.get_item
     # [WORD]
     drop drop 
