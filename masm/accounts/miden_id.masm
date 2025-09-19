@@ -1,0 +1,189 @@
+use.miden::account
+use.miden::note
+use.std::sys
+
+const.ALREADY_INITIALIZED="Already Initialized"
+const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
+const.OWNER_PREFIX_MISMATCH="Owner prefix mismatch"
+const.TOKEN_PREFIX_ZERO="Token prefix zero"
+const.TOKEN_SUFFIX_ZERO="Token suffix zero"
+const.ZERO_ASSET_RECEIVED="Paid zero tokens"
+const.SUB_OVERFLOW="Sub overflow"
+const.WRONG_AMOUNT_PAID="Paid amount less than"
+
+# Storage
+# If storage type is word, it holds 4 felts
+# Uppercase means word, lowercase means felt
+# 0: initialized flag
+# [1:2]: owner_prefix, owner_suffix
+# [3]: PRICE
+# [7:8]: payment_token_prefix, payment_token_suffix -> Actually its faucet id
+
+# Input: [PRICE, payment_token_prefix, payment_token_suffix]
+# Output: []
+export.init
+    exec._assert_initialized
+    # [PRICE, payment_token_prefix, payment_token_suffix]
+    exec._set_initialized
+    # [PRICE, payment_token_prefix, payment_token_suffix]
+    exec.get_sender
+    # [caller_prefix, caller_suffix, PRICE, payment_token_prefix, payment_token_suffix]
+    exec._update_owner
+    # [PRICE, payment_token_prefix, payment_token_suffix]
+    exec._set_price
+    # [payment_token_prefix, payment_token_suffix]
+    exec._assert_payment_token_not_zero
+    # [payment_token_prefix, payment_token_suffix]
+    exec._set_payment_token
+    # []
+end
+
+# Input: []
+# Output: []
+proc._assert_initialized
+    push.0
+    # [0]
+    exec.get_item
+    # [INITIALIZED_FLAG]
+    drop drop drop
+    # [initialized_flag]
+    assertz.err=ALREADY_INITIALIZED
+    # []
+end
+
+# Input: []
+# Output: []
+proc._set_initialized
+    push.1.0
+    # [0, 1]
+    exec.set_item
+    # [OLD_WORD]
+    dropw
+end
+
+# Input: []
+# Output: []
+proc._assert_only_owner
+    exec.get_sender
+    # [sender_prefix, sender_suffix]
+    push.1
+    # [1, sender_prefix, sender_suffix]
+    exec.get_item
+    # [OWNER_WORD, sender_prefix, sender_suffix]
+    drop drop
+    # [owner_prefix, owner_suffix, sender_prefix, sender_suffix]
+    swap.4
+    # [sender_suffix, owner_suffix, sender_prefix, owner_prefix]
+    assert_eq.err=OWNER_SUFFIX_MISMATCH
+    assert_eq.err=OWNER_PREFIX_MISMATCH
+    # []
+end
+
+# Input: [owner_prefix, owner_suffix]
+# Output: []
+proc._update_owner
+    push.0.0.0
+    # [0, 0, 0, owner_prefix, owner_suffix]
+    push.1
+    # [1, 0, 0, 0, owner_prefix, owner_suffix]
+    exec.set_item
+    # [OLD_ITEM, owner_suffix]
+    dropw
+    # [owner_suffix]
+    push.0.0.0
+    # [0, 0, 0, owner_suffix]
+    push.2
+    # [2, 0, 0, 0, owner_suffix]
+    exec.set_item
+    # [OLD_ITEM]
+    dropw
+end
+
+# Input: [PRICE]
+# Output: []
+proc._set_price
+    push.3
+    # [3, PRICE]
+    exec.set_item
+    # [OLD_PRICE]
+    dropw
+end
+
+# Input: []
+# Output: [price] NOT word
+proc._get_price
+    push.3
+    # [3]
+    exec.get_item
+    # [PRICE]
+    drop drop drop
+    # [price]
+end
+
+# Input: [token_prefix, token_suffix]
+# Output: []
+proc._set_payment_token
+    push.0.0.0
+    # [0, 0, 0, token_prefix, token_suffix]
+    push.7
+    # [7, 0, 0, token_prefix, token_suffix]
+    exec.set_item
+    # [OLD_VALUE, token_suffix]
+    dropw
+    # [token_suffix]
+    push.0.0.0
+    # [0, 0, 0, token_suffix]
+    push.8
+    # [8, 0, 0, 0, token_suffix]
+    exec.set_item
+    # [OLD_VALUE]
+    dropw
+end
+
+# Input: [token_prefix, token_suffix]
+# Output: [token_prefix, token_suffix]
+proc._assert_payment_token_not_zero
+    dup
+    # [token_prefix, token_prefix, token_suffix]
+    dup.2
+    # [token_suffix, token_prefix, token_prefix, token_suffix]
+    gt.0
+    # [token_suffix > 0, token_prefix, token_prefix, token_suffix]
+    assert.err=TOKEN_SUFFIX_ZERO
+    # [token_prefix, token_prefix, token_suffix]
+    gt.0
+    # [token_prefix > 0, token_prefix, token_suffix]
+    assert.err=TOKEN_PREFIX_ZERO
+    # [token_prefix, token_suffix]
+end
+
+
+# Input: []
+# Output: [balance]
+proc._get_balance
+    exec.get_balance
+    # [balance]
+end
+
+# Input: []
+# Output: []
+proc._validate_payment
+    exec._get_balance
+    # [initial_balance]
+    exec.add_assets_to_account
+    # [initial_balance]
+    exec._get_balance
+    # [after_balance, initial_balance]
+    swap
+    # [initial_balance, after_balance]
+    u32overflowing_sub # (after_balance - initial_balance)
+    # [1, result]
+    assert.err=SUB_OVERFLOW
+    # [result]
+    exec._get_price
+    # [price, result]
+    lte
+    # [price =< result]
+    assert.err=WRONG_AMOUNT_PAID
+    # []
+end
