@@ -249,6 +249,12 @@ end
 # Input: []
 # Output: [balance]
 proc._get_balance
+    push.7
+    # [7]
+    exec.get_item
+    # [WORD]
+    drop drop 
+    # [token_prefix, token_suffix]
     exec.get_balance
     # [balance]
 end
