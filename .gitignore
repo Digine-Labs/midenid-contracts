@@ -2,3 +2,4 @@
 /.logs
 /target
 store.sqlite3
+/webclient/node_modules
