@@ -1,34 +1,32 @@
 use miden_client::{
-    Client, ClientError, Felt, Word,
-    account::{
-        component::{BasicWallet},
-        AccountBuilder, AccountIdAddress, AccountStorageMode, AccountType, Address,
-        AddressInterface, Account, StorageSlot, AccountId
-    },
+    Client as MidenClient, ClientError, DebugMode, Felt, ScriptBuilder, Word,
+    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageSlot},
     auth::AuthSecretKey,
     builder::ClientBuilder,
     crypto::SecretKey,
     keystore::FilesystemKeyStore,
     note::{
         Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata,
-        NoteRecipient, NoteScript, NoteTag, NoteType, NoteRelevance
+        NoteRecipient, NoteRelevance, NoteScript, NoteTag, NoteType,
     },
     rpc::{Endpoint, TonicRpcClient},
-    transaction::{OutputNote, TransactionRequestBuilder}, ScriptBuilder,
-    store::InputNoteRecord,
+    store::{InputNoteRecord, NoteFilter},
+    transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
 };
-use miden_lib::account::auth::AuthRpoFalcon512;
-use rand::{prelude::StdRng, RngCore};
-use std::{fs, path::Path, sync::Arc};
-use tokio::time::{sleep, Duration};
+use miden_lib::account::{
+    auth::{self, AuthRpoFalcon512},
+    wallets::BasicWallet,
+};
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
-    account::{AccountComponent, NetworkId},
-    assembly::{Assembler, DefaultSourceManager, LibraryPath, Module, ModuleKind, Library},
+    account::AccountComponent,
+    assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind},
 };
+use rand::{RngCore, rngs::StdRng};
 use serde::de::value::Error;
+use std::{fs, path::Path, sync::Arc};
 
-use miden_crypto::rand::FeltRng;
+type Client = MidenClient<FilesystemKeyStore<rand::prelude::StdRng>>;
 
 // Clears keystore & default sqlite file
 pub async fn delete_keystore_and_store() {
@@ -60,19 +58,16 @@ pub async fn delete_keystore_and_store() {
 }
 
 // Helper to instantiate Client
-pub async fn instantiate_client() -> Result<Client<FilesystemKeyStore<StdRng>>, ClientError> {
-    let endpoint = Endpoint::testnet();
+pub async fn instantiate_client(endpoint: Endpoint) -> Result<Client, ClientError> {
     let timeout_ms = 10_000;
     let rpc_api = Arc::new(TonicRpcClient::new(&endpoint, timeout_ms));
 
-    let keystore = FilesystemKeyStore::new("./keystore".into()).unwrap().into();
-    let client: Client<FilesystemKeyStore<StdRng>> = ClientBuilder::new()
-        .rpc(rpc_api)
-        .authenticator(keystore)
-        .in_debug_mode(true.into())
+    let client = ClientBuilder::new()
+        .rpc(rpc_api.clone())
+        .filesystem_keystore("./keystore")
+        .in_debug_mode(DebugMode::Enabled)
         .build()
         .await?;
-
 
     Ok(client)
 }
@@ -93,18 +88,18 @@ pub fn create_library(
     Ok(library)
 }
 
-
 // Creates public note
 pub async fn create_public_note(
-    client: &mut Client<FilesystemKeyStore<StdRng>>,
-    ext_lib: &Library,
+    client: &mut Client,
     note_code: String,
     creator_account: Account,
     assets: NoteAssets,
 ) -> Result<Note, Error> {
+    let assembler = TransactionKernel::assembler().with_debug_mode(true);
     let rng = client.rng();
     let serial_num = rng.inner_mut().draw_word();
-    let note_script = ScriptBuilder::new(true).with_dynamically_linked_library(ext_lib).unwrap().compile_note_script(note_code).unwrap(); //NoteScript::compile(note_code, assembler.clone()).unwrap();
+    let program = assembler.clone().assemble_program(note_code).unwrap();
+    let note_script = NoteScript::new(program);
     let note_inputs = NoteInputs::new([].to_vec()).unwrap();
     let recipient = NoteRecipient::new(serial_num, note_script, note_inputs.clone());
     let tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap();
@@ -136,23 +131,25 @@ pub async fn create_public_note(
 
 // Creates basic account
 pub async fn create_basic_account(
-    client: &mut Client<FilesystemKeyStore<rand::prelude::StdRng>>,
+    client: &mut Client,
     keystore: FilesystemKeyStore<StdRng>,
-) -> Result<miden_client::account::Account, ClientError> {
-    let mut init_seed = [0u8; 32];
+) -> Result<(miden_client::account::Account, SecretKey), ClientError> {
+    let mut init_seed = [0_u8; 32];
     client.rng().fill_bytes(&mut init_seed);
+
     let key_pair = SecretKey::with_rng(client.rng());
     let builder = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountUpdatableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key()))
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
         .with_component(BasicWallet);
     let (account, seed) = builder.build().unwrap();
     client.add_account(&account, Some(seed), false).await?;
     keystore
-        .add_key(&AuthSecretKey::RpoFalcon512(key_pair))
+        .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
         .unwrap();
-    Ok(account)
+
+    Ok((account, key_pair))
 }
 
 pub async fn create_no_auth_component() -> Result<AccountComponent, Error> {
@@ -167,7 +164,7 @@ pub async fn create_no_auth_component() -> Result<AccountComponent, Error> {
 
 // Contract builder helper function
 pub async fn create_public_immutable_contract(
-    client: &mut Client<FilesystemKeyStore<StdRng>>,
+    client: &mut Client,
     account_code: &String,
 ) -> Result<(Account, Word), ClientError> {
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
@@ -175,20 +172,22 @@ pub async fn create_public_immutable_contract(
     let counter_component = AccountComponent::compile(
         account_code.clone(),
         assembler.clone(),
-        vec![StorageSlot::Value(
-        [Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0)].into(),
-    )],
+        vec![StorageSlot::Value(Word::new([
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(0),
+        ]))],
     )
     .unwrap()
     .with_supports_all_types();
 
     let mut init_seed = [0_u8; 32];
     client.rng().fill_bytes(&mut init_seed);
-    let no_auth_component = create_no_auth_component().await.unwrap();
     let (counter_contract, counter_seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(no_auth_component)
+        .with_auth_component(auth::NoAuth)
         .with_component(counter_component.clone())
         .build()
         .unwrap();
@@ -196,20 +195,45 @@ pub async fn create_public_immutable_contract(
     Ok((counter_contract, counter_seed))
 }
 
+pub fn create_tx_script(
+    script_code: String,
+    library: Option<Library>,
+) -> Result<TransactionScript, Error> {
+    if let Some(lib) = library {
+        return Ok(ScriptBuilder::new(true)
+            .with_dynamically_linked_library(&lib)
+            .unwrap()
+            .compile_tx_script(script_code)
+            .unwrap());
+    };
+
+    Ok(ScriptBuilder::new(true)
+        .compile_tx_script(script_code)
+        .unwrap())
+}
+
 // Waits for note
-// TODO: Burda hata var tx broadcast oluyor explorerda var ama wait bitmiyor
 pub async fn wait_for_note(
-    client: &mut Client<FilesystemKeyStore<rand::prelude::StdRng>>,
-    account_id: &Account,
+    client: &mut Client,
+    account_id: Option<Account>,
     expected: &Note,
 ) -> Result<(), ClientError> {
+    use tokio::time::{Duration, sleep};
+
     loop {
         client.sync_state().await?;
 
-        let notes: Vec<(InputNoteRecord, Vec<(AccountId, NoteRelevance)>)> =
-            client.get_consumable_notes(Some(account_id.id())).await?;
+        // Notes that can be consumed right now
+        let consumable: Vec<(InputNoteRecord, Vec<(AccountId, NoteRelevance)>)> = client
+            .get_consumable_notes(account_id.as_ref().map(|acc| acc.id()))
+            .await?;
 
-        let found = notes.iter().any(|(rec, _)| rec.id() == expected.id());
+        // Notes submitted that are now committed
+        let committed: Vec<InputNoteRecord> = client.get_input_notes(NoteFilter::Committed).await?;
+
+        // Check both vectors
+        let found = consumable.iter().any(|(rec, _)| rec.id() == expected.id())
+            || committed.iter().any(|rec| rec.id() == expected.id());
 
         if found {
             println!("✅ note found {}", expected.id().to_hex());
@@ -217,7 +241,8 @@ pub async fn wait_for_note(
         }
 
         println!("Note {} not found. Waiting...", expected.id().to_hex());
-        sleep(Duration::from_secs(3)).await;
+        sleep(Duration::from_secs(2)).await;
     }
+
     Ok(())
 }

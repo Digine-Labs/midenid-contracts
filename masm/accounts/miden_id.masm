@@ -13,6 +13,8 @@ const.WRONG_AMOUNT_PAID="Paid amount less than"
 const.NAME_ALREADY_REGISTERED="Name already registry"
 const.ID_ALREADY_ASSIGNED="ID already assigned to a name"
 
+# TODO: Stack yonetimleri yanlis. Wordlerde problem var. mumkun oldugunce word tutmamaya calis.
+
 # Storage
 # If storage type is word, it holds 4 felts
 # Uppercase means word, lowercase means felt
@@ -30,7 +32,7 @@ export.init
     # [PRICE, payment_token_prefix, payment_token_suffix]
     exec._set_initialized
     # [PRICE, payment_token_prefix, payment_token_suffix]
-    exec.get_sender
+    exec.note::get_sender
     # [caller_prefix, caller_suffix, PRICE, payment_token_prefix, payment_token_suffix]
     exec._update_owner
     # [PRICE, payment_token_prefix, payment_token_suffix]
@@ -47,7 +49,7 @@ end
 export.register_name
     exec._validate_payment
     # [NAME]
-    exec.get_sender
+    exec.note::get_sender
     # [caller_prefix, caller_suffix, NAME]
     exec._register_name
     # []
@@ -70,7 +72,7 @@ end
 export.is_taken
     push.9
     # [9, NAME]
-    exec.get_map_item
+    exec.account::get_map_item
     # [ID_WORD]
     push.0.0.0.0
     # [0, 0, 0, 0, ID_WORD]
@@ -85,7 +87,7 @@ end
 # Input: [NAME]
 # Output: []
 proc._register_name
-    exec.get_sender
+    exec.note::get_sender
     # [caller_prefix, caller_suffix, NAME]
     dupw.2
     # [NAME, caller_prefix, caller_suffix, NAME]
@@ -108,7 +110,7 @@ end
 proc._assert_name_not_registered
     push.9
     # [9, NAME]
-    exec.get_map_item
+    exec.account::get_map_item
     # [ID]
     push.0.0.0.0
     # [0, 0, 0, 0, ID]
@@ -124,7 +126,7 @@ end
 proc._assert_id_not_registered
     push.10
     # [10, id_prefix, id_suffix]
-    exec.get_map_item
+    exec.account::get_map_item
     # [NAME]
     push.0.0.0.0
     # [0, 0, 0, 0, NAME]
@@ -141,14 +143,14 @@ proc._get_name_by_id
     # [0, 0, id_prefix, id_suffix]
     push.10
     # [10, 0, 0, id_prefix, id_suffix]
-    exec.get_map_item
+    exec.account::get_map_item
     # [NAME]
 end
 
 # Input: [id_prefix, id_suffix, NAME]
 # Output: [id_prefix, id_suffix, NAME]
 proc._set_name_by_id
-    dupw.2
+    dupw.1
     # [NAME, id_prefix, id_suffix, NAME]
     dup.2 dup.2
     # [id_prefix, id_suffix, NAME, id_prefix, id_suffix, NAME]
@@ -156,7 +158,7 @@ proc._set_name_by_id
     # [0, 0, id_prefix, id_suffix, NAME, id_prefix, id_suffix, NAME]
     push.10
     # [10, 0, 0, id_prefix, id_suffix, NAME, id_prefix, id_suffix, NAME]
-    exec.set_map_item
+    exec.account::set_map_item
     # [OLD_MAP_ROOT, OLD_MAP_VALUE, id_prefix, id_suffix, NAME]
     dropw dropw
     # [id_prefix, id_suffix, NAME]
@@ -167,11 +169,11 @@ end
 proc._set_id_by_name
     push.0.0
     # [0, 0, id_prefix, id_suffix, NAME]
-    dupw.4
+    dupw.1
     # [NAME, 0, 0, id_prefix, id_suffix, NAME]
     push.9
     # [9, NAME, 0, 0, id_prefix, id_suffix, NAME]
-    exec.set_map_item
+    exec.account::set_map_item
     # [OLD_MAP_ROOT, OLD_MAP_VALUE, NAME]
     dropw dropw dropw
 end
@@ -181,7 +183,7 @@ end
 proc._get_id_by_name
     push.9
     # [9, NAME]
-    exec.get_map_item
+    exec.account::get_map_item
     # [0, 0, id_prefix, id_suffix]
     drop drop
     # [id_prefix, id_suffix]
@@ -192,7 +194,7 @@ end
 proc._set_price
     push.3
     # [3, PRICE]
-    exec.set_item
+    exec.account::set_item
     # [OLD_PRICE]
     dropw
 end
@@ -202,7 +204,7 @@ end
 proc._get_price
     push.3
     # [3]
-    exec.get_item
+    exec.account::get_item
     # [PRICE]
     drop drop drop
     # [price]
@@ -215,7 +217,7 @@ proc._set_payment_token
     # [0, 0, token_prefix, token_suffix]
     push.11
     # [11, 0, 0, token_prefix, token_suffix]
-    exec.set_item
+    exec.account::set_item
     # [OLD_VALUE]
     dropw
 end
@@ -243,11 +245,11 @@ end
 proc._get_balance
     push.11
     # [11]
-    exec.get_item
+    exec.account::get_item
     # [WORD]
     drop drop 
     # [token_prefix, token_suffix]
-    exec.get_balance
+    exec.account::get_balance
     # [balance]
 end
 
@@ -256,7 +258,7 @@ end
 proc._validate_payment
     exec._get_balance
     # [initial_balance]
-    exec.add_assets_to_account
+    exec.note::add_assets_to_account
     # [initial_balance]
     exec._get_balance
     # [after_balance, initial_balance]
@@ -279,7 +281,7 @@ end
 proc._assert_initialized
     push.0
     # [0]
-    exec.get_item
+    exec.account::get_item
     # [INITIALIZED_FLAG]
     drop drop drop
     # [initialized_flag]
@@ -292,7 +294,7 @@ end
 proc._set_initialized
     push.1.0
     # [0, 1]
-    exec.set_item
+    exec.account::set_item
     # [OLD_WORD]
     dropw
 end
@@ -300,11 +302,11 @@ end
 # Input: []
 # Output: []
 proc._assert_only_owner
-    exec.get_sender
+    exec.note::get_sender
     # [sender_prefix, sender_suffix]
     push.1
     # [1, sender_prefix, sender_suffix]
-    exec.get_item
+    exec.account::get_item
     # [OWNER_WORD, sender_prefix, sender_suffix]
     drop drop
     # [owner_prefix, owner_suffix, sender_prefix, sender_suffix]
@@ -322,7 +324,7 @@ proc._update_owner
     # [0, 0, 0, owner_prefix, owner_suffix]
     push.1
     # [1, 0, 0, 0, owner_prefix, owner_suffix]
-    exec.set_item
+    exec.account::set_item
     # [OLD_ITEM, owner_suffix]
     dropw
     # [owner_suffix]
@@ -330,7 +332,7 @@ proc._update_owner
     # [0, 0, 0, owner_suffix]
     push.2
     # [2, 0, 0, 0, owner_suffix]
-    exec.set_item
+    exec.account::set_item
     # [OLD_ITEM]
     dropw
 end
