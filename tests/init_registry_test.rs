@@ -1,5 +1,5 @@
 use midenid_contracts::common::{
-    create_basic_account, create_library, create_public_immutable_contract, create_public_note,
+    create_basic_account, create_library, create_public_immutable_contract, create_public_note_with_library,
     create_tx_script, delete_keystore_and_store, instantiate_client, wait_for_note,
 };
 
@@ -80,11 +80,11 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
 
     let note_assets = NoteAssets::new(vec![]).unwrap();
 
-    let increment_note = create_public_note(&mut client, note_code, alice_account, note_assets)
+    let increment_note = create_public_note_with_library(&mut client, note_code, alice_account, note_assets, library)
         .await
         .unwrap();
 
-    println!("increment note created, waiting for onchain commitment");
+    println!("Init note created, waiting for onchain commitment");
 
     // -------------------------------------------------------------------------
     // STEP 4: Consume the Note

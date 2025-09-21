@@ -80,3 +80,6 @@ cargo clippy
 - The project follows Miden's account-based architecture
 - Storage is managed through numbered slots with specific purposes
 - Notes enable asynchronous communication between accounts
+
+## Miden Documentation
+- https://0xmiden.github.io/miden-docs/index.html
