@@ -124,13 +124,7 @@ pub async fn create_public_note_with_library(
         .await
         .unwrap();
 
-    let submission_result = client.submit_transaction(tx_result).await;
-    if let Err(e) = submission_result {
-        eprintln!("Failed to submit note creation transaction: {}", e);
-        return Err(serde::de::value::Error::custom(format!("Transaction submission failed: {}", e)));
-    }
-    println!("Note creation transaction submitted successfully");
-    
+    let _ = client.submit_transaction(tx_result).await;
     client.sync_state().await.unwrap();
 
     Ok(note)
@@ -171,13 +165,7 @@ pub async fn create_public_note(
         .await
         .unwrap();
 
-    let submission_result = client.submit_transaction(tx_result).await;
-    if let Err(e) = submission_result {
-        eprintln!("Failed to submit note creation transaction: {}", e);
-        return Err(serde::de::value::Error::custom(format!("Transaction submission failed: {}", e)));
-    }
-    println!("Note creation transaction submitted successfully");
-    
+    let _ = client.submit_transaction(tx_result).await;
     client.sync_state().await.unwrap();
 
     Ok(note)

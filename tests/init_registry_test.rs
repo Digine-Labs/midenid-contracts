@@ -19,7 +19,7 @@ use tokio::time::{Duration, sleep};
 async fn init_registry_with_note() -> Result<(), ClientError> {
     delete_keystore_and_store().await;
 
-    let endpoint = Endpoint::localhost();
+    let endpoint = Endpoint::testnet();
     let mut client = instantiate_client(endpoint.clone()).await.unwrap();
 
     let keystore = FilesystemKeyStore::new("./keystore".into()).unwrap();
@@ -80,16 +80,20 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
 
     let note_assets = NoteAssets::new(vec![]).unwrap();
 
-    let increment_note = create_public_note_with_library(&mut client, note_code, alice_account, note_assets, library)
+    let increment_note = create_public_note_with_library(&mut client, note_code, alice_account.clone(), note_assets, library)
         .await
         .unwrap();
 
     println!("Init note created, waiting for onchain commitment");
+    
+    // Give time for transaction to be processed before looking for the note
+    // This prevents the wait_for_note function from getting stuck
+    sleep(Duration::from_secs(3)).await;
 
     // -------------------------------------------------------------------------
     // STEP 4: Consume the Note
     // -------------------------------------------------------------------------
-    wait_for_note(&mut client, None, &increment_note)
+    wait_for_note(&mut client, Some(alice_account.clone()), &increment_note)
         .await
         .unwrap();
 
@@ -106,7 +110,13 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
         .new_transaction(counter_contract.id(), consume_custom_req)
         .await
         .unwrap();
-    let _ = client.submit_transaction(tx_result).await;
+    
+    let submission_result = client.submit_transaction(tx_result).await;
+    if let Err(e) = submission_result {
+        eprintln!("Failed to submit consumption transaction: {}", e);
+        panic!("Transaction submission failed: {}", e);
+    }
+    println!("Note consumption transaction submitted successfully");
 
     // -------------------------------------------------------------------------
     // STEP 5: Validate Updated State
