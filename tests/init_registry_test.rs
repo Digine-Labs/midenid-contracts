@@ -93,9 +93,6 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     // STEP 4: Consume the Note
     // -------------------------------------------------------------------------
-    wait_for_note(&mut client, Some(alice_account.clone()), &increment_note)
-        .await
-        .unwrap();
 
     let script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm")).unwrap();
     let tx_script = create_tx_script(script_code, None).unwrap();
