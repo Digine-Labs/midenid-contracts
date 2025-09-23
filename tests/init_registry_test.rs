@@ -141,10 +141,12 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
         let count: Word = account.account().storage().get_item(0).unwrap().into();
         let val = count.get(3).unwrap().as_int();
         assert_eq!(val, 1);
-        println!("{}", alice_account.id().to_hex());
         let owner: Word = account.account().storage().get_item(1).unwrap().into();
-        //let (owner_prefix, owner_suffix) = (owner.get(2),owner.get(3));
-        //assert_eq!(owner_prefix, alice_account.)
+        let (owner_prefix, owner_suffix) = (owner.get(2), owner.get(3));
+        println!("{},{}", owner_prefix.unwrap().as_int(), owner_suffix.unwrap().as_int());
+        assert_eq!(owner_prefix.unwrap().as_int(), alice_account.id().prefix().as_felt().as_int());
+        assert_eq!(owner_suffix.unwrap().as_int(), alice_account.id().suffix().as_int());
+        
     }
 
     Ok(())

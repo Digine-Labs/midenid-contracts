@@ -204,6 +204,12 @@ pub async fn create_no_auth_component() -> Result<AccountComponent, Error> {
     Ok(no_auth_component)
 }
 
+fn empty_storage_value() -> StorageSlot {
+    StorageSlot::Value(Word::new([
+       Felt::new(0),Felt::new(0),Felt::new(0),Felt::new(0) 
+    ]))
+}
+
 // Contract builder helper function
 pub async fn create_public_immutable_contract(
     client: &mut Client,
@@ -214,17 +220,7 @@ pub async fn create_public_immutable_contract(
     let counter_component = AccountComponent::compile(
         account_code.clone(),
         assembler.clone(),
-        vec![StorageSlot::Value(Word::new([
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(0),
-        ])), StorageSlot::Value(Word::new([
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(0),
-        ]))],
+        vec![empty_storage_value(), empty_storage_value()],
     )
     .unwrap()
     .with_supports_all_types();

@@ -1,6 +1,6 @@
 use.miden::account
 use.miden::note
-#use.std::sys
+use.std::sys
 
 const.ALREADY_INITIALIZED="Already Initialized"
 const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
