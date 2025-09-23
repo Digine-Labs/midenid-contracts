@@ -97,8 +97,14 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
     let script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm")).unwrap();
     let tx_script = create_tx_script(script_code, None).unwrap();
 
+    //let consume_custom_req = TransactionRequestBuilder::new()
+    //    .authenticated_input_notes([(increment_note.id(), None)])
+    //    .custom_script(tx_script)
+    //    .build()
+    //    .unwrap();
+
     let consume_custom_req = TransactionRequestBuilder::new()
-        .authenticated_input_notes([(increment_note.id(), None)])
+        .unauthenticated_input_notes([(increment_note, None)])
         .custom_script(tx_script)
         .build()
         .unwrap();
@@ -135,6 +141,10 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
         let count: Word = account.account().storage().get_item(0).unwrap().into();
         let val = count.get(3).unwrap().as_int();
         assert_eq!(val, 1);
+        println!("{}", alice_account.id().to_hex());
+        let owner: Word = account.account().storage().get_item(1).unwrap().into();
+        //let (owner_prefix, owner_suffix) = (owner.get(2),owner.get(3));
+        //assert_eq!(owner_prefix, alice_account.)
     }
 
     Ok(())

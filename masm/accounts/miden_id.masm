@@ -1,14 +1,19 @@
 use.miden::account
 use.miden::note
-use.std::sys
+#use.std::sys
 
 const.ALREADY_INITIALIZED="Already Initialized"
-
+const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
+const.OWNER_PREFIX_MISMATCH="Owner prefix mismatch"
 # Storage
+# 0: Initialized flag
+# 1: Owner
 
 export.init
     exec._assert_initialized
     exec._set_initialized
+    exec.note::get_sender
+    exec._update_owner
 end
 
 # Input: []
@@ -34,4 +39,35 @@ proc._set_initialized
     exec.account::set_item
     # [OLD_WORD]
     dropw
+end
+
+# Input: [owner_prefix, owner_suffix]
+# Output: []
+proc._update_owner
+    push.0.0
+    # [0, 0, owner_prefix, owner_suffix]
+    push.1
+    # [1, 0, 0, owner_prefix, owner_suffix]
+    debug.stack
+    exec.account::set_item
+    # [OLD_VALUE]
+    dropw
+end
+
+# Input: []
+# Output: []
+proc._assert_only_owner
+    exec.note::get_sender
+    # [sender_prefix, sender_suffix]
+    push.1
+    # [1, sender_prefix, sender_suffix]
+    exec.account::get_item
+    # [OWNER_WORD, sender_prefix, sender_suffix]
+    drop drop
+    # [owner_prefix, owner_suffix, sender_prefix, sender_suffix]
+    swap.4
+    # [sender_suffix, owner_suffix, sender_prefix, owner_prefix]
+    assert_eq.err=OWNER_SUFFIX_MISMATCH
+    assert_eq.err=OWNER_PREFIX_MISMATCH
+    # []
 end

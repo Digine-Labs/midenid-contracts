@@ -219,6 +219,11 @@ pub async fn create_public_immutable_contract(
             Felt::new(0),
             Felt::new(0),
             Felt::new(0),
+        ])), StorageSlot::Value(Word::new([
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(0),
         ]))],
     )
     .unwrap()
