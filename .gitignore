@@ -1,4 +1,4 @@
-/node-data
+node-data/
 /.logs
 /target
 store.sqlite3

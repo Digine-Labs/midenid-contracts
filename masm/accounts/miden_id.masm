@@ -13,6 +13,8 @@ export.init
     exec._assert_initialized
     exec._set_initialized
     exec.note::get_sender
+    # [sender_prefix, sender_suffix]
+    debug.stack
     exec._update_owner
 end
 

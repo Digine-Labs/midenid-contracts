@@ -1,6 +1,6 @@
 use midenid_contracts::common::{
     create_basic_account, create_library, create_public_immutable_contract, create_public_note_with_library,
-    create_tx_script, delete_keystore_and_store, instantiate_client, wait_for_note,
+    create_tx_script, delete_keystore_and_store, instantiate_client,
 };
 
 use miden_client::{
@@ -142,8 +142,8 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
         let val = count.get(3).unwrap().as_int();
         assert_eq!(val, 1);
         let owner: Word = account.account().storage().get_item(1).unwrap().into();
-        let (owner_prefix, owner_suffix) = (owner.get(2), owner.get(3));
-        println!("{},{},{},{}",owner.get(0).unwrap().as_int(),owner.get(1).unwrap().as_int(), owner_prefix.unwrap().as_int(), owner_suffix.unwrap().as_int());
+        let (owner_suffix, owner_prefix) = (owner.get(0), owner.get(1));
+        println!("{},{},{},{}",owner.get(0).unwrap().as_int(),owner.get(1).unwrap().as_int(), owner.get(2).unwrap().as_int(), owner.get(3).unwrap().as_int());
         assert_eq!(owner_prefix.unwrap().as_int(), alice_account.id().prefix().as_felt().as_int());
         assert_eq!(owner_suffix.unwrap().as_int(), alice_account.id().suffix().as_int());
         
@@ -151,3 +151,4 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
 
     Ok(())
 }
+
