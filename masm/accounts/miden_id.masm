@@ -6,6 +6,7 @@ const.ALREADY_INITIALIZED="Already Initialized"
 const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
 const.OWNER_PREFIX_MISMATCH="Owner prefix mismatch"
 const.NAME_ALREADY_REGISTERED="Name already registered"
+const.ACCOUNT_ALREADY_HAS_NAME="Account already has name"
 
 # Storage
 # 0: Initialized flag
@@ -29,6 +30,24 @@ export.init
 end
 
 # Input: [NAME]
+# Output: []
+export.register_name
+    dupw
+    # [NAME, NAME]
+    exec._assert_name_not_registered
+    # [NAME]
+    exec.note::get_sender
+    # [prefix, suffix, NAME]
+    exec._assert_not_have_name
+    # [NAME]
+    exec.note::get_sender
+    # [prefix, suffix, NAME]
+    exec._update_registry
+    # []
+end
+
+
+# Input: [NAME]
 # Output: [1 or 0, VALUE, ZERO_WORD]
 export.is_name_registered
     push.3
@@ -39,6 +58,57 @@ export.is_name_registered
     # [VALUE, ZERO_WORD]
     eqw
     # [0 or 1, VALUE, ZERO_WORD]
+end
+
+# Input: [addr_prefix, addr_suffix]
+# Output: [NAME]
+export.get_name
+    exec._get_name_by_addr
+end
+
+# Input: [addr_prefix, addr_suffix]
+# Output: [1 or 0, ZERO_WORD, NAME]
+export.has_name
+    exec._get_name_by_addr
+    # [NAME]
+    padw
+    # [ZERO_WORD, NAME]
+    eqw
+end
+
+# Input: [prefix, suffix, NAME]
+# Output: []
+proc._update_registry
+    push.0.0
+    # [ADDR, NAME]
+    dupw.1
+    # [NAME, ADDR, NAME]
+    dupw.1
+    # [ADDR, NAME, ADDR, NAME]
+    push.4
+    # [4, ADDR, NAME, ADDR, NAME]
+    exec.account::set_map_item
+    # [OLD_ROOT, OLD_VAL, ADDR, NAME]
+    dropw dropw
+    # [ADDR, NAME]
+    swapw
+    # [NAME, ADDR]
+    push.3
+    # [3, NAME, ADDR]
+    exec.account::set_map_item
+    # [OLD_ROOT, OLD_VAL]
+    dropw dropw
+end
+
+# Input: [addr_prefix, addr_suffix]
+# Output: [NAME]
+proc._get_name_by_addr
+    push.0.0
+    # [0, 0, addr_prefix, addr_suffix]
+    push.4
+    # [4, 0, 0, addr_prefix, addr_suffix]
+    exec.account::get_map_item
+    # [VALUE]
 end
 
 # Input: [NAME]
@@ -56,6 +126,19 @@ proc._assert_name_not_registered
     # [VALUE, ZERO_WORD]
     dropw dropw
     # []
+end
+
+# Input: [prefix, suffix]
+# Output: []
+proc._assert_not_have_name
+    push.0.0
+    push.4
+    exec.account::get_map_item
+    # [VALUE]
+    padw
+    eqw
+    assertz.err=ACCOUNT_ALREADY_HAS_NAME
+    dropw dropw
 end
 
 
