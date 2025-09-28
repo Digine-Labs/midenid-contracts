@@ -5,16 +5,59 @@ use.std::sys
 const.ALREADY_INITIALIZED="Already Initialized"
 const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
 const.OWNER_PREFIX_MISMATCH="Owner prefix mismatch"
+const.NAME_ALREADY_REGISTERED="Name already registered"
+
 # Storage
 # 0: Initialized flag
 # 1: Owner
+# 2: Payment Token
+# 3: Name -> ID map
+# 4: ID -> Name map
 
+# Input: [token_prefix, token_suffix]
+# Output: []
 export.init
     exec._assert_initialized
+    # [token_prefix, token_suffix]
     exec._set_initialized
+    # [token_prefix, token_suffix]
     exec.note::get_sender
+    # [owner_prefix, owner_suffix, token_prefix, token_suffix]
     exec._update_owner
+    # [token_prefix, token_suffix]
+    exec._set_payment_token
 end
+
+# Input: [NAME]
+# Output: [1 or 0, VALUE, ZERO_WORD]
+export.is_name_registered
+    push.3
+    # [3, NAME]
+    exec.account::get_map_item
+    # [VALUE]
+    push.0.0.0.0
+    # [VALUE, ZERO_WORD]
+    eqw
+    # [0 or 1, VALUE, ZERO_WORD]
+end
+
+# Input: [NAME]
+# Output: []
+proc._assert_name_not_registered
+    push.3
+    # [3, NAME]
+    exec.account::get_map_item
+    # [VALUE]
+    push.0.0.0.0
+    # [VALUE, ZERO_WORD]
+    eqw
+    # [0 or 1, VALUE, ZERO_WORD]
+    assertz.err=NAME_ALREADY_REGISTERED
+    # [VALUE, ZERO_WORD]
+    dropw dropw
+    # []
+end
+
 
 # Input: []
 # Output: []
@@ -71,4 +114,15 @@ proc._assert_only_owner
     assert_eq.err=OWNER_SUFFIX_MISMATCH
     assert_eq.err=OWNER_PREFIX_MISMATCH
     # []
+end
+
+# Input: [token_prefix, token_suffix]
+# Output: []
+proc._set_payment_token
+    push.0.0
+    # [0, 0, token_prefix, token_suffix]
+    push.2
+    # [2, 0, 0, token_prefix, token_suffix]
+    exec.account::set_item
+    dropw
 end

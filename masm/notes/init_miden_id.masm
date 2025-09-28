@@ -2,6 +2,7 @@ use.miden_id::registry
 use.std::sys
 
 begin
+    push.0.0.1234.5678 # Payment token id
     call.registry::init
     exec.sys::truncate_stack
 end
