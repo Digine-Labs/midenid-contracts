@@ -5,15 +5,24 @@ use.std::sys
 const.ALREADY_INITIALIZED="Already Initialized"
 const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
 const.OWNER_PREFIX_MISMATCH="Owner prefix mismatch"
+
 # Storage
 # 0: Initialized flag
 # 1: Owner
+# 2: Payment Token
 
+# Input: [token_prefix, token_suffix]
+# Output: []
 export.init
     exec._assert_initialized
+    # [token_prefix, token_suffix]
     exec._set_initialized
+    # [token_prefix, token_suffix]
     exec.note::get_sender
+    # [owner_prefix, owner_suffix, token_prefix, token_suffix]
     exec._update_owner
+    # [token_prefix, token_suffix]
+    exec._set_payment_token
 end
 
 # Input: []
@@ -71,4 +80,15 @@ proc._assert_only_owner
     assert_eq.err=OWNER_SUFFIX_MISMATCH
     assert_eq.err=OWNER_PREFIX_MISMATCH
     # []
+end
+
+# Input: [token_prefix, token_suffix]
+# Output: []
+proc._set_payment_token
+    push.0.0
+    # [0, 0, token_prefix, token_suffix]
+    push.2
+    # [2, 0, 0, token_prefix, token_suffix]
+    exec.account::set_item
+    dropw
 end
