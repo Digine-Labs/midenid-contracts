@@ -5,11 +5,14 @@ use.std::sys
 const.ALREADY_INITIALIZED="Already Initialized"
 const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
 const.OWNER_PREFIX_MISMATCH="Owner prefix mismatch"
+const.NAME_ALREADY_REGISTERED="Name already registered"
 
 # Storage
 # 0: Initialized flag
 # 1: Owner
 # 2: Payment Token
+# 3: Name -> ID map
+# 4: ID -> Name map
 
 # Input: [token_prefix, token_suffix]
 # Output: []
@@ -24,6 +27,24 @@ export.init
     # [token_prefix, token_suffix]
     exec._set_payment_token
 end
+
+# Input: [NAME]
+# Output: []
+proc._assert_name_not_registered
+    push.3
+    # [3, NAME]
+    exec.account::get_map_item
+    # [VALUE]
+    push.0.0.0.0
+    # [VALUE, ZERO_WORD]
+    eqw
+    # [0 or 1, VALUE, ZERO_WORD]
+    assertz.err=NAME_ALREADY_REGISTERED
+    # [VALUE, ZERO_WORD]
+    dropw dropw
+    # []
+end
+
 
 # Input: []
 # Output: []
