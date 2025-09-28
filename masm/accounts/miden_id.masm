@@ -29,6 +29,19 @@ export.init
 end
 
 # Input: [NAME]
+# Output: [1 or 0, VALUE, ZERO_WORD]
+export.is_name_registered
+    push.3
+    # [3, NAME]
+    exec.account::get_map_item
+    # [VALUE]
+    push.0.0.0.0
+    # [VALUE, ZERO_WORD]
+    eqw
+    # [0 or 1, VALUE, ZERO_WORD]
+end
+
+# Input: [NAME]
 # Output: []
 proc._assert_name_not_registered
     push.3
