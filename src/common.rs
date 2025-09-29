@@ -215,7 +215,7 @@ pub async fn create_public_immutable_contract(
     let counter_component = AccountComponent::compile(
         account_code.clone(),
         assembler.clone(),
-        vec![empty_storage_value(), empty_storage_value(), empty_storage_value(), empty_storage_map(), empty_storage_map()],
+        vec![empty_storage_value(), empty_storage_value(), empty_storage_value(), empty_storage_map(), empty_storage_map(), empty_storage_value()],
     )
     .unwrap()
     .with_supports_all_types();

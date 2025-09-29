@@ -14,13 +14,17 @@ const.ACCOUNT_ALREADY_HAS_NAME="Account already has name"
 # 2: Payment Token
 # 3: Name -> ID map
 # 4: ID -> Name map
+# 5: Price
 
-# Input: [token_prefix, token_suffix]
+# Input: [PRICE, token_prefix, token_suffix]
 # Output: []
 export.init
+    debug.stack
     exec._assert_initialized
-    # [token_prefix, token_suffix]
+    # [PRICE, token_prefix, token_suffix]
     exec._set_initialized
+    # [PRICE, token_prefix, token_suffix]
+    exec._set_price
     # [token_prefix, token_suffix]
     exec.note::get_sender
     # [owner_prefix, owner_suffix, token_prefix, token_suffix]
@@ -162,9 +166,18 @@ proc._set_initialized
     # [0, 0, 0, 1]
     push.0
     # [0, 0, 0, 0, 1]
-    debug.stack
     exec.account::set_item
     # [OLD_WORD]
+    dropw
+end
+
+# Input: [PRICE]
+# Output: []
+proc._set_price
+    push.5
+    # [5, PRICE]
+    exec.account::set_item
+    # [OLD_VALUE]
     dropw
 end
 
@@ -175,7 +188,6 @@ proc._update_owner
     # [0, 0, owner_prefix, owner_suffix]
     push.1
     # [1, 0, 0, owner_prefix, owner_suffix]
-    debug.stack
     exec.account::set_item
     # [OLD_VALUE]
     dropw
