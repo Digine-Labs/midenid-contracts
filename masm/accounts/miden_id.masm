@@ -7,6 +7,8 @@ const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
 const.OWNER_PREFIX_MISMATCH="Owner prefix mismatch"
 const.NAME_ALREADY_REGISTERED="Name already registered"
 const.ACCOUNT_ALREADY_HAS_NAME="Account already has name"
+const.VALIDATE_SUB_OVERFLOW="Payment validation overflow"
+const.WRONG_AMOUNT_PAID="Paid amount low"
 
 # Storage
 # 0: Initialized flag
@@ -181,6 +183,15 @@ proc._set_price
     dropw
 end
 
+# Input: []
+# Output: [PRICE]
+proc._get_price_word
+    push.5
+    # [5]
+    exec.account::get_item
+    # [PRICE]
+end
+
 # Input: [owner_prefix, owner_suffix]
 # Output: []
 proc._update_owner
@@ -220,4 +231,39 @@ proc._set_payment_token
     # [2, 0, 0, token_prefix, token_suffix]
     exec.account::set_item
     dropw
+end
+
+# Input: []
+# Output: [balance]
+proc._get_balance
+    push.2
+    # [2]
+    exec.account::get_item
+    # [PAYMENT_TOKEN]
+    drop drop
+    # [token_prefix, token_suffix]
+    exec.account::get_balance
+    # [balance]
+end
+
+# Input: []
+# Output: []
+proc._validate_payment
+    exec._get_balance
+    # [initial_balance]
+    exec.note::add_assets_to_account
+    # [initial_balance]
+    exec._get_balance
+    # [after_balance, initial_balance]
+    u32overflowing_sub # after - initial
+    # [overflow, result]
+    assertz.err=VALIDATE_SUB_OVERFLOW
+    # [result]
+    exec._get_price_word
+    # [PRICE, result]
+    drop drop drop
+    # [price, result]
+    lte
+    # [price =< result]
+    assert.err=WRONG_AMOUNT_PAID
 end
