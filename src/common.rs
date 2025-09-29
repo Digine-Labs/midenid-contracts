@@ -1,17 +1,8 @@
 use miden_client::{
-    Client as MidenClient, ClientError, DebugMode, Felt, ScriptBuilder, Word,
-    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageSlot},
-    auth::AuthSecretKey,
-    builder::ClientBuilder,
-    crypto::SecretKey,
-    keystore::FilesystemKeyStore,
-    note::{
+    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageMap, StorageSlot}, auth::AuthSecretKey, builder::ClientBuilder, crypto::SecretKey, keystore::FilesystemKeyStore, note::{
         Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata,
         NoteRecipient, NoteRelevance, NoteScript, NoteTag, NoteType,
-    },
-    rpc::{Endpoint, TonicRpcClient},
-    store::{InputNoteRecord, NoteFilter},
-    transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
+    }, rpc::{Endpoint, TonicRpcClient}, store::{InputNoteRecord, NoteFilter}, transaction::{OutputNote, TransactionRequestBuilder, TransactionScript}, Client as MidenClient, ClientError, DebugMode, Felt, ScriptBuilder, Word
 };
 use miden_lib::account::{
     auth::{self, AuthRpoFalcon512},
@@ -210,6 +201,10 @@ fn empty_storage_value() -> StorageSlot {
     ]))
 }
 
+fn empty_storage_map() -> StorageSlot {
+    StorageSlot::Map(StorageMap::new())
+}
+
 // Contract builder helper function
 pub async fn create_public_immutable_contract(
     client: &mut Client,
@@ -220,7 +215,7 @@ pub async fn create_public_immutable_contract(
     let counter_component = AccountComponent::compile(
         account_code.clone(),
         assembler.clone(),
-        vec![empty_storage_value(), empty_storage_value(), empty_storage_value()],
+        vec![empty_storage_value(), empty_storage_value(), empty_storage_value(), empty_storage_map(), empty_storage_map()],
     )
     .unwrap()
     .with_supports_all_types();
