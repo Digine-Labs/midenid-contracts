@@ -3,6 +3,7 @@ use.miden::note
 use.std::sys
 
 const.ALREADY_INITIALIZED="Already Initialized"
+const.NOT_INITIALIZED="Contract not initialized"
 const.OWNER_SUFFIX_MISMATCH="Owner suffix mismatch"
 const.OWNER_PREFIX_MISMATCH="Owner prefix mismatch"
 const.NAME_ALREADY_REGISTERED="Name already registered"
@@ -61,9 +62,11 @@ export.is_name_registered
     exec.account::get_map_item
     # [VALUE]
     push.0.0.0.0
-    # [VALUE, ZERO_WORD]
+    # [ZERO_WORD, VALUE]
     eqw
-    # [0 or 1, VALUE, ZERO_WORD]
+    # [1 or 0] - 1 if value equals zero (not registered), 0 if value exists (registered)
+    not
+    # [0 or 1] - 0 if not registered, 1 if registered
 end
 
 # Input: [addr_prefix, addr_suffix]
@@ -77,9 +80,12 @@ end
 export.has_name
     exec._get_name_by_addr
     # [NAME]
-    padw
+    push.0.0.0.0
     # [ZERO_WORD, NAME]
     eqw
+    # [1 or 0] - 1 if NAME equals zero (no name), 0 if NAME exists (has name)
+    not
+    # [0 or 1] - 0 if no name, 1 if has name
 end
 
 # Input: [prefix, suffix, NAME]
@@ -125,12 +131,11 @@ proc._assert_name_not_registered
     exec.account::get_map_item
     # [VALUE]
     push.0.0.0.0
-    # [VALUE, ZERO_WORD]
+    # [ZERO_WORD, VALUE]
     eqw
-    # [0 or 1, VALUE, ZERO_WORD]
-    assertz.err=NAME_ALREADY_REGISTERED
-    # [VALUE, ZERO_WORD]
-    dropw dropw
+    # [1 or 0] - 1 if VALUE equals ZERO_WORD (name not registered), 0 if different (name registered)
+    assert.err=NAME_ALREADY_REGISTERED
+    # [] - assertion passes if name is not registered (eqw returned 1)
     # []
 end
 
@@ -141,10 +146,12 @@ proc._assert_not_have_name
     push.4
     exec.account::get_map_item
     # [VALUE]
-    padw
+    push.0.0.0.0
+    # [ZERO_WORD, VALUE]
     eqw
-    assertz.err=ACCOUNT_ALREADY_HAS_NAME
-    dropw dropw
+    # [1 or 0] - 1 if VALUE equals ZERO_WORD (no name), 0 if different (has name)
+    assert.err=ACCOUNT_ALREADY_HAS_NAME
+    # [] - assertion passes if account has no name (eqw returned 1)
 end
 
 
@@ -154,10 +161,11 @@ proc._assert_initialized
     push.0
     # [0]
     exec.account::get_item
+    assertz.err=ALREADY_INITIALIZED
     # [INITIALIZED_FLAG]
     drop drop drop
     # [initialized_flag]
-    assertz.err=ALREADY_INITIALIZED
+   
     # []
 end
 
