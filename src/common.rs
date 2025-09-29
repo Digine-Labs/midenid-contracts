@@ -1,8 +1,20 @@
 use miden_client::{
-    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageMap, StorageSlot}, auth::AuthSecretKey, builder::ClientBuilder, crypto::SecretKey, keystore::FilesystemKeyStore, note::{
+    Client as MidenClient, ClientError, DebugMode, Felt, ScriptBuilder, Word,
+    account::{
+        Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageMap,
+        StorageSlot,
+    },
+    auth::AuthSecretKey,
+    builder::ClientBuilder,
+    crypto::SecretKey,
+    keystore::FilesystemKeyStore,
+    note::{
         Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata,
         NoteRecipient, NoteRelevance, NoteScript, NoteTag, NoteType,
-    }, rpc::{Endpoint, TonicRpcClient}, store::{InputNoteRecord, NoteFilter}, transaction::{OutputNote, TransactionRequestBuilder, TransactionScript}, Client as MidenClient, ClientError, DebugMode, Felt, ScriptBuilder, Word
+    },
+    rpc::{Endpoint, TonicRpcClient},
+    store::{InputNoteRecord, NoteFilter},
+    transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
 };
 use miden_lib::account::{
     auth::{self, AuthRpoFalcon512},
@@ -85,9 +97,12 @@ pub async fn create_public_note_with_library(
     note_code: String,
     creator_account: Account,
     assets: NoteAssets,
-    library: Library
+    library: Library,
 ) -> Result<Note, Error> {
-    let assembler = TransactionKernel::assembler().with_debug_mode(true).with_dynamic_library(library).unwrap();
+    let assembler = TransactionKernel::assembler()
+        .with_debug_mode(true)
+        .with_dynamic_library(library)
+        .unwrap();
     let rng = client.rng();
     let serial_num = rng.inner_mut().draw_word();
     let program = assembler.clone().assemble_program(note_code).unwrap();
@@ -197,7 +212,10 @@ pub async fn create_no_auth_component() -> Result<AccountComponent, Error> {
 
 fn empty_storage_value() -> StorageSlot {
     StorageSlot::Value(Word::new([
-       Felt::new(0),Felt::new(0),Felt::new(0),Felt::new(0) 
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
     ]))
 }
 
@@ -215,7 +233,14 @@ pub async fn create_public_immutable_contract(
     let counter_component = AccountComponent::compile(
         account_code.clone(),
         assembler.clone(),
-        vec![empty_storage_value(), empty_storage_value(), empty_storage_value(), empty_storage_map(), empty_storage_map(), empty_storage_value()],
+        vec![
+            empty_storage_value(),
+            empty_storage_value(),
+            empty_storage_value(),
+            empty_storage_map(),
+            empty_storage_map(),
+            empty_storage_value(),
+        ],
     )
     .unwrap()
     .with_supports_all_types();

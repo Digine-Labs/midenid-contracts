@@ -54,11 +54,26 @@ async fn init_registry_complete_flow() -> Result<(), ClientError> {
         let complete_state = helper.get_complete_contract_state(&contract_state);
 
         // Check all storage slots are properly configured
-        assert_eq!(complete_state.initialized, 1, "Contract should be initialized");
-        assert_eq!(complete_state.owner_prefix, owner_account.id().prefix().as_felt().as_int());
-        assert_eq!(complete_state.owner_suffix, owner_account.id().suffix().as_int());
-        assert_eq!(complete_state.token_prefix, 1234, "Payment token prefix should be 1234");
-        assert_eq!(complete_state.token_suffix, 6789, "Payment token suffix should be 6789");
+        assert_eq!(
+            complete_state.initialized, 1,
+            "Contract should be initialized"
+        );
+        assert_eq!(
+            complete_state.owner_prefix,
+            owner_account.id().prefix().as_felt().as_int()
+        );
+        assert_eq!(
+            complete_state.owner_suffix,
+            owner_account.id().suffix().as_int()
+        );
+        assert_eq!(
+            complete_state.token_prefix, 1234,
+            "Payment token prefix should be 1234"
+        );
+        assert_eq!(
+            complete_state.token_suffix, 6789,
+            "Payment token suffix should be 6789"
+        );
 
         // Note: Map slots (3, 4) contain initial map root hashes, which is normal
         // The actual name mappings will be stored within these maps when names are registered

@@ -20,7 +20,7 @@ async fn test_basic_name_registration() -> Result<(), ClientError> {
     assert!(!helper.has_name_for_address(&user_account).await?);
     assert_eq!(
         helper.get_name_for_address(&user_account).await?,
-        None  // Returns None since reverse mapping is not implemented
+        None // Returns None since reverse mapping is not implemented
     );
 
     let (registered_prefix, registered_suffix) = helper

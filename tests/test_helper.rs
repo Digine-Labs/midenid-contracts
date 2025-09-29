@@ -1,4 +1,3 @@
-use midenid_contracts::common::*;
 use miden_client::{
     ClientError, Word,
     account::{Account, AccountIdAddress, AddressInterface},
@@ -9,6 +8,7 @@ use miden_client::{
     transaction::TransactionRequestBuilder,
 };
 use miden_objects::{Felt, FieldElement};
+use midenid_contracts::common::*;
 use rand::rngs::StdRng;
 use std::{fs, path::Path};
 use tokio::time::{Duration, sleep};
@@ -187,8 +187,8 @@ impl RegistryTestHelper {
             .unwrap()
             .into();
         let (token_prefix, token_suffix) = (
-            payment_token.get(0).unwrap().as_int(),  // Fixed: prefix is at index 0
-            payment_token.get(1).unwrap().as_int(),  // Fixed: suffix is at index 1
+            payment_token.get(0).unwrap().as_int(), // Fixed: prefix is at index 0
+            payment_token.get(1).unwrap().as_int(), // Fixed: suffix is at index 1
         );
 
         (token_prefix, token_suffix)
@@ -238,7 +238,6 @@ impl RegistryTestHelper {
         Ok(helper)
     }
 
-
     /// Encode a name string to a Word (4 felts) - direct string encoding, max 28 chars
     pub fn encode_name_to_word(name: &str) -> Word {
         assert!(name.len() <= 28, "Name must not exceed 28 characters");
@@ -285,7 +284,8 @@ impl RegistryTestHelper {
         for idx in 0..4 {
             if let Some(felt) = word.get(idx) {
                 let mut value = felt.as_int();
-                for _ in 0..7 {  // Changed from 8 to 7 to match encoding
+                for _ in 0..7 {
+                    // Changed from 8 to 7 to match encoding
                     let byte = (value & 0xFF) as u8;
                     if byte == 0 {
                         break;
@@ -402,7 +402,7 @@ end
         if let Some(contract_state) = self.get_contract_state().await? {
             let storage = contract_state.account().storage();
             let key = Self::encode_name_to_word(name);
-            let value = storage.get_map_item(3, key)?;  // Use slot 3 where names are stored
+            let value = storage.get_map_item(3, key)?; // Use slot 3 where names are stored
             if Self::is_zero_word(&value) {
                 Ok(None)
             } else {
@@ -420,7 +420,7 @@ end
         if let Some(contract_state) = self.get_contract_state().await? {
             let storage = contract_state.account().storage();
             let key = Self::encode_account_to_word(account);
-            let value = storage.get_map_item(4, key)?;  // Use slot 4 for account->name mapping
+            let value = storage.get_map_item(4, key)?; // Use slot 4 for account->name mapping
             if Self::is_zero_word(&value) {
                 Ok(None)
             } else {
