@@ -10,6 +10,9 @@ const.NAME_ALREADY_REGISTERED="Name already registered"
 const.ACCOUNT_ALREADY_HAS_NAME="Account already has name"
 const.VALIDATE_SUB_OVERFLOW="Payment validation overflow"
 const.WRONG_AMOUNT_PAID="Paid amount low"
+const.NAME_LEN_HIGH="Maximum 20 characters"
+
+const.MAX_NAME_LENGTH=20 # For now 20 then we maximize this limit
 
 # Storage
 # 0: Initialized flag
@@ -42,6 +45,8 @@ export.register_name
     dupw
     # [NAME, NAME]
     exec._assert_name_not_registered
+    # [NAME]
+    exec._assert_name_length
     # [NAME]
     exec.note::get_sender
     # [prefix, suffix, NAME]
@@ -110,6 +115,19 @@ proc._update_registry
     exec.account::set_map_item
     # [OLD_ROOT, OLD_VAL]
     dropw dropw
+end
+
+# Input: [NAME]
+# Output: [NAME]
+proc._assert_name_length
+    # [name_len, ascii, ascii, ascii]
+    dup
+    # [name_len, name_len, ascii, ascii, ascii]
+    push.MAX_NAME_LENGTH
+    # [max_name_len, name_len, name_len, ascii, ascii, ascii]
+    lte
+    # [max_name_len >= name_len, name_len, ascii, ascii, ascii]
+    assert.err=NAME_LEN_HIGH
 end
 
 # Input: [addr_prefix, addr_suffix]
