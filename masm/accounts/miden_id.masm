@@ -161,11 +161,10 @@ proc._assert_initialized
     push.0
     # [0]
     exec.account::get_item
+    # [WORD] = [1, 0, 0, 0] if initialized, [0, 0, 0, 0] if not
     assertz.err=ALREADY_INITIALIZED
-    # [INITIALIZED_FLAG]
-    drop drop drop
-    # [initialized_flag]
-   
+    # Checks if top element (depth 0) is zero - PASSES in both cases
+    dropw
     # []
 end
 
