@@ -1,0 +1,10 @@
+use.miden_id::registry
+use.std::sys
+
+begin
+    # NAME should be provided as input to the note
+    # For example: "alice" encoded as a Word
+    push.0.0.0.97 push.0.0.105.99 push.0.0.101.108 push.0.0.0.97  # "alice" encoded
+    call.registry::register_name
+    exec.sys::truncate_stack
+end
