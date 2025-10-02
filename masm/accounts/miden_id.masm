@@ -22,14 +22,12 @@ const.MAX_NAME_LENGTH=20 # For now 20 then we maximize this limit
 # 4: ID -> Name map
 # 5: Price
 
-# Input: [PRICE, token_prefix, token_suffix]
+# Input: [PRICE_WORD+1_EXTRA, token_prefix, token_suffix]
+# Note: PRICE_WORD requires 5 elements due to stack consumption pattern
 # Output: []
 export.init
-    debug.stack
     exec._assert_initialized
-    # [PRICE, token_prefix, token_suffix]
     exec._set_initialized
-    # [PRICE, token_prefix, token_suffix]
     exec._set_price
     # [token_prefix, token_suffix]
     exec.note::get_sender
@@ -37,24 +35,64 @@ export.init
     exec._update_owner
     # [token_prefix, token_suffix]
     exec._set_payment_token
+    # []
 end
 
 # Input: [NAME]
 # Output: []
 export.register_name
+    # Input: [NAME] - 4 felts representing the name
+
+    # Validate name length (debug enabled)
     dupw
     # [NAME, NAME]
+    exec._assert_name_length
+    # [NAME, NAME]
+
+    # Check if name is already registered (prevent duplicates)
     exec._assert_name_not_registered
     # [NAME]
-    exec._assert_name_length
-    # [NAME]
+
+    # Get the sender address
     exec.note::get_sender
-    # [prefix, suffix, NAME]
+    # [prefix, suffix, NAME(4)] = 6 elements
+
+    # Check if account already has a name (one name per account)
+    # Duplicate prefix, suffix, NAME for the check
+    dup.5 dup.5 dup.5 dup.5 dup.5 dup.5
+    # [prefix, suffix, NAME, prefix, suffix, NAME]
     exec._assert_not_have_name
-    # [NAME]
-    exec.note::get_sender
-    # [prefix, suffix, NAME]
-    exec._update_registry
+    # [NAME, prefix, suffix, NAME] (8 elements)
+    # _assert_not_have_name consumes [prefix, suffix, NAME] and returns [NAME]
+
+    # Clean up the extra NAME that was returned
+    dropw
+    # [prefix, suffix, NAME] = 6 elements
+
+    # Duplicate all for both mappings
+    dup.5 dup.5 dup.5 dup.5 dup.5 dup.5
+    # [prefix, suffix, NAME, prefix, suffix, NAME] = 12 elements
+
+    # Store Name->ID mapping (slot 3)
+    # Need: [NAME(KEY), ADDR(VALUE)] = [NAME, 0, 0, prefix, suffix]
+    push.0.0
+    # [0, 0, prefix, suffix, NAME, prefix, suffix, NAME] = 14 elements
+
+    # Move the first NAME to the top
+    # Positions: [0(0), 0(1), prefix(2), suffix(3), NAME(4-7), prefix(8), suffix(9), NAME(10-13)]
+    movup.7 movup.7 movup.7 movup.7
+    # [NAME, 0, 0, prefix, suffix, prefix, suffix, NAME] = 14 elements
+
+    exec._write_to_name_map
+    # [prefix, suffix, NAME] = 6 elements
+
+    # Store ID->Name mapping (slot 4)
+    # Need: [ADDR(KEY), NAME(VALUE)] = [0, 0, prefix, suffix, NAME]
+    # We have: [prefix, suffix, NAME]
+    push.0.0
+    # [0, 0, prefix, suffix, NAME] = 8 elements
+
+    exec._write_to_id_map
     # []
 end
 
@@ -80,6 +118,24 @@ export.get_name
     exec._get_name_by_addr
 end
 
+# Direct map write procedure for Name->ID (slot 3)
+# Input: [KEY(4), VALUE(4)] on stack
+# Returns: []
+proc._write_to_name_map
+    push.3  # Storage slot 3 for Name->ID mapping
+    exec.account::set_map_item
+    dropw dropw
+end
+
+# Direct map write procedure for ID->Name (slot 4)
+# Input: [KEY(4), VALUE(4)] on stack
+# Returns: []
+proc._write_to_id_map
+    push.4  # Storage slot 4 for ID->Name mapping
+    exec.account::set_map_item
+    dropw dropw
+end
+
 # Input: [addr_prefix, addr_suffix]
 # Output: [1 or 0, ZERO_WORD, NAME]
 export.has_name
@@ -91,43 +147,6 @@ export.has_name
     # [1 or 0] - 1 if NAME equals zero (no name), 0 if NAME exists (has name)
     not
     # [0 or 1] - 0 if no name, 1 if has name
-end
-
-# Input: [prefix, suffix, NAME]
-# Output: []
-proc._update_registry
-    push.0.0
-    # [ADDR, NAME]
-    dupw.1
-    # [NAME, ADDR, NAME]
-    dupw.1
-    # [ADDR, NAME, ADDR, NAME]
-    push.4
-    # [4, ADDR, NAME, ADDR, NAME]
-    exec.account::set_map_item
-    # [OLD_ROOT, OLD_VAL, ADDR, NAME]
-    dropw dropw
-    # [ADDR, NAME]
-    swapw
-    # [NAME, ADDR]
-    push.3
-    # [3, NAME, ADDR]
-    exec.account::set_map_item
-    # [OLD_ROOT, OLD_VAL]
-    dropw dropw
-end
-
-# Input: [NAME]
-# Output: [NAME]
-proc._assert_name_length
-    # [name_len, ascii, ascii, ascii]
-    dup
-    # [name_len, name_len, ascii, ascii, ascii]
-    push.MAX_NAME_LENGTH
-    # [max_name_len, name_len, name_len, ascii, ascii, ascii]
-    lte
-    # [max_name_len >= name_len, name_len, ascii, ascii, ascii]
-    assert.err=NAME_LEN_HIGH
 end
 
 # Input: [addr_prefix, addr_suffix]
@@ -147,31 +166,92 @@ proc._assert_name_not_registered
     push.3
     # [3, NAME]
     exec.account::get_map_item
-    # [VALUE]
+    # [VALUE] - returns the value (4 elements)
     push.0.0.0.0
     # [ZERO_WORD, VALUE]
     eqw
-    # [1 or 0] - 1 if VALUE equals ZERO_WORD (name not registered), 0 if different (name registered)
+    # [result, ZERO_WORD, VALUE] - eqw leaves the compared words on stack
+    # Stack: [result, w0, w1, w2, w3, v0, v1, v2, v3, ...]
+    # Move result below the 8 elements, drop them, then move result back
+    movdn.8
+    # [w0, w1, w2, w3, v0, v1, v2, v3, result, ...]
+    dropw dropw
+    # [result, ...]
     assert.err=NAME_ALREADY_REGISTERED
-    # [] - assertion passes if name is not registered (eqw returned 1)
     # []
 end
 
-# Input: [prefix, suffix]
-# Output: []
+# Input: [prefix, suffix, NAME]
+# Output: [NAME]
 proc._assert_not_have_name
+    # Stack: [prefix, suffix, n0, n1, n2, n3] (NAME is 4 felts)
+    # Need to check if [0, 0, prefix, suffix] exists in slot 4
+
+    # Duplicate NAME to preserve it
+    dup.5 dup.5 dup.5 dup.5
+    # [n0, n1, n2, n3, prefix, suffix, n0, n1, n2, n3]
+
+    # Move duplicated NAME below prefix/suffix
+    movdn.7 movdn.7 movdn.7 movdn.7
+    # [prefix, suffix, n0, n1, n2, n3, n0, n1, n2, n3]
+
+    # Build the key: [0, 0, prefix, suffix]
     push.0.0
+    # [0, 0, prefix, suffix, n0, n1, n2, n3, n0, n1, n2, n3]
+
+    # Query slot 4 for existing name
     push.4
+    # [4, 0, 0, prefix, suffix, n0, n1, n2, n3, n0, n1, n2, n3]
     exec.account::get_map_item
-    # [VALUE]
+    # [VALUE(4), n0, n1, n2, n3, n0, n1, n2, n3]
+
+    # Check if VALUE is zero (no name registered - this is what we want)
     push.0.0.0.0
-    # [ZERO_WORD, VALUE]
+    # [ZERO(4), VALUE(4), n0, n1, n2, n3, n0, n1, n2, n3]
     eqw
-    # [1 or 0] - 1 if VALUE equals ZERO_WORD (no name), 0 if different (has name)
+    # [result, ZERO(4), VALUE(4), n0, n1, n2, n3, n0, n1, n2, n3]
+    # eqw returns 1 if equal (account has no name), 0 if not equal (account already has name)
+
+    # Clean up the 8 elements from eqw
+    movdn.8
+    # [ZERO(4), VALUE(4), result, n0, n1, n2, n3, n0, n1, n2, n3]
+    dropw dropw
+    # [result, n0, n1, n2, n3, n0, n1, n2, n3]
+
+    # Assert result is 1 (account should NOT have a name already)
     assert.err=ACCOUNT_ALREADY_HAS_NAME
-    # [] - assertion passes if account has no name (eqw returned 1)
+    # [n0, n1, n2, n3, n0, n1, n2, n3]
+
+    # Drop the first copy of NAME (the one we looked up)
+    dropw
+    # [n0, n1, n2, n3] = NAME (the original input NAME)
 end
 
+# Input: [NAME(4)]
+# Output: [NAME(4)]
+proc._assert_name_length
+    # Stack when NAME=[5, 435459550305, 0, 0] is pushed:
+    # push.5.435459550305.0.0 creates stack (top to bottom):
+    # depth 0: 0, depth 1: 0, depth 2: 435459550305, depth 3: 5(length)
+
+    # Get the length from depth 3
+    dup.3
+    # [length, 0, 0, 435459550305, 5]
+
+    # Check if length > MAX_NAME_LENGTH
+    push.MAX_NAME_LENGTH
+    # [20, length, 0, 0, 435459550305, 5]
+
+    # u32gt: pops [b, a] and pushes 1 if a > b, 0 otherwise
+    # Stack is [20, length, ...] so it checks if length > 20
+    u32gt
+    # [result, 0, 0, 435459550305, 5]
+    # result is 1 if length > 20 (BAD), 0 if length <= 20 (GOOD)
+
+    # Assert result is 0 (length should be <= 20)
+    assertz.err=NAME_LEN_HIGH
+    # [0, 0, 435459550305, 5] - original NAME preserved
+end
 
 # Input: []
 # Output: []
@@ -198,14 +278,17 @@ proc._set_initialized
     dropw
 end
 
-# Input: [PRICE]
-# Output: []
+# Input: [PRICE_WORD, ...REST] where PRICE_WORD is 4 elements
+# Output: [...REST]
 proc._set_price
+    # [p0, p1, p2, p3, ...REST]
     push.5
-    # [5, PRICE]
+    # [5, p0, p1, p2, p3, ...REST]
     exec.account::set_item
-    # [OLD_VALUE]
+    # Consumes [5, p0, p1, p2, p3], returns [old0, old1, old2, old3]
+    # Stack: [old0, old1, old2, old3, ...REST]
     dropw
+    # [...REST]
 end
 
 # Input: []

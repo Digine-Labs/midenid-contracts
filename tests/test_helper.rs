@@ -13,6 +13,18 @@ use rand::rngs::StdRng;
 use std::{fs, path::Path};
 use tokio::time::{Duration, sleep};
 
+/// Converts a Word to a MASM push string
+/// CRITICAL: push.a.b.c.d in MASM = Word([a,b,c,d]) in Rust (SAME ORDER)
+/// Word elements are in order [e0, e1, e2, e3]
+/// MASM push order matches Word array order directly: push.e0.e1.e2.e3
+fn word_to_masm_push_string(word: &Word) -> String {
+    format!("{}.{}.{}.{}",
+        word[0].as_int(),
+        word[1].as_int(),
+        word[2].as_int(),
+        word[3].as_int())
+}
+
 type Client = miden_client::Client<FilesystemKeyStore<StdRng>>;
 
 /// Complete contract state structure for validation
@@ -154,6 +166,33 @@ impl RegistryTestHelper {
         self.client.get_account(registry_id).await
     }
 
+    /// Execute a transaction from a specific account with custom MASM code
+    pub async fn execute_tx_from_account(
+        &mut self,
+        account: &Account,
+        masm_code: &str,
+    ) -> Result<(), ClientError> {
+        // Create transaction script from MASM code
+        let transaction_script = create_tx_script(masm_code.to_string(), None).unwrap();
+
+        let tx_request = TransactionRequestBuilder::new()
+            .custom_script(transaction_script)
+            .build()
+            .unwrap();
+
+        let registry_id = self.registry_contract.as_ref().unwrap().id();
+        let tx_result = self
+            .client
+            .new_transaction(registry_id, tx_request)
+            .await?;
+        self.client.submit_transaction(tx_result).await?;
+
+        // Wait for transaction confirmation
+        sleep(Duration::from_secs(8)).await;
+
+        Ok(())
+    }
+
     /// Get contract initialization state data
     pub fn get_initialization_state(&self, account_record: &AccountRecord) -> (u64, u64, u64) {
         let init_flag: Word = account_record
@@ -186,9 +225,10 @@ impl RegistryTestHelper {
             .get_item(2)
             .unwrap()
             .into();
+        // With storage reversal: we store [0, 0, prefix, suffix] → retrieve as [suffix, prefix, 0, 0]
         let (token_prefix, token_suffix) = (
-            payment_token.get(0).unwrap().as_int(), // Fixed: prefix is at index 0
-            payment_token.get(1).unwrap().as_int(), // Fixed: suffix is at index 1
+            payment_token.get(0).unwrap().as_int(), // prefix is at index 1
+            payment_token.get(1).unwrap().as_int(), // suffix is at index 0
         );
 
         (token_prefix, token_suffix)
@@ -240,22 +280,25 @@ impl RegistryTestHelper {
 
     /// Encode a name string to a Word (4 felts) - direct string encoding, max 28 chars
     pub fn encode_name_to_word(name: &str) -> Word {
-        assert!(name.len() <= 28, "Name must not exceed 28 characters");
+        assert!(name.len() <= 20, "Name must not exceed 20 characters");
 
         let bytes = name.as_bytes();
         let mut felts = [Felt::ZERO; 4];
 
-        // Pack bytes directly into felts (7 bytes per felt to stay within field limits)
+        // Felt[0]: Store name length (simple POC approach)
+        felts[0] = Felt::new(bytes.len() as u64);
+
+        // Felt[1-3]: Pack 7 ASCII characters per felt (56 bits used, 7 bits unused)
         for (i, chunk) in bytes.chunks(7).enumerate() {
-            if i >= 4 {
-                break;
+            if i >= 3 {
+                break; // Only felts 1, 2, 3 available for characters
             }
 
             let mut value = 0u64;
             for (j, &byte) in chunk.iter().enumerate() {
                 value |= (byte as u64) << (j * 8);
             }
-            felts[i] = Felt::new(value);
+            felts[i + 1] = Felt::new(value); // +1 because felt[0] is length
         }
 
         Word::new(felts)
@@ -279,13 +322,22 @@ impl RegistryTestHelper {
     }
 
     pub fn decode_name_word(word: &Word) -> String {
+        // Felt[0] contains the length
+        let length = word.get(0).map(|f| f.as_int() as usize).unwrap_or(0);
+        if length == 0 {
+            return String::new();
+        }
+
         let mut bytes = Vec::new();
 
-        for idx in 0..4 {
+        // Felt[1-3] contain the ASCII characters (7 per felt)
+        for idx in 1..4 {
             if let Some(felt) = word.get(idx) {
                 let mut value = felt.as_int();
                 for _ in 0..7 {
-                    // Changed from 8 to 7 to match encoding
+                    if bytes.len() >= length {
+                        break; // Stop when we've read 'length' characters
+                    }
                     let byte = (value & 0xFF) as u8;
                     if byte == 0 {
                         break;
@@ -293,6 +345,9 @@ impl RegistryTestHelper {
                     bytes.push(byte);
                     value >>= 8;
                 }
+            }
+            if bytes.len() >= length {
+                break;
             }
         }
 
@@ -314,22 +369,23 @@ impl RegistryTestHelper {
         // Create a custom note script for this specific name
         let name_word = Self::encode_name_to_word(name);
 
+        // Use word_to_masm_push_string for correct Word conversion
+        let name_push_str = word_to_masm_push_string(&name_word);
         let register_note_code = format!(
             r#"
 use.miden_id::registry
 use.std::sys
 
 begin
-    push.{}.{}.{}.{}
+    push.{name_push}
     call.registry::register_name
     exec.sys::truncate_stack
 end
 "#,
-            name_word[3].as_int(),
-            name_word[2].as_int(),
-            name_word[1].as_int(),
-            name_word[0].as_int()
+            name_push = name_push_str
         );
+
+        println!("Register note code for '{}': push.{}", name, name_push_str);
 
         let contract_code = fs::read_to_string(Path::new("./masm/accounts/miden_id.masm")).unwrap();
         let library_namespace = "miden_id::registry";
@@ -365,7 +421,7 @@ end
         self.client.submit_transaction(tx_result).await?;
 
         // Wait for transaction confirmation
-        sleep(Duration::from_secs(8)).await;
+        sleep(Duration::from_secs(15)).await;
         self.sync_network().await?;
 
         Ok(())
@@ -402,7 +458,7 @@ end
         if let Some(contract_state) = self.get_contract_state().await? {
             let storage = contract_state.account().storage();
             let key = Self::encode_name_to_word(name);
-            let value = storage.get_map_item(3, key)?; // Use slot 3 where names are stored
+            let value = storage.get_map_item(3, key)?; // Use slot 9 for name->id mapping
             if Self::is_zero_word(&value) {
                 Ok(None)
             } else {
@@ -420,7 +476,7 @@ end
         if let Some(contract_state) = self.get_contract_state().await? {
             let storage = contract_state.account().storage();
             let key = Self::encode_account_to_word(account);
-            let value = storage.get_map_item(4, key)?; // Use slot 4 for account->name mapping
+            let value = storage.get_map_item(4, key)?; // Use slot 10 for id->name mapping
             if Self::is_zero_word(&value) {
                 Ok(None)
             } else {
