@@ -3,7 +3,7 @@ use.std::sys
 
 begin
     push.1234.6789 # payment token prefix, suffix
-    push.500.0.0.0 # minting price
+    push.500.0.0.0.0 # minting price
     # [PRICE, token_prefix, token_suffix]
     call.registry::init
     exec.sys::truncate_stack
