@@ -1,10 +1,22 @@
 use.miden_id::registry
 use.std::sys
 
+# Registry Initialization Configuration
+#
+# To get the MIDEN faucet account ID:
+# 1. Visit https://faucet.testnet.miden.io
+# 2. Request tokens to any account
+# 3. Check the note details - the sender will be the faucet account
+# 4. Extract prefix and suffix from the faucet account ID
+#
+# Price is stored as a Word (4 felts). Only the last felt is used for comparison.
+# For production, replace placeholder values below with actual faucet ID and desired price.
+
 begin
-    push.1234.6789 # payment token prefix, suffix
-    push.500.0.0.0.0 # minting price
-    # [PRICE, token_prefix, token_suffix]
+    push.1234 # payment token prefix (PLACEHOLDER)
+    push.6789 # payment token suffix (PLACEHOLDER)
+    push.500  # registration price (PLACEHOLDER)
+    # Stack: [price, token_suffix, token_prefix]
     call.registry::init
     exec.sys::truncate_stack
 end

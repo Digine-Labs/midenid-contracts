@@ -7,9 +7,8 @@ use test_helper::RegistryTestHelper;
 async fn test_register_name_creates_bidirectional_mapping() -> Result<(), ClientError> {
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
-    let user_account = helper.create_account("User").await?;
-
     helper.initialize_registry(&owner_account).await?;
+    let user_account = helper.create_account("User").await?;
     helper
         .register_name_for_account(&user_account, "alice")
         .await?;
@@ -54,10 +53,9 @@ async fn test_register_name_creates_bidirectional_mapping() -> Result<(), Client
 async fn test_cannot_register_same_name_twice() -> Result<(), ClientError> {
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
+    helper.initialize_registry(&owner_account).await?;
     let user1_account = helper.create_account("User1").await?;
     let user2_account = helper.create_account("User2").await?;
-
-    helper.initialize_registry(&owner_account).await?;
     helper
         .register_name_for_account(&user1_account, "alice")
         .await?;
@@ -76,7 +74,8 @@ async fn test_cannot_register_same_name_twice() -> Result<(), ClientError> {
     let error_msg = duplicate_result.unwrap_err().to_string().to_lowercase();
     assert!(
         error_msg.contains("name already registered") || error_msg.contains("transaction"),
-        "unexpected error message: {}", error_msg
+        "unexpected error message: {}",
+        error_msg
     );
 
     // Verify only user1 has the name
@@ -106,9 +105,10 @@ async fn test_cannot_register_same_name_twice() -> Result<(), ClientError> {
 async fn test_account_can_only_register_one_name() -> Result<(), ClientError> {
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
+    helper.initialize_registry(&owner_account).await?;
+
     let user_account = helper.create_account("User").await?;
 
-    helper.initialize_registry(&owner_account).await?;
     helper
         .register_name_for_account(&user_account, "alice")
         .await?;
@@ -143,11 +143,12 @@ async fn test_account_can_only_register_one_name() -> Result<(), ClientError> {
 async fn test_multiple_accounts_can_register_different_names() -> Result<(), ClientError> {
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
+    helper.initialize_registry(&owner_account).await?;
+
     let alice_account = helper.create_account("Alice").await?;
     let bob_account = helper.create_account("Bob").await?;
     let charlie_account = helper.create_account("Charlie").await?;
 
-    helper.initialize_registry(&owner_account).await?;
     helper
         .register_name_for_account(&alice_account, "alice")
         .await?;
@@ -228,9 +229,9 @@ async fn test_multiple_accounts_can_register_different_names() -> Result<(), Cli
 async fn test_unregistered_names_and_addresses_return_none() -> Result<(), ClientError> {
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
-    let user_account = helper.create_account("User").await?;
-
     helper.initialize_registry(&owner_account).await?;
+
+    let user_account = helper.create_account("User").await?;
 
     // Verify slot 3 (Name→ID) returns empty for unregistered name
     assert!(
@@ -261,8 +262,8 @@ async fn test_unregistered_names_and_addresses_return_none() -> Result<(), Clien
 async fn test_registry_owner_can_register_name_for_themselves() -> Result<(), ClientError> {
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
-
     helper.initialize_registry(&owner_account).await?;
+
     helper
         .register_name_for_account(&owner_account, "admin")
         .await?;
@@ -299,10 +300,10 @@ async fn test_registry_owner_can_register_name_for_themselves() -> Result<(), Cl
 async fn test_name_to_id_and_id_to_name_mappings_stay_consistent() -> Result<(), ClientError> {
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
+    helper.initialize_registry(&owner_account).await?;
+
     let alice_account = helper.create_account("Alice").await?;
     let bob_account = helper.create_account("Bob").await?;
-
-    helper.initialize_registry(&owner_account).await?;
 
     // Register names for both accounts
     helper
@@ -396,12 +397,13 @@ async fn test_name_to_id_and_id_to_name_mappings_stay_consistent() -> Result<(),
 }
 
 #[tokio::test]
-async fn test_address_has_no_name_before_registration_and_has_name_after() -> Result<(), ClientError> {
+async fn test_address_has_no_name_before_registration_and_has_name_after() -> Result<(), ClientError>
+{
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
-    let user_account = helper.create_account("User").await?;
-
     helper.initialize_registry(&owner_account).await?;
+
+    let user_account = helper.create_account("User").await?;
 
     // Before registration: slot 4 should be empty
     assert!(
