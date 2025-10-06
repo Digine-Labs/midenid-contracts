@@ -24,15 +24,23 @@ async fn init_registry_with_note() -> Result<(), ClientError> {
         assert_eq!(owner_prefix, owner_account.id().prefix().as_felt().as_int());
         assert_eq!(owner_suffix, owner_account.id().suffix().as_int());
 
-        // Verify payment token configuration from init note (1234, 6789)
+        // Verify payment token configuration (uses owner account when no faucet provided)
         let (token_prefix, token_suffix) = helper.get_payment_token_state(&contract_state);
-        assert_eq!(token_prefix, 1234, "Payment token prefix should be 1234");
-        assert_eq!(token_suffix, 6789, "Payment token suffix should be 6789");
+        assert_eq!(
+            token_prefix,
+            owner_account.id().prefix().as_felt().as_int(),
+            "Payment token prefix should match owner"
+        );
+        assert_eq!(
+            token_suffix,
+            owner_account.id().suffix().as_int(),
+            "Payment token suffix should match owner"
+        );
 
-        // Verify price is set (500 from init note)
+        // Verify price is set (0 when no faucet provided - free registration)
         let price_word = contract_state.account().storage().get_item(5).unwrap();
         let price = price_word.get(0).unwrap().as_int();
-        assert_eq!(price, 500, "Price should be 500");
+        assert_eq!(price, 0, "Price should be 0 for free registration");
     } else {
         panic!("Contract state should be available after initialization");
     }
@@ -66,13 +74,16 @@ async fn init_registry_complete_flow() -> Result<(), ClientError> {
             complete_state.owner_suffix,
             owner_account.id().suffix().as_int()
         );
+        // When no faucet is provided, owner account is used as payment token
         assert_eq!(
-            complete_state.token_prefix, 1234,
-            "Payment token prefix should be 1234"
+            complete_state.token_prefix,
+            owner_account.id().prefix().as_felt().as_int(),
+            "Payment token prefix should match owner"
         );
         assert_eq!(
-            complete_state.token_suffix, 6789,
-            "Payment token suffix should be 6789"
+            complete_state.token_suffix,
+            owner_account.id().suffix().as_int(),
+            "Payment token suffix should match owner"
         );
 
         // Note: Map slots (3, 4) contain initial map root hashes, which is normal
@@ -218,14 +229,16 @@ async fn test_complete_contract_state_validation() -> Result<(), ClientError> {
             "Owner suffix should match"
         );
 
-        // Validate payment token state (slot 2)
+        // Validate payment token state (slot 2) - uses owner account when no faucet provided
         assert_eq!(
-            state.token_prefix, 1234,
-            "Payment token prefix should be 1234"
+            state.token_prefix,
+            owner_account.id().prefix().as_felt().as_int(),
+            "Payment token prefix should match owner"
         );
         assert_eq!(
-            state.token_suffix, 6789,
-            "Payment token suffix should be 6789"
+            state.token_suffix,
+            owner_account.id().suffix().as_int(),
+            "Payment token suffix should match owner"
         );
 
         // Note: Slots 3-4 use map storage (set_map_item/get_map_item) which stores

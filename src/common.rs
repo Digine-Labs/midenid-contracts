@@ -18,12 +18,14 @@ use miden_client::{
 };
 use miden_lib::account::{
     auth::{self, AuthRpoFalcon512},
+    faucets::BasicFungibleFaucet,
     wallets::BasicWallet,
 };
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
     account::AccountComponent,
     assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind},
+    asset::TokenSymbol,
 };
 use rand::{RngCore, rngs::StdRng};
 use serde::de::value::Error;
@@ -308,4 +310,43 @@ pub async fn wait_for_note(
     }
 
     Ok(())
+}
+
+// Creates a fungible faucet account for testing
+pub async fn create_faucet_account(
+    client: &mut Client,
+    keystore: FilesystemKeyStore<StdRng>,
+    symbol: &str,
+    decimals: u8,
+    max_supply: u64,
+) -> Result<(Account, SecretKey), ClientError> {
+    let mut init_seed = [0_u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let key_pair = SecretKey::with_rng(client.rng());
+
+    // Create token symbol (max 8 characters)
+    let token_symbol = TokenSymbol::new(symbol).expect("Invalid token symbol");
+
+    // Create faucet component with metadata
+    let faucet = BasicFungibleFaucet::new(token_symbol, decimals, Felt::new(max_supply))
+        .expect("Failed to create faucet");
+
+    // Build faucet account (must use FungibleFaucet account type)
+    let builder = AccountBuilder::new(init_seed)
+        .account_type(AccountType::FungibleFaucet)
+        .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
+        .with_component(faucet);
+
+    let (account, seed) = builder
+        .build()
+        .map_err(|e| ClientError::AccountError(e.into()))?;
+
+    client.add_account(&account, Some(seed), false).await?;
+    keystore
+        .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
+        .unwrap();
+
+    Ok((account, key_pair))
 }
