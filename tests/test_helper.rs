@@ -594,7 +594,7 @@ use.miden::note
 begin
     # Use standard Miden helper to transfer all assets from note to account
     # This will call the account's receive_asset export for each asset
-    exec.note::add_assets_to_account
+    #exec.note::add_assets_to_account
 
     # Now register the name - payment validation will check the vault balance
     push.{name_push}

@@ -74,7 +74,7 @@ end
 # Input: [ASSET]
 # Output: [pad(16)]
 # Standard Miden wallet interface - receive an asset into the account vault
-export.receive_assetds
+export.receive_asset
     exec.account::add_asset
     # => [ASSET', pad(12)]
 
@@ -450,7 +450,7 @@ end
 proc._validate_payment
     exec._get_balance
     # [initial_balance]
-    #exec.note::add_assets_to_account
+    exec.note::add_assets_to_account
     # [initial_balance]
     exec._get_balance
     # [after_balance, initial_balance]
