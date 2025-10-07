@@ -74,7 +74,7 @@ end
 # Input: [ASSET]
 # Output: [pad(16)]
 # Standard Miden wallet interface - receive an asset into the account vault
-export.receive_asset
+export.receive_assetds
     exec.account::add_asset
     # => [ASSET', pad(12)]
 
@@ -448,6 +448,32 @@ end
 # Input: []
 # Output: []
 proc._validate_payment
+    exec._get_balance
+    # [initial_balance]
+    exec.note::add_assets_to_account
+    # [initial_balance]
+    exec._get_balance
+    # [after_balance, initial_balance]
+    swap
+    # [initial_balance, after_balance]
+    debug.stack
+    u32overflowing_sub # after - initial
+    debug.stack
+    # [overflow, result]
+    assertz.err=VALIDATE_SUB_OVERFLOW
+    # [result]
+    exec._get_price_word
+    # [PRICE, result]
+    drop drop drop
+    # [price, result]
+    lte
+    # [price =< result]
+    assert.err=WRONG_AMOUNT_PAID
+end
+
+# Input: []
+# Output: []
+proc._validate_payment_old
     # Get price first to check if payment is required
     exec._get_price_word
     # [PRICE_WORD] where price is at index 3 (top of stack when retrieved via get_item)

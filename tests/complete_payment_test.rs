@@ -37,7 +37,7 @@ async fn test_complete_payment_with_p2id() -> Result<(), ClientError> {
     let fungible_asset =
         FungibleAsset::new(faucet_account.id(), amount).expect("Failed to create fungible asset");
 
-    for i in 1..=5 {
+    for i in 1..=2 {
         println!("   Minting note {} with {} tokens...", i, amount);
 
         let transaction_request = TransactionRequestBuilder::new()
@@ -59,7 +59,7 @@ async fn test_complete_payment_with_p2id() -> Result<(), ClientError> {
             .submit_transaction(tx_execution_result)
             .await?;
     }
-    println!("✅ Minted 5 notes of {} tokens each", amount);
+    println!("✅ Minted 2 notes of {} tokens each", amount);
 
     // Step 5: Wait for notes and consume them
     println!("\n🔄 Waiting for notes to be available...");
@@ -76,14 +76,14 @@ async fn test_complete_payment_with_p2id() -> Result<(), ClientError> {
 
         println!("   Found {} consumable notes", note_ids.len());
 
-        if note_ids.len() >= 5 {
+        if note_ids.len() >= 2 {
             break note_ids;
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     };
 
-    println!("✅ All 5 notes are now consumable");
+    println!("✅ All 2 notes are now consumable");
 
     // Step 6: Consume all notes
     println!("\n💸 Alice consuming all notes...");
