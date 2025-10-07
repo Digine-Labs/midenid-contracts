@@ -450,15 +450,13 @@ end
 proc._validate_payment
     exec._get_balance
     # [initial_balance]
-    exec.note::add_assets_to_account
+    #exec.note::add_assets_to_account
     # [initial_balance]
     exec._get_balance
     # [after_balance, initial_balance]
     swap
     # [initial_balance, after_balance]
-    debug.stack
     u32overflowing_sub # after - initial
-    debug.stack
     # [overflow, result]
     assertz.err=VALIDATE_SUB_OVERFLOW
     # [result]
@@ -466,7 +464,7 @@ proc._validate_payment
     # [PRICE, result]
     drop drop drop
     # [price, result]
-    lte
+    gte # result >= price
     # [price =< result]
     assert.err=WRONG_AMOUNT_PAID
 end
