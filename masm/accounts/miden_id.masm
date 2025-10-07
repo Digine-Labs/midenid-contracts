@@ -326,13 +326,12 @@ proc._assert_initialized
     # [0]
     exec.account::get_item
     # Returns: [0, 0, 0, 0] if NOT initialized, [1, 0, 0, 0] if initialized
-    # Stack is now [V3, V2, V1, V0] where V0 is the initialized flag
-    # assertz checks position 0 (V3), but we need to check V0!
-    # Let's move V0 to the top
-    movup.3
-    # [V0, V3, V2, V1]
+    # Stack is now [1, 0, 0, 0] (or [0, 0, 0, 0] if not initialized)
+    # The initialized flag is at position 0
+    # Check if position 0 is zero (not initialized)
+    # assertz will fail if value is NOT zero (i.e., if initialized)
     assertz.err=ALREADY_INITIALIZED
-    # [V3, V2, V1] - assertz consumed V0
+    # Drop the rest of the Word
     drop drop drop
     # []
 end
