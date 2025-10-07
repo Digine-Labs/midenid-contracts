@@ -1,0 +1,35 @@
+
+# Storage
+# SLOT[0] - initialized flag
+# SLOT[1] - PRICE FOR 1 LETTER
+# SLOT[2] - 2 LETTER
+# SLOT[3] - 3 LETTER
+# SLOT[4] - 4 LETTER
+# SLOT[5] - 5 or more letters
+
+export.init
+end
+
+# Inputs: [NAME]
+# Output: [price] or maybe price word
+export.calculate_price_by_name
+end
+
+# Inputs: [domain_len]
+# Output: [price] TODO: maybe we can return as word
+export.calculate_price_by_len
+    push.5
+    # [5, domain_len]
+
+end
+
+# Input: []
+# Output: []
+proc._assert_initialized
+
+end
+
+# Input: []
+# Output: []
+proc._set_initialized
+end
