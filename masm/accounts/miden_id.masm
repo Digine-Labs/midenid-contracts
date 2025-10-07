@@ -175,6 +175,12 @@ export.get_name
     exec._get_name_by_addr
 end
 
+# Input: [NAME]
+# Output: [prefix, suffix]
+export.get_address
+    exec._get_addr_by_name
+end
+
 # Direct map write procedure for Name->ID (slot 3)
 # Input: [KEY(4), VALUE(4)] on stack
 # Returns: []
@@ -215,6 +221,17 @@ proc._get_name_by_addr
     # [4, 0, 0, addr_prefix, addr_suffix]
     exec.account::get_map_item
     # [VALUE]
+end
+
+# Input: [NAME]
+# Output: [addr_prefix, addr_suffix]
+proc._get_addr_by_name
+    push.3
+    # [4, NAME]
+    exec.account::get_map_item
+    # [VALUE]
+    drop drop
+    # [prefix, suffix]
 end
 
 # Input: [NAME]
