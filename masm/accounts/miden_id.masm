@@ -67,6 +67,15 @@ export.update_price
     # []
 end
 
+# Input: []
+# Output: []
+# Only owner can call this function
+export.withdraw_assets
+    exec._assert_only_owner
+    # []
+    ##### TODO
+end
+
 # MIDEN BASIC WALLET INTERFACE
 # Required for the account to receive assets from notes
 # This MUST match the exact implementation from miden-base/asm/miden/contracts/wallets/basic.masm
