@@ -1,0 +1,54 @@
+use.miden::account
+use.miden::account_id
+use.miden::active_note
+
+# ERRORS
+# =================================================================================================
+
+const.ERR_P2N_WRONG_NUMBER_OF_INPUTS="P2IDN note expects exactly 4 note inputs"
+
+const.ERR_P2ID_TARGET_ACCT_MISMATCH="P2ID's target account address and transaction address do not match"
+
+#! Pay-to-Name script: adds all assets from the note to the account, assuming name of the account
+#! registeren on Miden Name Service.
+#!
+#! Requires that the account exposes:
+#! - miden::contracts::wallets::basic::receive_asset procedure.
+#!
+#! Inputs:  []
+#! Outputs: []
+#!
+#! Note inputs are assumed to be as follows:
+#! - target_account_name is the name WORD of the account for which the note is intended
+#!
+#! Panics if:
+#! - Account does not expose miden::contracts::wallets::basic::receive_asset procedure.
+#! - Name word does not match with any Account.
+#! - Account ID of executing account is not equal to the Account ID specified via note inputs.
+#! - The same non-fungible asset already exists in the account.
+#! - Adding a fungible asset would result in amount overflow, i.e., the total amount would be
+#!   greater than 2^63.
+begin
+    # store the note inputs to memory starting at address 0
+    padw push.0 exec.active_note::get_inputs
+    # => [num_inputs, inputs_ptr, EMPTY_WORD]
+
+    # make sure the number of inputs is 4 (name is a full word)
+    eq.4 assert.err=ERR_P2N_WRONG_NUMBER_OF_INPUTS
+    # => [inputs_ptr, EMPTY_WORD]
+
+    # read the target account ID from the note inputs
+    mem_loadw
+    # => [NAME_WORD]
+
+    # TODO: resolve name from registry
+    exec.account::get_id
+    # => [account_id_prefix, account_id_suffix, target_account_id_prefix, target_account_id_suffix, ...]
+
+    # ensure account_id = target_account_id, fails otherwise
+    exec.account_id::is_equal assert.err=ERR_P2ID_TARGET_ACCT_MISMATCH
+    # => []
+
+    exec.active_note::add_assets_to_account
+    # => []
+end
