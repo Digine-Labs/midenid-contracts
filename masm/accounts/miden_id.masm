@@ -162,6 +162,18 @@ export.register_name
     # []
 end
 
+# Input: [index]
+# Output: [STORAGE_ITEM]
+export.read_storage
+    exec.account::get_item
+end
+
+# Input: [index, KEY]
+# Output: [STORAGE_ITEM]
+export.read_storage_map
+    exec.account::get_map_item
+end
+
 
 # Input: [NAME]
 # Output: [1 or 0, VALUE, ZERO_WORD]
