@@ -394,33 +394,16 @@ proc._update_owner
     dropw
 end
 
-# Input: []
-# Output: []
 proc._assert_only_owner
     exec.note::get_sender
-    # [sender_prefix, sender_suffix]
     push.1
-    # [1, sender_prefix, sender_suffix]
     exec.account::get_item
-    # [owner_prefix, owner_suffix, 0, 0, sender_prefix, sender_suffix]
     drop drop
-    # [owner_prefix, owner_suffix, sender_prefix, sender_suffix]
-
-    # Compare prefix: owner_prefix (depth 0) == sender_prefix (depth 2)?
-    dup.0 dup.3
-    # [sender_prefix, owner_prefix, owner_prefix, owner_suffix, sender_prefix, sender_suffix]
+    dup.1 dup.3
     assert_eq.err=OWNER_PREFIX_MISMATCH
-    # [owner_prefix, owner_suffix, sender_prefix, sender_suffix]
-
-    # Compare suffix: owner_suffix (depth 1) == sender_suffix (depth 3)?
-    dup.1 dup.4
-    # [sender_suffix, owner_suffix, owner_prefix, owner_suffix, sender_prefix, sender_suffix]
+    dup.0 dup.4
     assert_eq.err=OWNER_SUFFIX_MISMATCH
-    # [owner_prefix, owner_suffix, sender_prefix, sender_suffix]
-
-    # Clean up stack
     dropw
-    # []
 end
 
 # Input: [token_prefix, token_suffix]

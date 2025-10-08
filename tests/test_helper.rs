@@ -54,8 +54,6 @@ impl RegistryTestHelper {
         let client = match instantiate_client(endpoint.clone()).await {
             Ok(client) => client,
             Err(e) => {
-                println!("Testnet connection failed: {}", e);
-                println!("Falling back to localhost...");
                 let localhost_endpoint = Endpoint::localhost();
                 instantiate_client(localhost_endpoint.clone()).await?
             }
@@ -81,8 +79,6 @@ impl RegistryTestHelper {
         let client = match instantiate_client(endpoint.clone()).await {
             Ok(client) => client,
             Err(e) => {
-                println!("Testnet connection failed: {}", e);
-                println!("Falling back to localhost...");
                 let localhost_endpoint = Endpoint::localhost();
                 instantiate_client(localhost_endpoint.clone()).await?
             }
@@ -195,11 +191,6 @@ end
 
         let _tx_result = self.client.new_transaction(faucet.id(), request).await?;
 
-        println!("⚠️  Note: Faucet token distribution requires proper note handling.");
-        println!(
-            "⚠️  For full payment validation, use real testnet faucet or implement P2ID notes."
-        );
-        println!("⚠️  Current test will validate payment logic but skip actual token transfer.");
 
         Ok(())
     }
@@ -314,7 +305,9 @@ use.miden_id::registry
 use.std::sys
 
 begin
-    push.0.0.0.{new_price} # new price as PRICE_WORD [price, 0, 0, 0]
+    push.{new_price}.0.0.0
+    # Stack: [0, 0, 0, price]
+    # This will be stored via set_item as Word [price, 0, 0, 0]
     call.registry::update_price
     exec.sys::truncate_stack
 end
@@ -402,10 +395,11 @@ end
             .unwrap()
             .into();
 
-        // Payment token stored as Word [prefix, suffix, 0, 0] at slot 2
+        // Payment token stored as Word [suffix, prefix, 0, 0] at slot 2 due to Word reversal
+        // But we return (prefix, suffix) tuple for consistency
         (
-            payment_token.get(0).unwrap().as_int(), // prefix at index 0
-            payment_token.get(1).unwrap().as_int(), // suffix at index 1
+            payment_token.get(1).unwrap().as_int(), // prefix at index 1
+            payment_token.get(0).unwrap().as_int(), // suffix at index 0
         )
     }
 
