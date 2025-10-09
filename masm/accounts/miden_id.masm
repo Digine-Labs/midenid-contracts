@@ -67,6 +67,13 @@ export.update_price
     # []
 end
 
+# Input: [new_owner_prefix, new_owner_suffix]
+# Output: []
+export.update_owner
+    exec._assert_only_owner
+    exec._update_owner
+end
+
 # Input: []
 # Output: []
 # Only owner can call this function
