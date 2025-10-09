@@ -2,10 +2,12 @@ use.miden_id::registry
 use.miden::note
 use.std::sys
 
+const.NOTE_INPUT_PTR=0
+
 # Input to this note is a note input. So it is not directly pushed to stack
 # Inputs: [PRICE] (argument)
 begin
-    push.0
+    push.NOTE_INPUT_PTR
     exec.note::get_inputs
     push.0
     mem_loadw
