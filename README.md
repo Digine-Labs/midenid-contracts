@@ -37,6 +37,7 @@ All core logic is implemented in Miden Assembly (`.masm` files):
     - `SLOT[4]`: ID-to-Name reverse mapping (SMT root)
     - `SLOT[5]`: Registration price
 - **[pricing.masm](masm/accounts/pricing.masm)**: Pricing contract that calculates price of a name (Under development)
+- **[identity.masm](masm/accounts/identity.masm)**: Identity contract that stores users public identities (Under development, will be renamed as miden_id.masm)
 
 #### Notes
 - **[init.masm](masm/notes/init.masm)**: Initialize naming registry with owner and price
