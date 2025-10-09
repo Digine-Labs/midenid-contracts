@@ -41,7 +41,7 @@ All core logic is implemented in Miden Assembly (`.masm` files):
 
 #### Notes
 - **[init.masm](masm/notes/init.masm)**: Initialize naming registry with owner and price
-- **[register_name.masm](masm/notes/register_name.masm)**: Register a new name with payment
+- **[register_name.masm](masm/notes/register_name.masm)**: Register a new name with payment (Hardcoded-name for example)
 - **[update_price.masm](masm/notes/update_price.masm)**: Update registration price (owner only)
 - **[update_owner.masm](masm/notes/update_owner.masm)**: Transfer ownership (owner only)
 - **[P2N.masm](masm/notes/P2N.masm)**: Pay-to-note for payment handling (TBD)
