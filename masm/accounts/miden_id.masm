@@ -83,10 +83,6 @@ export.withdraw_assets
     ##### TODO
 end
 
-# MIDEN BASIC WALLET INTERFACE
-# Required for the account to receive assets from notes
-# This MUST match the exact implementation from miden-base/asm/miden/contracts/wallets/basic.masm
-
 # Input: [ASSET]
 # Output: [pad(16)]
 # Standard Miden wallet interface - receive an asset into the account vault
