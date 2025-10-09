@@ -303,6 +303,39 @@ end
         Ok(())
     }
 
+    pub async fn update_owner(
+        &mut self,
+        owner_account: &Account,
+        new_owner: &Account,
+    ) -> Result<(), ClientError> {
+        let contract_code = fs::read_to_string(Path::new("./masm/accounts/miden_id.masm")).unwrap();
+        let update_owner_note_code = get_note_code("update_owner".to_string());
+
+        let library_namespace = "miden_id::registry";
+        let contract_library = create_library(contract_code, library_namespace).unwrap();
+        let empty_assets = NoteAssets::new(vec![]).unwrap();
+        let inputs = NoteInputs::new(vec![new_owner.id().suffix(),new_owner.id().prefix().as_felt()]).unwrap();
+
+        let update_price_note = create_public_note_with_library_and_inputs(
+            &mut self.client,
+            update_owner_note_code,
+            owner_account.clone(),
+            empty_assets,
+            contract_library,
+            inputs
+        )
+        .await
+        .unwrap();
+
+        self.execute_transaction_with_note(update_price_note)
+            .await?;
+
+        sleep(Duration::from_secs(8)).await;
+        self.sync_network().await?;
+
+        Ok(())
+    }
+
     // ================================================================================================
     // STATE QUERY METHODS
     // ================================================================================================
@@ -348,6 +381,16 @@ end
         );
 
         (initialized, owner_prefix, owner_suffix)
+    }
+
+    pub fn get_owner(&self, account_record: &AccountRecord) -> (u64, u64) {
+        let owner: Word = account_record.account().storage().get_item(1).unwrap().into();
+        let (owner_prefix, owner_suffix) = (
+            owner.get(0).unwrap().as_int(), // prefix at index 0
+            owner.get(1).unwrap().as_int(), // suffix at index 1
+        );
+
+        (owner_prefix, owner_suffix)
     }
 
     /// Get payment token configuration from slot 2
