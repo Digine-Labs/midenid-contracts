@@ -1,6 +1,8 @@
 use.miden_id::registry
 use.std::sys
 
+## This is just for an example. We highly recommend note inputs such like update_owner.masm and update_price.masm.
+
 begin
     # NAME should be provided as input to the note
     # For example: "alice" encoded as a Word
