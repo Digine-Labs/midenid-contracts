@@ -84,8 +84,32 @@ cargo build --release
 
 ### Running Tests
 
+Tests run against the Miden testnet by default. For local development, we provide automated scripts to set up and run a local Miden node.
+
+#### Using Automated Scripts (Recommended for Local Development)
+
+Miden Name Registry tests run on testnet. However, we have implemented scripts in the scripts folder to set up, start, and test a local node.The `scripts/` folder contains shell scripts to simplify local node setup and testing:
+
+- **[setup_node.sh](scripts/setup_node.sh)**: Installs miden-node, creates required directories, and bootstraps a local node with genesis data
+- **[start_node.sh](scripts/start_node.sh)**: Starts the local Miden node with RPC server on port 57291
+- **[start_node_and_test.sh](scripts/start_node_and_test.sh)**: Complete automation script that starts the node, waits for it to be ready, runs all tests, and cleans up the node process automatically
+
 ```bash
-# Run all tests (requires testnet access)
+# One-time setup: Install and bootstrap local node
+bash scripts/setup_node.sh
+
+# Option 1: Run tests with automatic node management (recommended)
+bash scripts/start_node_and_test.sh
+
+# Option 2: Manual node control
+bash scripts/start_node.sh  # In one terminal
+cargo test --release -- --nocapture --test-threads=1  # In another terminal
+```
+
+#### Manual Test Commands
+
+```bash
+# Run all tests (requires testnet or local node access)
 cargo test --release -- --nocapture --test-threads=1
 
 # Run specific test file
