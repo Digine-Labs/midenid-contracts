@@ -1,0 +1,14 @@
+use.miden_id::registry
+use.miden::note
+use.std::sys
+
+# Input to this note is a note input. So it is not directly pushed to stack
+# Inputs: [PRICE] (argument)
+begin
+    push.0
+    exec.note::get_inputs
+    push.0
+    mem_loadw
+    call.registry::update_price
+    exec.sys::truncate_stack
+end

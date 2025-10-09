@@ -1,0 +1,15 @@
+use.miden_id::registry
+use.miden::note
+use.std::sys
+
+begin
+    push.0
+    exec.note::get_inputs
+    debug.stack
+    push.0
+    mem_loadw
+    drop
+    debug.stack
+    call.registry::init
+    exec.sys::truncate_stack
+end

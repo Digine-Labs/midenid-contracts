@@ -93,6 +93,51 @@ pub fn create_library(
     Ok(library)
 }
 
+pub async fn create_public_note_with_library_and_inputs(
+    client: &mut Client,
+    note_code: String,
+    creator_account: Account,
+    assets: NoteAssets,
+    library: Library,
+    inputs: NoteInputs
+) -> Result<Note, Error> {
+    let assembler = TransactionKernel::assembler()
+        .with_debug_mode(true)
+        .with_dynamic_library(library)
+        .unwrap();
+    let rng = client.rng();
+    let serial_num = rng.inner_mut().draw_word();
+    let program = assembler.clone().assemble_program(note_code).unwrap();
+    let note_script = NoteScript::new(program);
+    //let note_inputs = NoteInputs::new([].to_vec()).unwrap();
+    let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
+    let tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap();
+    let metadata = NoteMetadata::new(
+        creator_account.id(),
+        NoteType::Public,
+        tag,
+        NoteExecutionHint::always(),
+        Felt::new(0),
+    )
+    .unwrap();
+
+    let note = Note::new(assets, metadata, recipient);
+
+    let note_req = TransactionRequestBuilder::new()
+        .own_output_notes(vec![OutputNote::Full(note.clone())])
+        .build()
+        .unwrap();
+    let tx_result = client
+        .new_transaction(creator_account.id(), note_req)
+        .await
+        .unwrap();
+
+    let _ = client.submit_transaction(tx_result).await;
+    client.sync_state().await.unwrap();
+
+    Ok(note)
+}
+
 // Creates public note with library
 pub async fn create_public_note_with_library(
     client: &mut Client,

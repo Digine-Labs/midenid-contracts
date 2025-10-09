@@ -1,11 +1,5 @@
 use miden_client::{
-    ClientError, Word,
-    account::Account,
-    keystore::FilesystemKeyStore,
-    note::{Note, NoteAssets},
-    rpc::Endpoint,
-    store::AccountRecord,
-    transaction::TransactionRequestBuilder,
+    account::Account, keystore::FilesystemKeyStore, note::{Note, NoteAssets, NoteInputs}, rpc::Endpoint, store::AccountRecord, transaction::TransactionRequestBuilder, ClientError, Word
 };
 use miden_objects::{Felt, FieldElement, account::AccountId, asset::FungibleAsset};
 use midenid_contracts::common::*;
@@ -232,8 +226,8 @@ end
 
         // Use faucet if provided, otherwise use owner account
         let payment_token = faucet_account.unwrap_or(owner_account);
-        let token_prefix = payment_token.id().prefix().as_felt().as_int();
-        let token_suffix = payment_token.id().suffix().as_int();
+        let token_prefix = payment_token.id().prefix().as_felt();
+        let token_suffix = payment_token.id().suffix();
 
         // Set price based on whether we have a faucet
         // With faucet: price = 100 (payment required)
@@ -241,37 +235,20 @@ end
         let price = if faucet_account.is_some() { 100 } else { 0 };
 
         // Create dynamic init note with payment token
-        let init_note_code = format!(
-            r#"
-use.miden_id::registry
-use.std::sys
-
-begin
-    push.{token_prefix}
-    push.{token_suffix}
-    push.{price}
-    # Stack: [price, token_suffix, token_prefix]
-    call.registry::init
-    exec.sys::truncate_stack
-end
-"#,
-            token_prefix = token_prefix,
-            token_suffix = token_suffix,
-            price = price
-        );
-
-        println!("DEBUG: Init note code:\n{}", init_note_code);
+        let init_note_code = get_note_code("init".to_string());
 
         let library_namespace = "miden_id::registry";
         let contract_library = create_library(contract_code, library_namespace).unwrap();
         let empty_assets = NoteAssets::new(vec![]).unwrap();
+        let inputs = NoteInputs::new(vec![ token_prefix, token_suffix, Felt::new(price)]).unwrap();
 
-        let init_note = create_public_note_with_library(
+        let init_note = create_public_note_with_library_and_inputs(
             &mut self.client,
             init_note_code,
             owner_account.clone(),
             empty_assets,
             contract_library,
+            inputs
         )
         .await
         .unwrap();
@@ -299,32 +276,20 @@ end
         let contract_code = fs::read_to_string(Path::new("./masm/accounts/miden_id.masm")).unwrap();
 
         // Create note to update price
-        let update_price_note_code = format!(
-            r#"
-use.miden_id::registry
-use.std::sys
-
-begin
-    push.{new_price}.0.0.0
-    # Stack: [0, 0, 0, price]
-    # This will be stored via set_item as Word [price, 0, 0, 0]
-    call.registry::update_price
-    exec.sys::truncate_stack
-end
-"#,
-            new_price = new_price
-        );
+        let update_price_note_code = get_note_code("update_price".to_string());
 
         let library_namespace = "miden_id::registry";
         let contract_library = create_library(contract_code, library_namespace).unwrap();
         let empty_assets = NoteAssets::new(vec![]).unwrap();
+        let inputs = NoteInputs::new(vec![Felt::new(new_price), Felt::new(0), Felt::new(0), Felt::new(0)]).unwrap();
 
-        let update_price_note = create_public_note_with_library(
+        let update_price_note = create_public_note_with_library_and_inputs(
             &mut self.client,
             update_price_note_code,
             owner_account.clone(),
             empty_assets,
             contract_library,
+            inputs
         )
         .await
         .unwrap();
@@ -772,4 +737,12 @@ fn word_to_masm_push_string(word: &Word) -> String {
         word[2].as_int(),
         word[3].as_int()
     )
+}
+
+pub fn get_script_code(script_name: String) -> String {
+    fs::read_to_string(Path::new(&format!("./masm/scripts/{file_name}.masm", file_name = script_name))).unwrap()
+}
+
+pub fn get_note_code(note_name: String) -> String {
+    fs::read_to_string(Path::new(&format!("./masm/notes/{file_name}.masm", file_name = note_name))).unwrap()
 }
