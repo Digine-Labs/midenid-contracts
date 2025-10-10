@@ -39,6 +39,35 @@ end
 export.set_default_name
 end
 
+## Resolver functions
+# Input: [account_prefix, account_suffix]
+# Output: [DOMAIN]
+export.domain_by_account_id
+    push.0.0
+    # [0, 0, prefix, suffix]
+    push.ACCOUNT_ID_TO_DOMAIN_SLOT
+    # [slot, 0, 0, prefix, suffix]
+    exec.account::get_map_item
+    # [DOMAIN]
+end
+
+# Input: [DOMAIN]
+# Output: [prefix, suffix]
+export.account_id_by_domain
+    push.DOMAIN_TO_ACCOUNT_ID_SLOT
+    exec.account::get_map_item drop drop
+    # [prefix, suffix]
+end
+
+# Input: [DOMAIN]
+# Output: [prefix, suffix]
+export.owner_of_domain
+    push.DOMAIN_TO_OWNER_SLOT
+    # [slot, DOMAIN]
+    exec.account::get_map_item drop drop
+    # [owner_prefix, owner_suffix]
+end
+
 ## Only Owner
 # Input: [new_owner_prefix, new_owner_suffix]
 # Output: []
@@ -64,7 +93,7 @@ end
 
 # Input: [token_prefix, token_suffix, contract_prefix, contract_suffix]
 # Output: []
-export.set_payment_token
+export.set_payment_token_contract
     exec._assert_only_owner
     # [token_prefix, token_suffix, contract_prefix, contract_suffix]
     push.0.0
@@ -88,6 +117,20 @@ export.set_payment_token
 end
 
 ## Internal procedures
+
+# Input: [token_prefix, token_suffix]
+# Output: [1 or 0]
+proc._is_token_available_for_payment
+    push.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT
+    exec.account::get_map_item drop drop
+    # [contract_prefix, contract_suffix]
+    push.0.0
+    exec.account_id::is_equal
+    # [1 if token contract zero]
+    not
+    # [1 or 0]
+end
+
 # Input: [DOMAIN]
 # Output: [1 or 0]
 proc._is_domain_exist
