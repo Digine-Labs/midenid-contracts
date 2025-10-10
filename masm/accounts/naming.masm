@@ -88,6 +88,28 @@ export.set_payment_token
 end
 
 ## Internal procedures
+# Input: [DOMAIN]
+# Output: [1 or 0]
+proc._is_domain_exist
+    push.DOMAIN_TO_OWNER_SLOT
+    # [slot, DOMAIN]
+    exec.account::get_map_item drop drop
+    # [prefix, suffix]
+    push.0.0
+    # [0, 0, prefix, suffix]
+    exec.account_id::is_equal
+    # [1 if not owner]
+    not
+    # [1 or 0]
+end
+
+# Input: [payment_token_prefix, payment_token_suffix]
+# Output: [balance]
+proc._get_balance
+    exec.account::get_balance
+    # [balance]
+end
+
 # Input: []
 # Output: []
 proc._assert_only_owner
