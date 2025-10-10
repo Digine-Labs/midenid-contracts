@@ -1968,6 +1968,7 @@ dependencies = [
 name = "midenid-contracts"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "miden-assembly 0.17.1",
  "miden-client 0.11.4",
  "miden-client-tools",
