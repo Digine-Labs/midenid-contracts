@@ -132,9 +132,30 @@ cargo fmt
 cargo clippy
 ```
 
+## Deployment
+
+For production deployment to testnet or mainnet, see the comprehensive **[DEPLOYMENT.md](DEPLOYMENT.md)** guide.
+
+**Quick Start:**
+```bash
+cargo run --release --bin deploy -- <network> <payment_token_id> <price> [owner_account_id]
+```
+
+Example:
+```bash
+# Deploy to testnet with auto-created owner account
+cargo run --release --bin deploy -- testnet 0x97598f759deab5201e93e1aac55997 10
+```
+
+The deployment script will:
+- Deploy the registry contract as public, immutable
+- Create or use an existing owner account
+- Initialize the registry with payment token and price
+- Save deployment info to `./deployments/` directory
+
 ## Usage Examples
 
-### Deploying and Initializing Registry
+### Deploying and Initializing Registry (Testing)
 
 ```rust
 let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;

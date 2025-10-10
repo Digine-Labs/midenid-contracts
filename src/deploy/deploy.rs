@@ -1,6 +1,6 @@
 use std::{env, fs, path::Path};
 use midenid_contracts::common::{
-    create_library, create_public_immutable_contract, create_public_note_with_library,
+    create_library, create_public_immutable_contract, create_public_note_with_library_and_inputs,
     create_tx_script, instantiate_client,
 };
 use miden_client::{
@@ -8,14 +8,31 @@ use miden_client::{
     rpc::Endpoint,
     transaction::TransactionRequestBuilder,
 };
-use miden_objects::{address::Address, note::NoteAssets};
+use miden_objects::{address::Address, note::{NoteAssets, NoteInputs}, Felt, FieldElement};
 use tokio::time::{sleep, Duration};
 
-/// Parse account ID from hex or bech32 format
+/// Parses an account ID from either hexadecimal or Bech32 format.
 ///
-/// Supports:
-/// - Hex format: 0x1c89546e3b82cd1012a9fe4853bc68
-/// - Bech32 format: mm1..., mtst..., mdev...
+/// This function supports two input formats for Miden account IDs:
+/// - **Hexadecimal**: Prefixed with `0x` (e.g., `0x1c89546e3b82cd1012a9fe4853bc68`)
+/// - **Bech32**: Network-specific prefixes (e.g., `mm1...`, `mtst1...`, `mdev1...`)
+///
+/// # Arguments
+///
+/// * `id_str` - A string slice containing the account ID in either hex or bech32 format
+///
+/// # Returns
+///
+/// * `Ok(AccountId)` - Successfully parsed account ID
+/// * `Err(String)` - Error message if parsing fails or format is unsupported
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The input string doesn't start with `0x`, `mm1`, `mtst1`, or `mdev1`
+/// - The hex format is invalid
+/// - The bech32 address cannot be decoded
+/// - The bech32 address doesn't contain an AccountId type
 fn parse_account_id(id_str: &str) -> Result<AccountId, String> {
     // Check if it's a bech32 address (starts with known prefixes)
     if id_str.starts_with("mm1") || id_str.starts_with("mtst1") || id_str.starts_with("mdev1") {
@@ -199,39 +216,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("STEP 2: Initialize Registry");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let token_prefix = payment_token_id.prefix().as_felt().as_int();
-    let token_suffix = payment_token_id.suffix().as_int();
-
     println!("⚙️  Initialization:");
     println!("   Owner: {}", owner_id);
     println!("   Payment Token: {}", payment_token_id);
     println!("   Price: {} tokens\n", price);
 
-    let init_note_code = format!(
-        r#"
-use.miden_id::registry
-use.std::sys
-
-begin
-    push.{token_prefix}
-    push.{token_suffix}
-    push.{price}
-    call.registry::init
-    exec.sys::truncate_stack
-end
-"#
-    );
+    // Read init note code from file
+    let init_note_code = fs::read_to_string(Path::new("./masm/notes/init.masm"))?;
 
     let library_namespace = "miden_id::registry";
     let contract_library = create_library(registry_code.clone(), library_namespace)?;
     let empty_assets = NoteAssets::new(vec![])?;
 
-    let init_note = create_public_note_with_library(
+    // Pass initialization parameters as note inputs
+    let token_prefix = payment_token_id.prefix().as_felt();
+    let token_suffix = payment_token_id.suffix();
+    let inputs = NoteInputs::new(vec![token_prefix, token_suffix, Felt::new(price)])?;
+
+    let init_note = create_public_note_with_library_and_inputs(
         &mut client,
         init_note_code,
         owner_account.clone(),
         empty_assets,
         contract_library,
+        inputs,
     )
     .await?;
 
