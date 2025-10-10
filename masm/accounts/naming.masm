@@ -1,0 +1,118 @@
+use.miden::account
+use.miden::account_id
+use.miden::note
+
+## Errors
+const.ERR_ONLY_OWNER="Only owner"
+const.ERR_ONLY_DOMAIN_OWNER="Only domain owner"
+
+## Constants
+const.INIT_FLAG_SLOT=0
+const.OWNER_SLOT=1
+const.TREASURY_SLOT=2
+const.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT=10
+const.ACCOUNT_ID_TO_DOMAIN_SLOT=11
+const.DOMAIN_TO_ACCOUNT_ID_SLOT=12
+const.DOMAIN_TO_OWNER_SLOT=13
+
+const.MAX_NAME_LENGTH=20
+
+## Storage
+# 0: init flag
+# 1: owner
+# 2: treasury
+# Empty fields
+# 10: map(payment_token -> pricing contract ID)
+# 11: Account to domain map([0, 0, account_prefix, account_suffix] -> Name)
+# 12: Domain to account map(Name -> [0, 0, account_prefix, account_suffix])
+# 13: Domain to owner map(Name -> [0, 0, owner_prefix, owner_suffix])
+
+export.init
+end
+
+export.register
+end
+
+export.transfer
+end
+
+export.set_default_name
+end
+
+## Only Owner
+# Input: [new_owner_prefix, new_owner_suffix]
+# Output: []
+export.update_owner
+    exec._assert_only_owner
+    push.0.0
+    # [0, 0, new_owner_prefix, new_owner_suffix]
+    push.OWNER_SLOT
+    exec.account::set_item
+    dropw
+end
+
+# Input: [new_treasury_prefix, new_treasury_suffix]
+# Output: []
+export.update_treasury
+    exec._assert_only_owner
+    push.0.0
+    # [0, 0, new_treasury_prefix, new_treasury_suffix]
+    push.TREASURY_SLOT
+    exec.account::set_item
+    dropw
+end
+
+# Input: [token_prefix, token_suffix, contract_prefix, contract_suffix]
+# Output: []
+export.set_payment_token
+    exec._assert_only_owner
+    # [token_prefix, token_suffix, contract_prefix, contract_suffix]
+    push.0.0
+    # [0, 0, token_prefix, token_suffix, contract_prefix, contract_suffix]
+    movup.5 movup.5
+    # [contract_prefix, contract_suffix, 0, 0, token_prefix, token_suffix]
+    movdn.3 movdn.3
+    # [0, 0, contract_prefix, contract_suffix, token_prefix, token_suffix]
+    push.0.0
+    # [0, 0, 0, 0, contract_prefix, contract_suffix, token_prefix, token_suffix]
+    movup.7 movup.7
+    # [token_prefix, token_suffix, 0, 0, 0, 0, contract_prefix, contract_suffix]
+    movdn.3 movdn.3
+    # [0, 0, token_prefix, token_suffix, 0, 0, contract_prefix, contract_suffix]
+    push.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT
+    # [10, 0, 0, token_prefix, token_suffix, 0, 0, contract_prefix, contract_suffix]
+    exec.account::set_map_item
+    # [OLD_VALUE, OLD_KEY]
+    dropw dropw
+    # []
+end
+
+## Internal procedures
+# Input: []
+# Output: []
+proc._assert_only_owner
+    exec.note::get_sender
+    # [caller_prefix, caller_suffix]
+    push.OWNER_SLOT
+    exec.account::get_item
+    # [0, 0, owner_prefix, owner_suffix, caller_prefix, caller_suffix]
+    drop drop
+    # [owner_prefix, owner_suffix, caller_prefix, caller_suffix]
+    exec.account_id::is_equal assert.err=ERR_ONLY_OWNER
+    # []
+end
+
+# Input: [DOMAIN]
+# Output: []
+proc._assert_only_domain_owner
+    push.DOMAIN_TO_OWNER_SLOT
+    # [slot, DOMAIN]
+    exec.account::get_map_item
+    # [OWNER]
+    drop drop
+    # [owner_prefix, owner_suffix]
+    exec.note::get_sender
+    # [caller_prefix, caller_suffix, owner_prefix, owner_suffix]
+    exec.account_id::is_equal assert.err=ERR_ONLY_DOMAIN_OWNER
+    # []
+end
