@@ -1,12 +1,19 @@
 use.miden_id::registry
+use.miden::note
 use.std::sys
 
-## This is just for an example. We highly recommend note inputs such like update_owner.masm and update_price.masm.
+const.NOTE_INPUT_PTR=0
 
+# Input to this note is provided via note inputs
+# Inputs: [NAME_WORD] (Word containing encoded name)
 begin
-    # NAME should be provided as input to the note
-    # For example: "alice" encoded as a Word
-    push.0.0.0.97 push.0.0.105.99 push.0.0.101.108 push.0.0.0.97  # "alice" encoded
+    # Load the name from note inputs
+    push.NOTE_INPUT_PTR
+    exec.note::get_inputs
+    push.0
+    mem_loadw
+
+    # Register the name
     call.registry::register_name
     exec.sys::truncate_stack
 end
