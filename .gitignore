@@ -9,3 +9,4 @@ store.sqlite3
 store.sqlite3
 /.claude
 CLAUDE.md
+/deployments
