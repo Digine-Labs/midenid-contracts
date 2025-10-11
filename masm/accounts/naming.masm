@@ -45,7 +45,7 @@ export.init
     # []
 end
 
-# Input: [DOMAIN]
+# Input: [payment_token_prefix, payment_token_suffix, DOMAIN]
 # Output: []
 export.register
 end
