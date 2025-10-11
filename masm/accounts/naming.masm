@@ -23,9 +23,9 @@ const.MAX_NAME_LENGTH=20
 # 2: treasury
 # Empty fields
 # 10: map(payment_token -> pricing contract ID)
-# 11: Account to domain map([0, 0, account_prefix, account_suffix] -> Name)
-# 12: Domain to account map(Name -> [0, 0, account_prefix, account_suffix])
-# 13: Domain to owner map(Name -> [0, 0, owner_prefix, owner_suffix])
+# 11: Account to domain map([0, 0, account_prefix, account_suffix] -> DOMAIN)
+# 12: Domain to account map(DOMAIN -> [0, 0, account_prefix, account_suffix])
+# 13: Domain to owner map(DOMAIN -> [0, 0, owner_prefix, owner_suffix])
 
 export.init
 end
@@ -36,7 +36,16 @@ end
 export.transfer
 end
 
-export.set_default_name
+# Input: [DOMAIN]
+# Output: []
+export.set_default_domain
+    dupw
+    exec._assert_only_domain_owner
+    # [DOMAIN]
+    exec.note::get_sender
+    # [caller_prefix, caller_suffix, DOMAIN]
+    exec._update_domain_map
+    # []
 end
 
 ## Resolver functions
@@ -71,7 +80,7 @@ end
 ## Only Owner
 # Input: [new_owner_prefix, new_owner_suffix]
 # Output: []
-export.update_owner
+export.update_registry_owner
     exec._assert_only_owner
     push.0.0
     # [0, 0, new_owner_prefix, new_owner_suffix]
@@ -117,6 +126,34 @@ export.set_payment_token_contract
 end
 
 ## Internal procedures
+
+# Input: [account_prefix, account_suffix, DOMAIN]
+# Output: []
+proc._update_domain_map
+    push.0.0
+    # [ACCOUNT, DOMAIN]
+    dupw dupw.2
+    # [DOMAIN, ACCOUNT, ACCOUNT, DOMAIN]
+    push.DOMAIN_TO_ACCOUNT_ID_SLOT
+    exec.account::set_map_item dropw dropw
+    # [ACCOUNT, DOMAIN]
+    push.ACCOUNT_ID_TO_DOMAIN_SLOT
+    exec.account::set_map_item dropw dropw
+    # []
+end
+
+# Input: [new_owner_prefix, new_owner_suffix, DOMAIN]
+# Output: []
+proc._update_domain_owner
+    push.0.0
+    # [0,0, prefix, suffix, DOMAIN]
+    swapw
+    # [DOMAIN, 0, 0, prefix, suffix]
+    push.DOMAIN_TO_OWNER_SLOT
+    # [slot, DOMAIN, 0, 0, prefix, suffix]
+    exec.account::set_map_item dropw dropw
+    # []
+end
 
 # Input: [token_prefix, token_suffix]
 # Output: [1 or 0]
