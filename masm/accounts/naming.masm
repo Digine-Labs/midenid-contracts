@@ -5,6 +5,7 @@ use.miden::note
 ## Errors
 const.ERR_ONLY_OWNER="Only owner"
 const.ERR_ONLY_DOMAIN_OWNER="Only domain owner"
+const.ERR_ALREADY_INITIALIZED="Contract already initialized"
 
 ## Constants
 const.INIT_FLAG_SLOT=0
@@ -27,9 +28,25 @@ const.MAX_NAME_LENGTH=20
 # 12: Domain to account map(DOMAIN -> [0, 0, account_prefix, account_suffix])
 # 13: Domain to owner map(DOMAIN -> [0, 0, owner_prefix, owner_suffix])
 
+# Input: [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
 export.init
+    push.INIT_FLAG_SLOT
+    exec.account::get_item drop drop drop
+    assertz.err=ERR_ALREADY_INITIALIZED
+    # [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
+    push.0.0
+    # [OWNER, treasury_prefix, treasury_suffix]
+    push.OWNER_SLOT
+    exec.account::set_item dropw
+    push.0.0
+    # [TREASURY]
+    push.TREASURY_SLOT
+    exec.account::set_item dropw
+    # []
 end
 
+# Input: [DOMAIN]
+# Output: []
 export.register
 end
 
