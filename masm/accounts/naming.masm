@@ -33,7 +33,25 @@ end
 export.register
 end
 
+# Input: [new_owner_prefix, new_owner_suffix, DOMAIN]
 export.transfer
+    push.0.0
+    # [NEW_OWNER, DOMAIN]
+    swapw
+    # [DOMAIN, NEW_OWNER]
+    dupw
+    # [DOMAIN, DOMAIN, NEW_OWNER]
+    exec._assert_only_domain_owner
+    # [DOMAIN, NEW_OWNER]
+    dupw
+    # [DOMAIN, DOMAIN, NEW_OWNER]
+    exec.note::get_sender
+    # [prefix, suffix, DOMAIN, DOMAIN, NEW_OWNER]
+    exec._clear_domain_mapping
+    # [DOMAIN, NEW_OWNER]
+    push.DOMAIN_TO_OWNER_SLOT
+    exec.account::set_map_item dropw dropw
+    # []
 end
 
 # Input: [DOMAIN]
@@ -126,6 +144,45 @@ export.set_payment_token_contract
 end
 
 ## Internal procedures
+
+### Clears domain to account and account to domain mapping if this domain set as default domain.
+# Input: [prefix, suffix, DOMAIN]
+# Output: []
+proc._clear_domain_mapping
+    push.0.0
+    # [ACCOUNT, DOMAIN]
+    swapw
+    # [DOMAIN, ACCOUNT]
+    dupw
+    # [DOMAIN, DOMAIN, ACCOUNT]
+    padw
+    # [ZERO, DOMAIN, DOMAIN, ACCOUNT]
+    swapw
+    # [DOMAIN, ZERO, DOMAIN, ACCOUNT]
+    push.DOMAIN_TO_ACCOUNT_ID_SLOT
+    exec.account::set_map_item dropw dropw
+    # [DOMAIN, ACCOUNT]
+    dupw.1
+    # [ACCOUNT, DOMAIN, ACCOUNT]
+    push.ACCOUNT_ID_TO_DOMAIN_SLOT
+    exec.account::get_map_item
+    # [A2D, DOMAIN, ACCOUNT]
+    eqw
+    # [1 if domain is set as default, A2D, DOMAIN, ACCOUNT]
+    if.true
+        # [A2D, DOMAIN, ACCOUNT]
+        dropw dropw
+        # [ACCOUNT]
+        padw swapw
+        # [ACCOUNT, ZERO]
+        push.ACCOUNT_ID_TO_DOMAIN_SLOT
+        exec.account::set_map_item dropw dropw
+        # []
+    else
+        # [A2D, DOMAIN, ACCOUNT]
+        dropw dropw dropw
+    end
+end
 
 # Input: [account_prefix, account_suffix, DOMAIN]
 # Output: []
