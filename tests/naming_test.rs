@@ -17,6 +17,9 @@ fn naming_storage() -> Vec<StorageSlot> {
     return storage_slots;
 }
 
+// Develop test like that
+// https://github.com/0xMiden/miden-base/blob/719ff03d1482e6ce2ad4e986f59ec7b9a8ddf962/crates/miden-testing/src/kernel_tests/tx/test_fpi.rs#L515
+
 #[tokio::test]
 async fn test_naming_initialize() -> Result<()>{
     let storage_slots = vec![AccountStorage::mock_item_0().slot]
