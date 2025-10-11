@@ -47,6 +47,7 @@ end
 # Input: [payment_token_prefix, payment_token_suffix, DOMAIN]
 # Output: []
 export.register
+    nop
 end
 
 # Input: [new_owner_prefix, new_owner_suffix, DOMAIN]
