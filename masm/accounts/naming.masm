@@ -11,10 +11,10 @@ const.ERR_ALREADY_INITIALIZED="Contract already initialized"
 const.INIT_FLAG_SLOT=0
 const.OWNER_SLOT=1
 const.TREASURY_SLOT=2
-const.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT=10
-const.ACCOUNT_ID_TO_DOMAIN_SLOT=11
-const.DOMAIN_TO_ACCOUNT_ID_SLOT=12
-const.DOMAIN_TO_OWNER_SLOT=13
+const.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT=3
+const.ACCOUNT_ID_TO_DOMAIN_SLOT=4
+const.DOMAIN_TO_ACCOUNT_ID_SLOT=5
+const.DOMAIN_TO_OWNER_SLOT=6
 
 const.MAX_NAME_LENGTH=20
 
@@ -22,11 +22,10 @@ const.MAX_NAME_LENGTH=20
 # 0: init flag
 # 1: owner
 # 2: treasury
-# Empty fields
-# 10: map(payment_token -> pricing contract ID)
-# 11: Account to domain map([0, 0, account_prefix, account_suffix] -> DOMAIN)
-# 12: Domain to account map(DOMAIN -> [0, 0, account_prefix, account_suffix])
-# 13: Domain to owner map(DOMAIN -> [0, 0, owner_prefix, owner_suffix])
+# 3: map(payment_token -> pricing contract ID)
+# 4: Account to domain map([0, 0, account_prefix, account_suffix] -> DOMAIN)
+# 5: Domain to account map(DOMAIN -> [0, 0, account_prefix, account_suffix])
+# 6: Domain to owner map(DOMAIN -> [0, 0, owner_prefix, owner_suffix])
 
 # Input: [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
 export.init
