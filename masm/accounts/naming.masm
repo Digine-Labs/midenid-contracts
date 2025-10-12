@@ -42,11 +42,17 @@ export.init
     push.TREASURY_SLOT
     exec.account::set_item dropw
     # []
+    push.INIT_FLAG_SLOT
+    push.1.0.0.0
+    exec.account::set_item dropw
+    # []
 end
 
 # Input: [payment_token_prefix, payment_token_suffix, DOMAIN]
 # Output: []
 export.register
+    ## Implement after we understand how properly call external contract procedures.
+    ## We have to read price of payment token from our pricing contract.
     nop
 end
 

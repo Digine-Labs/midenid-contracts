@@ -1,1 +1,51 @@
 ## Pricing contract. Each payment token has its own pricing contract. They all must rely on same interface
+use.miden::account
+use.miden::account_id
+use.miden::note
+
+## Errors
+const.ERR_ALREADY_INITIALIZED="Contract already initialized"
+const.ERR_ONLY_PRICE_SETTER="Only price setter"
+
+## Constants
+const.INIT_FLAG_SLOT=0
+const.PRICE_SETTER_SLOT=1 # [0, 0, prefix, suffix]
+const.PAYMENT_TOKEN_SLOT=2 # [0, 0, prefix, suffix]
+
+# Input: [token_prefix, token_suffix, setter_prefix, setter_suffix]
+# Output: []
+export.init
+    push.INIT_FLAG_SLOT
+    exec.account::get_item drop drop drop
+    assertz.err=ERR_ALREADY_INITIALIZED
+    # [token_prefix, token_suffix, setter_prefix, setter_suffix]
+    push.0.0
+    push.PAYMENT_TOKEN_SLOT
+    exec.account::set_item dropw
+    # [setter_prefix, setter_suffix]
+    push.0.0
+    push.PRICE_SETTER_SLOT
+    exec.account::set_item dropw
+    # []
+    push.INIT_FLAG_SLOT
+    push.1.0.0.0
+    exec.account::set_item dropw
+    # []
+end
+
+# Input: [DOMAIN]
+export.calculate_domain_cost
+end
+
+## Internal methods
+# Input: []
+# Output: []
+proc._assert_only_setter
+    exec.note::get_sender
+    push.PRICE_SETTER_SLOT
+    exec.account::get_item
+    # [0, 0, setter_prefix, setter_suffix, caller_prefix, caller_suffix]
+    drop drop
+    exec.account_id::is_equal assert.err=ERR_ONLY_PRICE_SETTER
+    # []
+end
