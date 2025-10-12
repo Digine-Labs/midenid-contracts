@@ -1,4 +1,5 @@
-use miden_client::{note::{NoteExecutionMode, NoteTag}, testing::NoteBuilder};
+use core::slice;
+use miden_client::{note::{NoteExecutionMode, NoteTag}, testing::NoteBuilder, transaction::AccountInterface};
 use miden_crypto::Felt;
 use miden_testing::{MockChainBuilder};
 use rand_chacha::ChaCha20Rng;
@@ -18,8 +19,6 @@ async fn test_naming_initialize() -> anyhow::Result<()>{
     let treasury_account = create_account()?;
     let naming_account = create_naming_account();
 
-    let mut mock_chain = MockChainBuilder::with_accounts([naming_account.clone()]).unwrap().build()?;
-    mock_chain.prove_next_block()?;
 
     // Reverse ordered. TODO: create utility function to reverse order words.
     let initialize_inputs = vec![
@@ -39,11 +38,25 @@ async fn test_naming_initialize() -> anyhow::Result<()>{
         .dynamically_linked_libraries(vec![naming_library])
         .note_inputs(initialize_inputs.clone()).unwrap().build()?;
 
-    let tx_context = mock_chain.build_tx_context(owner_account.id(), &[note.id()], &[note])
-        .expect("failed to build tx")
-        .build()?;
+    let mut mock_chain = MockChainBuilder::with_accounts([naming_account.clone(), owner_account.clone(), treasury_account.clone()]).unwrap()
+    .build()?;
+    mock_chain.prove_next_block()?;
 
-    tx_context.execute();
+    let sender_account_interface = AccountInterface::from(&owner_account);
+
+    let send_note_tx_script = sender_account_interface.build_send_notes_script(
+        slice::from_ref(&note.clone().into()), 
+        Some(10u16), 
+        true
+    )?;
+
+    let _executed_tx = mock_chain
+        .build_tx_context(owner_account.id(), &[], &[])
+        .expect("failed to build tx context")
+        .tx_script(send_note_tx_script)
+        .build()?
+        .execute()
+        .await?;
     
     Ok(())
 }
