@@ -93,3 +93,18 @@ pub fn create_naming_library() -> Result<Library, Box<dyn std::error::Error>> {
     let library = assembler.clone().assemble_library([module])?;
     Ok(library)
 }
+
+// Name encoding decoding
+// 7 bits per felt
+// Total 4 felts
+// Felts in word must not be reversed in storage
+// So we have to reverse here
+// [P4, P3, P2, P1] -> on MASM [P1, P2, P3, P4]
+pub fn encode_domain(domain: String) -> Word {
+
+}
+
+pub fn decode_domain(encoded_domain: Word) -> String {
+
+}
+
