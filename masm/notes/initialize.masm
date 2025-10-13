@@ -4,6 +4,7 @@ use.std::sys
 
 const.INITIALIZE_NOTE_INPUT_PTR=0
 
+# Input (arguments): [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
 begin
     push.INITIALIZE_NOTE_INPUT_PTR
     exec.note::get_inputs
