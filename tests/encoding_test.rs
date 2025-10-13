@@ -1,7 +1,5 @@
-mod utils;
-
 use miden_crypto::{Felt, Word};
-use utils::{encode_domain, decode_domain};
+use midenid_contracts::utils::{encode_domain, decode_domain};
 
 #[test]
 fn encode_letter() {
