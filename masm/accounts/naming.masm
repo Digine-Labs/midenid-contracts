@@ -19,9 +19,9 @@ const.DOMAIN_TO_OWNER_SLOT=6
 const.MAX_NAME_LENGTH=20
 
 ## Storage
-# 0: init flag
-# 1: owner
-# 2: treasury
+# 0: init flag [flag, 0, 0, 0]
+# 1: owner [0, 0, prefix, suffix]
+# 2: treasury [0, 0, prefix, suffix]
 # 3: map(payment_token -> pricing contract ID)
 # 4: Account to domain map([0, 0, account_prefix, account_suffix] -> DOMAIN)
 # 5: Domain to account map(DOMAIN -> [0, 0, account_prefix, account_suffix])
@@ -42,8 +42,8 @@ export.init
     push.TREASURY_SLOT
     exec.account::set_item dropw
     # []
-    push.INIT_FLAG_SLOT
     push.1.0.0.0
+    push.INIT_FLAG_SLOT
     exec.account::set_item dropw
     # []
 end
