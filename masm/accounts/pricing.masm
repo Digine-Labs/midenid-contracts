@@ -27,14 +27,15 @@ export.init
     push.PRICE_SETTER_SLOT
     exec.account::set_item dropw
     # []
-    push.INIT_FLAG_SLOT
     push.1.0.0.0
+    push.INIT_FLAG_SLOT
     exec.account::set_item dropw
     # []
 end
 
 # Input: [DOMAIN]
 export.calculate_domain_cost
+    nop
 end
 
 ## Internal methods

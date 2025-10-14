@@ -24,8 +24,18 @@ pub fn naming_storage() -> Vec<StorageSlot> {
     return storage_slots;
 }
 
+pub fn pricing_storage() -> Vec<StorageSlot> {
+    let storage_slots: Vec<StorageSlot> = vec![
+        empty_storage_value(), // Init flag
+        empty_storage_value(), // setter
+        empty_storage_value(), // token
+        ];
+    return storage_slots;
+}
+
 mod paths {
     pub const NAMING_ACCOUNT: &str = "./masm/accounts/naming.masm";
+    pub const PRICING_ACCOUNT: &str = "./masm/accounts/pricing.masm";
 }
 
 pub fn empty_storage_value() -> StorageSlot {
@@ -45,6 +55,10 @@ pub fn get_naming_account_code() -> String {
     fs::read_to_string(Path::new(paths::NAMING_ACCOUNT)).unwrap()
 }
 
+pub fn get_pricing_account_code() -> String {
+    fs::read_to_string(Path::new(paths::PRICING_ACCOUNT)).unwrap()
+}
+
 
 
 pub fn create_account() -> anyhow::Result<Account> {
@@ -62,6 +76,24 @@ pub fn create_account() -> anyhow::Result<Account> {
 pub fn create_naming_account() -> Account {
     let storage_slots = naming_storage();
     let account_code = get_naming_account_code();
+
+    let account_component = AccountComponent::compile(
+        account_code.clone(), 
+        TransactionKernel::assembler().with_debug_mode(true), 
+        storage_slots
+    ).unwrap().with_supports_all_types();
+
+    let account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
+        .with_auth_component(auth::NoAuth)
+        .with_component(account_component)
+        .storage_mode(AccountStorageMode::Public)
+        .build_existing().unwrap();
+    return account;
+}
+
+pub fn create_pricing_account() -> Account {
+    let storage_slots = pricing_storage();
+    let account_code = get_pricing_account_code();
 
     let account_component = AccountComponent::compile(
         account_code.clone(), 

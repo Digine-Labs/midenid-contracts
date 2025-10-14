@@ -1,10 +1,10 @@
-use.miden_name::naming
+use.miden_name::pricing
 use.miden::note
 use.std::sys
 
 const.INITIALIZE_NOTE_INPUT_PTR=0
 
-# Input (arguments): [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
+# Input (arguments): [token_prefix, token_suffix, setter_prefix, setter_suffix]
 begin
     push.INITIALIZE_NOTE_INPUT_PTR
     exec.note::get_inputs
@@ -12,7 +12,6 @@ begin
     drop drop push.INITIALIZE_NOTE_INPUT_PTR
     mem_loadw
     # [INPUTS]
-    debug.stack
-    call.naming::init
+    call.pricing::init
     exec.sys::truncate_stack
 end
