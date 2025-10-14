@@ -19,7 +19,7 @@ const.DOMAIN_TO_OWNER_SLOT=6
 const.MAX_NAME_LENGTH=20
 
 ## Storage
-# 0: init flag [flag, 0, 0, 0]
+# 0: init flag [0, 0, 0, flag]
 # 1: owner [0, 0, prefix, suffix]
 # 2: treasury [0, 0, prefix, suffix]
 # 3: map(payment_token -> pricing contract ID)
