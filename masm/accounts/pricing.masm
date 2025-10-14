@@ -14,6 +14,7 @@ const.ERR_INVALID_DOMAIN_LENGTH="Domain length field does not match actual chara
 const.INIT_FLAG_SLOT=0
 const.PRICE_SETTER_SLOT=1 # [0, 0, prefix, suffix]
 const.PAYMENT_TOKEN_SLOT=2 # [0, 0, prefix, suffix]
+const.PRICE_SLOT=3 # map(letter_count -> price)
 
 const.MAX_LENGTH=21
 const.MAX_FELT_PART=0xFFFFFFFFFFFFFF # 8*7 bits
@@ -44,19 +45,48 @@ export.init
     # []
 end
 
-# Input: [DOMAIN]
-export.calculate_domain_cost
-    exec._validate_domain_length
-    push.1.1.1.1
+# Input: [letter_count, PRICE]
+# Output: []
+export.set_price
+    exec._assert_only_setter
+    dup gt.5
+    # [letter_count > 5, letter_count, PRICE]
+    if.true
+        drop push.5
+    end
+    # [letter_count, PRICE]
+    push.0.0.0
+    # [LETTER_COUNT, PRICE]
+    push.PRICE_SLOT
+    exec.account::set_map_item dropw dropw
+    # []
 end
 
-
+# Input: [DOMAIN]
+export.calculate_domain_cost
+    dupw
+    exec._validate_domain_length
+    movdn.3
+    drop drop drop dup
+    debug.stack
+    gt.5
+    # [letter_count > 5, DOMAIN]
+    if.true
+        drop drop
+        push.5
+    end
+    push.0.0.0
+    # [LETTER_COUNT]
+    push.PRICE_SLOT
+    exec.account::get_map_item
+    debug.stack
+end
 
 ## Internal methods
 
 # Validates that the domain length field matches the actual character count
 # Input: [length, felt1, felt2, felt3]
-# Output: [length, felt1, felt2, felt3] (unchanged)
+# Output: []
 proc._validate_domain_length
     # Stack: [length, felt1, felt2, felt3]
     movdn.3

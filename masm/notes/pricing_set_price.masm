@@ -1,0 +1,8 @@
+use.miden_name::pricing
+use.miden::note
+use.std::sys
+
+## TODO: set price
+begin
+    nop
+end

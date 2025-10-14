@@ -102,3 +102,7 @@ pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word:
     let note = Note::new(note_assets, note_metadata, note_recipient);
     Ok(note)
 }
+
+pub async fn create_price_set_note() -> Result<Note, Error> {
+    // TODO: set price
+}
