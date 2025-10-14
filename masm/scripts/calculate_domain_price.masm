@@ -1,0 +1,18 @@
+use.miden_name::pricing
+use.miden::note
+use.std::sys
+
+const.CALCULATE_NOTE_INPUT_PTR=0
+
+# Input (arguments): [length, felt1, felt2, felt3]
+# This script calls calculate_domain_cost which validates the domain format
+begin
+    push.CALCULATE_NOTE_INPUT_PTR
+    exec.note::get_inputs
+    # [num_inputs, init_ptr]
+    drop drop push.CALCULATE_NOTE_INPUT_PTR
+    mem_loadw
+    # [length, felt1, felt2, felt3]
+    call.pricing::calculate_domain_cost
+    exec.sys::truncate_stack
+end

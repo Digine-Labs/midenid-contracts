@@ -16,7 +16,7 @@ const.ACCOUNT_ID_TO_DOMAIN_SLOT=4
 const.DOMAIN_TO_ACCOUNT_ID_SLOT=5
 const.DOMAIN_TO_OWNER_SLOT=6
 
-const.MAX_NAME_LENGTH=20
+const.MAX_NAME_LENGTH=21
 
 ## Storage
 # 0: init flag [0, 0, 0, flag]
@@ -298,3 +298,4 @@ proc._assert_only_domain_owner
     exec.account_id::is_equal assert.err=ERR_ONLY_DOMAIN_OWNER
     # []
 end
+

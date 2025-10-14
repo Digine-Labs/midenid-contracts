@@ -70,3 +70,35 @@ pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId
     let note = Note::new(note_assets, note_metadata, note_recipient);
     Ok(note)
 }
+
+pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word: Word, pricing: Account) -> Result<Note, Error> {
+    let note_code = fs::read_to_string(Path::new("./masm/scripts/calculate_domain_price.masm")).unwrap();
+    let account_code = get_pricing_account_code();
+
+    let library_path = "miden_name::pricing";
+    let library = create_library(account_code, library_path).unwrap();
+
+    let note_script = ScriptBuilder::new(true)
+        .with_dynamically_linked_library(&library)
+        .unwrap()
+        .compile_note_script(note_code)
+        .unwrap();
+
+    // domain_word format: [length, felt1, felt2, felt3]
+    let note_inputs = NoteInputs::new(vec![
+        domain_word[0],
+        domain_word[1],
+        domain_word[2],
+        domain_word[3]
+    ]).unwrap();
+
+    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+
+    let note_tag = NoteTag::from_account_id(pricing.id());
+
+    let note_metadata = NoteMetadata::new(tx_sender.id(), NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
+
+    let note_assets = NoteAssets::new(vec![]).unwrap();
+    let note = Note::new(note_assets, note_metadata, note_recipient);
+    Ok(note)
+}
