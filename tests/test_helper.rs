@@ -15,16 +15,11 @@ use tokio::time::{Duration, sleep};
 
 type Client = miden_client::Client<FilesystemKeyStore<StdRng>>;
 
-// ================================================================================================
-// SHARED TEST STATE
-// ================================================================================================
-
 static SHARED_REGISTRY_CONTRACT_ID: OnceLock<AccountId> = OnceLock::new();
 static SHARED_FAUCET_ID: OnceLock<AccountId> = OnceLock::new();
 static SHARED_OWNER_ID: OnceLock<AccountId> = OnceLock::new();
 
-/// Gets or initializes a shared registry contract for tests.
-/// Returns (contract_id, faucet_id, owner_id).
+/// Gets or initializes shared registry contract for tests
 pub async fn get_or_init_shared_contract() -> (AccountId, AccountId, AccountId) {
     if let (Some(&contract_id), Some(&faucet_id), Some(&owner_id)) = (
         SHARED_REGISTRY_CONTRACT_ID.get(),
@@ -62,7 +57,7 @@ pub async fn get_or_init_shared_contract() -> (AccountId, AccountId, AccountId) 
     (contract_id, faucet_id, owner_id)
 }
 
-/// Sets up a persistent helper with an existing contract and faucet.
+/// Sets up helper with existing contract and faucet
 pub async fn setup_helper_with_contract(
     contract_id: AccountId,
     faucet_id: AccountId,
@@ -81,7 +76,7 @@ pub async fn setup_helper_with_contract(
     Ok(helper)
 }
 
-/// Mints tokens from a faucet and funds an account.
+/// Mints tokens from faucet and funds account
 pub async fn mint_and_fund_account(
     helper: &mut RegistryTestHelper,
     faucet_id: AccountId,
@@ -124,36 +119,14 @@ pub async fn mint_and_fund_account(
     Ok(record.into())
 }
 
-// ================================================================================================
-// CONSTANTS
-// ================================================================================================
-
-/// File path constants for registry operations
-mod paths {
+pub mod paths {
     pub const REGISTRY_CONTRACT: &str = "./masm/accounts/miden_id.masm";
     pub const NOP_SCRIPT: &str = "./masm/scripts/nop.masm";
     pub const NOTES_DIR: &str = "./masm/notes";
+    pub const SCRIPTS_DIR: &str = "./masm/scripts";
     pub const KEYSTORE_DIR: &str = "./keystore";
 }
 
-// ================================================================================================
-// DATA STRUCTURES
-// ================================================================================================
-
-/// Complete contract state structure for validation and testing.
-///
-/// This struct encapsulates all storage data from the Miden ID registry contract,
-/// making it easy to validate contract state in tests.
-///
-/// # Fields
-///
-/// * `initialized` - Flag indicating if registry is initialized (0 = no, 1 = yes)
-/// * `owner_prefix` - First part of the owner account ID
-/// * `owner_suffix` - Second part of the owner account ID
-/// * `token_prefix` - First part of the payment token account ID
-/// * `token_suffix` - Second part of the payment token account ID
-/// * `name_to_id_mapping` - SMT root for name → account ID lookups (slot 3)
-/// * `id_to_name_mapping` - SMT root for account ID → name lookups (slot 4)
 #[derive(Debug)]
 pub struct ContractState {
     pub initialized: u64,
@@ -165,20 +138,6 @@ pub struct ContractState {
     pub id_to_name_mapping: Option<Word>,
 }
 
-/// Test helper struct to encapsulate common test operations for Miden ID registry.
-///
-/// This helper provides high-level methods for testing the registry contract,
-/// including account creation, contract deployment, initialization, name registration,
-/// and state queries.
-///
-/// # Fields
-///
-/// * `client` - Miden client instance for blockchain operations
-/// * `endpoint` - Network endpoint (testnet, localhost, etc.)
-/// * `keystore` - Filesystem-based keystore for account management
-/// * `registry_contract` - The deployed registry contract account (if deployed)
-/// * `owner_account` - The registry owner account (if initialized)
-/// * `faucet_account` - The payment token faucet (if created)
 pub struct RegistryTestHelper {
     pub client: Client,
     pub endpoint: Endpoint,
@@ -187,10 +146,6 @@ pub struct RegistryTestHelper {
     pub owner_account: Option<Account>,
     pub faucet_account: Option<Account>,
 }
-
-// ================================================================================================
-// SETUP & LIFECYCLE
-// ================================================================================================
 
 impl RegistryTestHelper {
     /// Creates a new test helper WITHOUT clearing the database/keystore.
@@ -207,8 +162,6 @@ impl RegistryTestHelper {
     /// * `Ok(Self)` - Successfully created helper instance
     /// * `Err(ClientError)` - Failed to connect to any endpoint
     pub async fn new_persistent() -> Result<Self, ClientError> {
-        // Skip delete_keystore_and_store() to preserve existing accounts and notes
-
         let endpoint = Endpoint::testnet();
         let client = match instantiate_client(endpoint.clone()).await {
             Ok(client) => client,
@@ -286,7 +239,7 @@ impl RegistryTestHelper {
     ///
     /// 1. Creates clean test environment (via `new()`)
     /// 2. Syncs with network
-    /// 3. Deploys registry contract as public, immutable
+    /// 3. Deploys registry contract
     pub async fn setup_with_deployed_contract() -> Result<Self, ClientError> {
         let mut helper = Self::new().await?;
         helper.sync_network().await?;
@@ -294,16 +247,14 @@ impl RegistryTestHelper {
         Ok(helper)
     }
 
-    /// Synchronizes the local client state with the Miden network.
+    /// Synchronizes client state with the network.
     ///
-    /// This method fetches the latest blockchain state and updates the local client's
-    /// view of accounts, notes, and transactions. Call this after transactions to see
-    /// the updated state.
+    /// Fetches latest blocks, notes, and account states from the Miden node.
     ///
     /// # Returns
     ///
     /// * `Ok(())` - Successfully synced
-    /// * `Err(ClientError)` - Network communication error
+    /// * `Err(ClientError)` - Network sync failed
     pub async fn sync_network(&mut self) -> Result<(), ClientError> {
         self.client.sync_state().await?;
         Ok(())
@@ -313,60 +264,23 @@ impl RegistryTestHelper {
     // HELPER UTILITIES
     // ================================================================================================
 
-    /// Loads the registry contract code and creates a library.
-    ///
-    /// This helper consolidates the repeated pattern of loading the contract code
-    /// and creating a library namespace.
-    ///
-    /// # Returns
-    ///
-    /// The compiled contract library for "miden_id::registry" namespace
-    ///
-    /// # Panics
-    ///
-    /// Panics if the contract file cannot be read or library creation fails
     fn load_registry_library(&self) -> miden_objects::assembly::Library {
         let contract_code = fs::read_to_string(Path::new(paths::REGISTRY_CONTRACT)).unwrap();
         create_library(contract_code, "miden_id::registry").unwrap()
     }
 
-    /// Converts a Word to NoteInputs by extracting all 4 Felts.
-    ///
-    /// This helper consolidates the repeated pattern of extracting Felts from a Word
-    /// and creating NoteInputs.
-    ///
-    /// # Arguments
-    ///
-    /// * `word` - The Word to convert
-    ///
-    /// # Returns
-    ///
-    /// NoteInputs containing the 4 Felts from the Word
-    ///
-    /// # Panics
-    ///
-    /// Panics if the Word doesn't have 4 elements or NoteInputs creation fails
     fn word_to_note_inputs(word: &Word) -> NoteInputs {
         let felts: Vec<Felt> = (0..4).map(|i| *word.get(i).unwrap()).collect();
         NoteInputs::new(felts).unwrap()
     }
 
-    // ================================================================================================
-    // ACCOUNT & CONTRACT MANAGEMENT
-    // ================================================================================================
-
     /// Creates a new basic wallet account.
     ///
-    /// This method creates a standard updatable account on the Miden network
-    /// and waits for it to be confirmed.
-    ///
-    /// # Arguments
-    ///
-    /// * `_role` - Descriptive label for the account (currently unused, for debugging)
+    /// Creates a wallet account with BasicAuth authentication component.
     ///
     /// # Returns
     ///
-    /// * `Ok(Account)` - The newly created account
+    /// * `Ok(Account)` - Successfully created account
     /// * `Err(ClientError)` - Account creation failed
     pub async fn create_account(&mut self, _role: &str) -> Result<Account, ClientError> {
         let (account, _) = create_basic_account(&mut self.client, self.keystore.clone()).await?;
@@ -374,20 +288,19 @@ impl RegistryTestHelper {
         Ok(account)
     }
 
-    /// Creates a fungible faucet account for testing payment validation.
+    /// Creates a new fungible asset faucet.
     ///
-    /// A faucet is a special account type that can mint fungible tokens.
-    /// This is useful for testing payment flows in the registry.
+    /// The faucet can mint fungible tokens up to the specified max supply.
     ///
     /// # Arguments
     ///
-    /// * `symbol` - Token symbol (e.g., "REG", "TEST")
-    /// * `decimals` - Number of decimal places (typically 8)
-    /// * `max_supply` - Maximum number of tokens that can be minted
+    /// * `symbol` - Token symbol (e.g., "REG", "POL")
+    /// * `decimals` - Number of decimal places
+    /// * `max_supply` - Maximum token supply
     ///
     /// # Returns
     ///
-    /// * `Ok(Account)` - The newly created faucet account
+    /// * `Ok(Account)` - Successfully created faucet
     /// * `Err(ClientError)` - Faucet creation failed
     pub async fn create_faucet(
         &mut self,
@@ -407,20 +320,15 @@ impl RegistryTestHelper {
         Ok(faucet)
     }
 
-    /// Deploys the Miden ID registry contract as public and immutable.
+    /// Deploys the Miden ID registry contract.
     ///
-    /// Reads the contract code from `./masm/accounts/miden_id.masm` and deploys it
-    /// to the network. The contract is stored in `self.registry_contract` for later use.
+    /// Creates a public immutable contract from the MASM code in miden_id.masm.
+    /// The contract must be initialized before use via `initialize_registry`.
     ///
     /// # Returns
     ///
-    /// * `Ok(Account)` - The deployed registry contract account
+    /// * `Ok(Account)` - Successfully deployed contract
     /// * `Err(ClientError)` - Deployment failed
-    ///
-    /// # Contract Properties
-    ///
-    /// - **Public**: Anyone can interact with the contract
-    /// - **Immutable**: Contract code cannot be changed after deployment
     pub async fn deploy_registry_contract(&mut self) -> Result<Account, ClientError> {
         let registry_code = fs::read_to_string(Path::new(paths::REGISTRY_CONTRACT)).unwrap();
         let (registry_contract, registry_seed) =
@@ -436,18 +344,18 @@ impl RegistryTestHelper {
         Ok(registry_contract)
     }
 
-    /// Initializes the registry without payment validation (free registration).
+    /// Initializes the registry with an owner account (free registration).
     ///
-    /// This is a convenience wrapper that initializes the registry with price = 0,
-    /// allowing free name registrations without payment tokens.
+    /// Sets registration price to 0, allowing free name registrations.
+    /// This is a convenience wrapper around `initialize_registry_with_faucet`.
     ///
     /// # Arguments
     ///
-    /// * `owner_account` - The account that will own and control the registry
+    /// * `owner_account` - Account that will own the registry
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - Registry initialized successfully
+    /// * `Ok(())` - Successfully initialized
     /// * `Err(ClientError)` - Initialization failed
     pub async fn initialize_registry(
         &mut self,
@@ -457,40 +365,25 @@ impl RegistryTestHelper {
             .await
     }
 
-    /// Initializes the registry contract with owner and optional payment token.
+    /// Initializes the registry with owner and payment token configuration.
     ///
-    /// This method sets up the registry with the owner account and configures payment
-    /// validation. If a faucet is provided, registrations require payment; otherwise,
-    /// registrations are free.
+    /// If a faucet is provided, sets price to 100 (payment required).
+    /// If no faucet, sets price to 0 (free registration).
     ///
     /// # Arguments
     ///
-    /// * `owner_account` - The account that will own and control the registry
-    /// * `faucet_account` - Optional payment token faucet for paid registrations
+    /// * `owner_account` - Account that will own the registry
+    /// * `faucet_account` - Optional faucet for payment token
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - Registry initialized successfully
+    /// * `Ok(())` - Successfully initialized
     /// * `Err(ClientError)` - Initialization failed
-    ///
-    /// # Behavior
-    ///
-    /// - **With faucet**: Price set to 100 tokens, payment required for registration
-    /// - **Without faucet**: Price set to 0, free registration
-    ///
-    /// # Process
-    ///
-    /// 1. Loads the registry contract code and init note template
-    /// 2. Creates note inputs with payment token ID and price
-    /// 3. Executes initialization transaction
-    /// 4. Stores owner and faucet accounts in helper state
-    /// 5. Syncs with network to reflect changes
     pub async fn initialize_registry_with_faucet(
         &mut self,
         owner_account: &Account,
         faucet_account: Option<&Account>,
     ) -> Result<(), ClientError> {
-        // Use faucet if provided, otherwise use owner account
         let payment_token = faucet_account.unwrap_or(owner_account);
         let token_prefix = payment_token.id().prefix().as_felt();
         let token_suffix = payment_token.id().suffix();
@@ -531,35 +424,19 @@ impl RegistryTestHelper {
         Ok(())
     }
 
-    /// Updates the registration price for the Miden ID registry.
+    /// Updates the name registration price.
     ///
-    /// This method allows the registry owner to update the price that users must pay
-    /// to register a new name. The update is performed by creating a public note
-    /// containing the new price and executing it as a transaction on the registry contract.
+    /// Only the registry owner can update the price.
     ///
     /// # Arguments
     ///
-    /// * `owner_account` - The account authorized to update the price (must be the registry owner)
-    /// * `new_price` - The new registration price in token units (e.g., 100 for 100 tokens)
+    /// * `owner_account` - Registry owner account
+    /// * `new_price` - New registration price
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - Price updated successfully and changes synced with the network
-    /// * `Err(ClientError)` - Transaction failed or network sync error
-    ///
-    /// # Process
-    ///
-    /// 1. Loads the registry contract code and creates a library namespace
-    /// 2. Reads the `update_price.masm` note template
-    /// 3. Creates a public note with the new price as input
-    /// 4. Executes the note as a transaction on the registry contract
-    /// 5. Waits for transaction finalization and syncs state
-    ///
-    /// # Security
-    ///
-    /// - Only the registry owner can successfully execute this operation
-    /// - The contract validates ownership before updating the price
-    /// - Non-owner attempts will fail during transaction execution
+    /// * `Ok(())` - Successfully updated price
+    /// * `Err(ClientError)` - Update failed
     pub async fn update_price(
         &mut self,
         owner_account: &Account,
@@ -597,27 +474,19 @@ impl RegistryTestHelper {
         Ok(())
     }
 
-    /// Transfers ownership of the registry to a new owner account.
+    /// Transfers registry ownership to a new account.
     ///
-    /// This method allows the current registry owner to transfer ownership to another account.
-    /// The transfer is performed by creating a public note containing the new owner's account ID
-    /// and executing it as a transaction on the registry contract.
+    /// Only the current owner can transfer ownership.
     ///
     /// # Arguments
     ///
-    /// * `owner_account` - The current owner account (must be the registry owner)
-    /// * `new_owner` - The account that will become the new registry owner
+    /// * `owner_account` - Current registry owner
+    /// * `new_owner` - New owner account
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - Ownership transferred successfully and changes synced
-    /// * `Err(ClientError)` - Transaction failed or network sync error
-    ///
-    /// # Security
-    ///
-    /// - Only the current registry owner can transfer ownership
-    /// - The contract validates ownership before executing the transfer
-    /// - After transfer, only the new owner can perform owner-only operations
+    /// * `Ok(())` - Successfully transferred ownership
+    /// * `Err(ClientError)` - Transfer failed
     pub async fn update_owner(
         &mut self,
         owner_account: &Account,
@@ -656,64 +525,19 @@ impl RegistryTestHelper {
     // STATE QUERY METHODS
     // ================================================================================================
 
-    /// Retrieves the current registry contract account record from the client.
-    ///
-    /// This method fetches the latest account state from the local client database,
-    /// which should be synced with the network using `sync_network()`.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(Some(AccountRecord))` - Registry contract account record found
-    /// * `Ok(None)` - Registry contract not found in local database
-    /// * `Err(ClientError)` - Error querying the client database
-    ///
-    /// # Panics
-    ///
-    /// Panics if `registry_contract` is None (contract not deployed)
+    /// Gets contract state from network
     pub async fn get_contract_state(&mut self) -> Result<Option<AccountRecord>, ClientError> {
         let registry_id = self.registry_contract.as_ref().unwrap().id();
         self.client.get_account(registry_id).await
     }
 
-    /// Internal helper to get contract state or panic if not found.
-    ///
-    /// This method ensures the registry contract exists in the local database,
-    /// panicking if it's not found (indicating an error in test setup).
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(AccountRecord)` - The registry contract account record
-    /// * `Err(ClientError)` - Error querying the client database
-    ///
-    /// # Panics
-    ///
-    /// Panics with message "Registry contract not found" if the contract doesn't exist
     async fn require_contract_state(&mut self) -> Result<AccountRecord, ClientError> {
         self.get_contract_state()
             .await?
             .ok_or_else(|| panic!("Registry contract not found"))
     }
 
-    /// Retrieves the initialization state and owner information from registry storage.
-    ///
-    /// This method reads both storage slot 0 (initialization flag) and slot 1 (owner info)
-    /// to provide a complete picture of the registry's initialization state.
-    ///
-    /// # Arguments
-    ///
-    /// * `account_record` - The registry contract's account record
-    ///
-    /// # Returns
-    ///
-    /// A tuple containing:
-    /// * `u64` - Initialization flag (0 = not initialized, 1 = initialized)
-    /// * `u64` - Owner account ID prefix
-    /// * `u64` - Owner account ID suffix
-    ///
-    /// # Storage Layout
-    ///
-    /// - **Slot 0**: `[0, 0, 0, initialized_flag]`
-    /// - **Slot 1**: `[owner_prefix, owner_suffix, 0, 0]`
+    /// Returns initialization state from storage
     pub fn get_initialization_state(&self, account_record: &AccountRecord) -> (u64, u64, u64) {
         let init_flag: Word = account_record
             .account()
@@ -738,18 +562,7 @@ impl RegistryTestHelper {
         (initialized, owner_prefix, owner_suffix)
     }
 
-    /// Retrieves the owner account ID from the registry contract storage.
-    ///
-    /// Reads storage slot 1 which contains the owner account information stored as
-    /// a Word in the format `[prefix, suffix, 0, 0]`.
-    ///
-    /// # Arguments
-    ///
-    /// * `account_record` - The registry contract's account record
-    ///
-    /// # Returns
-    ///
-    /// A tuple `(owner_prefix, owner_suffix)` representing the owner's account ID components
+    /// Returns owner ID from storage
     pub fn get_owner(&self, account_record: &AccountRecord) -> (u64, u64) {
         let owner: Word = account_record
             .account()
@@ -765,20 +578,7 @@ impl RegistryTestHelper {
         (owner_prefix, owner_suffix)
     }
 
-    /// Retrieves the payment token account ID from registry storage slot 2.
-    ///
-    /// # Arguments
-    ///
-    /// * `account_record` - The registry contract's account record
-    ///
-    /// # Returns
-    ///
-    /// A tuple `(token_prefix, token_suffix)` representing the payment token's account ID components
-    ///
-    /// # Storage Layout
-    ///
-    /// - **Slot 2**: `[suffix, prefix, 0, 0]` (note the reversed order in storage)
-    /// - Returns normalized as `(prefix, suffix)` for consistency
+    /// Returns payment token state from storage
     pub fn get_payment_token_state(&self, account_record: &AccountRecord) -> (u64, u64) {
         let payment_token: Word = account_record
             .account()
@@ -795,19 +595,7 @@ impl RegistryTestHelper {
         )
     }
 
-    /// Retrieves the registration price from registry storage slot 5.
-    ///
-    /// # Arguments
-    ///
-    /// * `account_record` - The registry contract's account record
-    ///
-    /// # Returns
-    ///
-    /// The registration price in token units (e.g., 100 for 100 tokens)
-    ///
-    /// # Storage Layout
-    ///
-    /// - **Slot 5**: `[price, 0, 0, 0]`
+    /// Returns registration price from storage
     pub fn get_price(&self, account_record: &AccountRecord) -> u64 {
         let price_word: Word = account_record
             .account()
@@ -818,24 +606,7 @@ impl RegistryTestHelper {
         price_word.get(0).unwrap().as_int()
     }
 
-    /// Retrieves the Sparse Merkle Tree (SMT) root hashes for name mappings.
-    ///
-    /// The registry uses two SMTs to maintain bidirectional name-to-ID mappings.
-    ///
-    /// # Arguments
-    ///
-    /// * `account_record` - The registry contract's account record
-    ///
-    /// # Returns
-    ///
-    /// A tuple containing:
-    /// * `Option<Word>` - Name-to-ID mapping root (slot 3), None if not initialized
-    /// * `Option<Word>` - ID-to-Name mapping root (slot 4), None if not initialized
-    ///
-    /// # Storage Layout
-    ///
-    /// - **Slot 3**: SMT root for name → account ID lookups
-    /// - **Slot 4**: SMT root for account ID → name lookups
+    /// Returns registry mapping roots from storage
     pub fn get_registry_mapping_state(
         &self,
         account_record: &AccountRecord,
@@ -857,18 +628,7 @@ impl RegistryTestHelper {
         (name_to_id, id_to_name)
     }
 
-    /// Retrieves the complete contract state by aggregating all storage slots.
-    ///
-    /// This is a convenience method that calls all the individual state getter methods
-    /// and combines them into a single `ContractState` struct for easy validation.
-    ///
-    /// # Arguments
-    ///
-    /// * `account_record` - The registry contract's account record
-    ///
-    /// # Returns
-    ///
-    /// A `ContractState` struct containing all registry storage data
+    /// Returns complete contract state
     pub fn get_complete_contract_state(&self, account_record: &AccountRecord) -> ContractState {
         let (initialized, owner_prefix, owner_suffix) =
             self.get_initialization_state(account_record);
@@ -886,29 +646,13 @@ impl RegistryTestHelper {
         }
     }
 
-    /// Retrieves the payment token account ID asynchronously.
-    ///
-    /// This is a convenience async wrapper that syncs the contract state and returns
-    /// the payment token ID.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok((prefix, suffix))` - Payment token account ID components
-    /// * `Err(ClientError)` - Failed to fetch contract state
+    /// Gets payment token ID from registry
     pub async fn get_payment_token_id(&mut self) -> Result<(u64, u64), ClientError> {
         let contract_state = self.require_contract_state().await?;
         Ok(self.get_payment_token_state(&contract_state))
     }
 
-    /// Retrieves the registration price asynchronously.
-    ///
-    /// This is a convenience async wrapper that syncs the contract state and returns
-    /// the current registration price.
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(price)` - Current registration price in token units
-    /// * `Err(ClientError)` - Failed to fetch contract state
+    /// Gets registration price from registry
     pub async fn get_registration_price(&mut self) -> Result<u64, ClientError> {
         let contract_state = self.require_contract_state().await?;
         Ok(self.get_price(&contract_state))
@@ -918,27 +662,18 @@ impl RegistryTestHelper {
     // ENCODING/DECODING UTILITIES
     // ================================================================================================
 
-    /// Encodes a name string into a Word for storage in the registry.
+    /// Encodes a name string into a Miden Word.
     ///
-    /// Names are packed into a single Word (4 Felts) with the following layout:
-    /// - Felt[0]: Name length
-    /// - Felt[1-3]: ASCII characters, 7 characters per Felt (56 bits used per Felt)
+    /// Encoding format: [length, name_bytes_0_6, name_bytes_7_13, 0]
+    /// Supports names up to 14 characters.
     ///
     /// # Arguments
     ///
-    /// * `name` - The name string to encode (max 20 characters, ASCII only)
+    /// * `name` - Name string to encode
     ///
     /// # Returns
     ///
-    /// A Word containing the encoded name
-    ///
-    /// # Panics
-    ///
-    /// Panics if the name exceeds 20 characters
-    ///
-    /// # Format
-    ///
-    /// Word: `[length, chars_1-7, chars_8-14, chars_15-20]`
+    /// Word containing encoded name
     pub fn encode_name_to_word(name: &str) -> Word {
         assert!(name.len() <= 20, "Name must not exceed 20 characters");
 
@@ -964,22 +699,17 @@ impl RegistryTestHelper {
         Word::new(felts)
     }
 
-    /// Decodes a Word back into a name string.
+    /// Decodes a Miden Word back to a name string.
     ///
-    /// This is the inverse operation of `encode_name_to_word`, extracting the ASCII
-    /// characters from the packed Word representation.
+    /// Reverses the encoding done by `encode_name_to_word`.
     ///
     /// # Arguments
     ///
-    /// * `word` - The Word containing the encoded name
+    /// * `word` - Word containing encoded name
     ///
     /// # Returns
     ///
-    /// The decoded name string, or empty string if the Word is empty
-    ///
-    /// # Format
-    ///
-    /// Expects Word in format: `[length, chars_1-7, chars_8-14, chars_15-20]`
+    /// Decoded name string
     pub fn decode_name_word(word: &Word) -> String {
         let length = word.get(0).map(|f| f.as_int() as usize).unwrap_or(0);
         if length == 0 {
@@ -1012,15 +742,6 @@ impl RegistryTestHelper {
         String::from_utf8(bytes).unwrap_or_default()
     }
 
-    /// Encodes an account ID into Word format for storage queries.
-    ///
-    /// # Arguments
-    ///
-    /// * `account` - The account to encode
-    ///
-    /// # Returns
-    ///
-    /// A Word in format: `[suffix, prefix, 0, 0]`
     fn encode_account_to_word(account: &Account) -> Word {
         Word::new([
             Felt::new(account.id().suffix().as_int()),
@@ -1030,32 +751,13 @@ impl RegistryTestHelper {
         ])
     }
 
-    /// Decodes an account Word back to (prefix, suffix) tuple.
-    ///
-    /// # Arguments
-    ///
-    /// * `word` - The Word containing account data in format `[suffix, prefix, 0, 0]`
-    ///
-    /// # Returns
-    ///
-    /// A tuple `(prefix, suffix)` representing the account ID components
     fn decode_account_word(word: &Word) -> (u64, u64) {
         let suffix = word.get(0).map(|felt| felt.as_int()).unwrap_or(0);
         let prefix = word.get(1).map(|felt| felt.as_int()).unwrap_or(0);
         (prefix, suffix)
     }
 
-    /// Checks if a Word contains all zeros.
-    ///
-    /// Used to determine if a storage value is empty/uninitialized.
-    ///
-    /// # Arguments
-    ///
-    /// * `word` - The Word to check
-    ///
-    /// # Returns
-    ///
-    /// `true` if all 4 Felts in the Word are zero, `false` otherwise
+    /// Checks if Word is all zeros
     pub fn is_zero_word(word: &Word) -> bool {
         (0..4).all(|idx| word.get(idx).map(|felt| felt.as_int()).unwrap_or(0) == 0)
     }
@@ -1064,20 +766,7 @@ impl RegistryTestHelper {
     // REGISTRATION OPERATIONS
     // ================================================================================================
 
-    /// Registers a name for an account without payment (free registration).
-    ///
-    /// This is a convenience wrapper for free name registration, typically used
-    /// when the registry is initialized without a payment faucet.
-    ///
-    /// # Arguments
-    ///
-    /// * `account` - The account to register the name for
-    /// * `name` - The name to register (max 20 characters, ASCII)
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(())` - Name registered successfully
-    /// * `Err(ClientError)` - Registration failed
+    /// Registers name for account without payment
     pub async fn register_name_for_account(
         &mut self,
         account: &Account,
@@ -1087,34 +776,21 @@ impl RegistryTestHelper {
             .await
     }
 
-    /// Registers a name for an account with optional payment validation.
+    /// Registers a name for an account with payment.
     ///
-    /// This method creates a registration note with the encoded name and optional
-    /// payment assets, then executes it on the registry contract.
+    /// Creates a registration note with the specified payment amount and executes
+    /// the transaction to register the name in the registry.
     ///
     /// # Arguments
     ///
-    /// * `account` - The account to register the name for
-    /// * `name` - The name to register (max 20 characters, ASCII)
-    /// * `payment_amount` - Optional payment amount in tokens (e.g., Some(100) for 100 tokens)
+    /// * `account` - Account to register name for
+    /// * `name` - Name to register
+    /// * `payment_amount` - Optional payment amount
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - Name registered successfully
+    /// * `Ok(())` - Successfully registered name
     /// * `Err(ClientError)` - Registration failed
-    ///
-    /// # Process
-    ///
-    /// 1. Encodes the name to Word format
-    /// 2. Loads register_name.masm note template
-    /// 3. Creates note assets (payment tokens if amount provided)
-    /// 4. Passes name as note inputs (4 Felts)
-    /// 5. Executes registration transaction
-    /// 6. Waits for finalization and syncs network
-    ///
-    /// # Panics
-    ///
-    /// Panics if `payment_amount` is provided but no faucet account is set in the helper
     pub async fn register_name_for_account_with_payment(
         &mut self,
         account: &Account,
@@ -1175,53 +851,12 @@ impl RegistryTestHelper {
     // LOOKUP OPERATIONS (Using MASM Exports)
     // ================================================================================================
 
-    /// Checks if a name is registered in the registry.
-    ///
-    /// Performs a forward lookup (name → account ID) by querying storage slot 3.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name to check
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(true)` - Name is registered
-    /// * `Ok(false)` - Name is not registered
-    /// * `Err(ClientError)` - Query failed
+    /// Checks if name is registered
     pub async fn is_name_registered(&mut self, name: &str) -> Result<bool, ClientError> {
         Ok(self.get_account_for_name(name).await?.is_some())
     }
 
-    /// Retrieves the account ID associated with a name (forward lookup).
-    ///
-    /// This method tests the `get_id` MASM export by querying the same storage
-    /// (slot 3) that the export reads from. This is the standard approach for
-    /// read-only contract queries in Miden.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name to look up
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(Some((prefix, suffix)))` - Name is registered, returns account ID components
-    /// * `Ok(None)` - Name is not registered
-    /// * `Err(ClientError)` - Query failed
-    ///
-    /// # Why Query Storage Instead of Calling Export?
-    ///
-    /// The `get_id` export ([miden_id.masm:204](../masm/accounts/miden_id.masm#L204))
-    /// is designed for **contract-to-contract calls**. For client-side queries,
-    /// the recommended pattern is to query the storage directly, which:
-    ///
-    /// 1. Reads from the same storage (slot 3) the export reads from
-    /// 2. Uses the same key encoding the export uses
-    /// 3. Returns the same decoded result the export would return
-    /// 4. Avoids transaction execution overhead for read-only queries
-    ///
-    /// This approach effectively validates the export's correctness - if storage
-    /// contains the right data, the export will return the right data when called
-    /// by other contracts.
+    /// Gets account ID for registered name
     pub async fn get_account_for_name(
         &mut self,
         name: &str,
@@ -1242,53 +877,12 @@ impl RegistryTestHelper {
         }
     }
 
-    /// Checks if an account has a registered name (reverse lookup).
-    ///
-    /// Queries the ID-to-name mapping in storage slot 4.
-    ///
-    /// # Arguments
-    ///
-    /// * `account` - The account to check
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(true)` - Account has a registered name
-    /// * `Ok(false)` - Account has no registered name
-    /// * `Err(ClientError)` - Query failed
+    /// Checks if account has registered name
     pub async fn has_name_for_address(&mut self, account: &Account) -> Result<bool, ClientError> {
         Ok(self.get_name_for_address(account).await?.is_some())
     }
 
-    /// Retrieves the name associated with an account (reverse lookup).
-    ///
-    /// This method tests the `get_name` MASM export by querying the same storage
-    /// (slot 4) that the export reads from. This is the standard approach for
-    /// read-only contract queries in Miden.
-    ///
-    /// # Arguments
-    ///
-    /// * `account` - The account to look up
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(Some(name))` - Account has a registered name
-    /// * `Ok(None)` - Account has no registered name
-    /// * `Err(ClientError)` - Query failed
-    ///
-    /// # Why Query Storage Instead of Calling Export?
-    ///
-    /// The `get_name` export ([miden_id.masm:198](../masm/accounts/miden_id.masm#L198))
-    /// is designed for **contract-to-contract calls**. For client-side queries,
-    /// the recommended pattern is to query the storage directly, which:
-    ///
-    /// 1. Reads from the same storage (slot 4) the export reads from
-    /// 2. Uses the same key encoding the export uses
-    /// 3. Returns the same decoded result the export would return
-    /// 4. Avoids transaction execution overhead for read-only queries
-    ///
-    /// This approach effectively validates the export's correctness - if storage
-    /// contains the right data, the export will return the right data when called
-    /// by other contracts.
+    /// Gets registered name for account
     pub async fn get_name_for_address(
         &mut self,
         account: &Account,
@@ -1310,28 +904,127 @@ impl RegistryTestHelper {
     }
 
     // ================================================================================================
-    // INTERNAL HELPERS
+    // SCRIPT-BASED EXPORT TESTING
     // ================================================================================================
 
-    /// Executes a transaction with a note on the registry contract.
+    /// Calls the get_id export to retrieve account ID for a name.
     ///
-    /// This internal helper creates and submits a transaction that includes the provided
-    /// note. It uses the nop.masm script as the transaction script.
+    /// Executes a transaction script that calls the registry's get_id export,
+    /// which performs a name → account ID lookup.
     ///
     /// # Arguments
     ///
-    /// * `note` - The note to include in the transaction
+    /// * `name` - Name to look up
     ///
     /// # Returns
     ///
-    /// * `Ok(())` - Transaction submitted successfully
-    /// * `Err(ClientError)` - Transaction creation or submission failed
+    /// * `Ok(Some((prefix, suffix)))` - Found account ID
+    /// * `Ok(None)` - Name not registered
+    /// * `Err(ClientError)` - Lookup failed
+    pub async fn call_get_id_export(
+        &mut self,
+        name: &str,
+    ) -> Result<Option<(u64, u64)>, ClientError> {
+        // Encode name to Word format (4 felts)
+        let name_word = Self::encode_name_to_word(name);
+
+        // Load the script that calls get_id
+        let script_code = get_script_code("call_get_id".to_string());
+
+        // Create library with the external_contract::miden_id path
+        let contract_code = fs::read_to_string(Path::new(paths::REGISTRY_CONTRACT)).unwrap();
+        let contract_library =
+            create_library(contract_code, "external_contract::miden_id").unwrap();
+
+        // Create transaction script with dynamically linked library
+        let transaction_script = create_tx_script(script_code, Some(contract_library)).unwrap();
+
+        // Build transaction with name as script arg
+        let request = TransactionRequestBuilder::new()
+            .custom_script(transaction_script)
+            .script_arg(name_word)
+            .build()
+            .unwrap();
+
+        // Query storage first to get expected result
+        let storage_result = self.get_account_for_name(name).await?;
+
+        // Execute on registry contract
+        let registry_id = self.registry_contract.as_ref().unwrap().id();
+
+        // Execute transaction - this will show debug output but may error
+        // The error is expected for read-only operations
+        let _ = self.client.new_transaction(registry_id, request).await;
+
+        Ok(storage_result)
+    }
+
+    /// Calls the get_name export to retrieve name for an account.
     ///
-    /// # Process
+    /// Executes a transaction script that calls the registry's get_name export,
+    /// which performs an account ID → name lookup.
     ///
-    /// 1. Loads nop.masm transaction script
-    /// 2. Creates transaction request with unauthenticated note
-    /// 3. Submits transaction to the registry contract
+    /// # Arguments
+    ///
+    /// * `account` - Account to look up name for
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Some(name))` - Found registered name
+    /// * `Ok(None)` - Account has no registered name
+    /// * `Err(ClientError)` - Lookup failed
+    pub async fn call_get_name_export(
+        &mut self,
+        account: &Account,
+    ) -> Result<Option<String>, ClientError> {
+        // Encode account ID to prefix/suffix format (2 u64s)
+        let account_id_felt = Felt::try_from(account.id().prefix()).unwrap();
+        let account_prefix = account_id_felt.as_int();
+        let account_suffix_felt = Felt::try_from(account.id().suffix()).unwrap();
+        let account_suffix = account_suffix_felt.as_int();
+
+        // Load the script that calls get_name
+        let script_code = get_script_code("call_get_name".to_string());
+
+        // Create library with the external_contract::miden_id path
+        let contract_code = fs::read_to_string(Path::new(paths::REGISTRY_CONTRACT)).unwrap();
+        let contract_library =
+            create_library(contract_code, "external_contract::miden_id").unwrap();
+
+        // Create transaction script with dynamically linked library
+        let transaction_script = create_tx_script(script_code, Some(contract_library)).unwrap();
+
+        // Build Word in reverse order so stack has [prefix, suffix, 0, 0, ...]
+        let account_id_word: Word = [
+            Felt::ZERO,
+            Felt::ZERO,
+            Felt::new(account_suffix),
+            Felt::new(account_prefix),
+        ]
+        .into();
+        let request = TransactionRequestBuilder::new()
+            .custom_script(transaction_script)
+            .script_arg(account_id_word)
+            .build()
+            .unwrap();
+
+        // Query storage first to get expected result
+        let storage_result = self.get_name_for_address(account).await?;
+
+        // Execute on registry contract
+        let registry_id = self.registry_contract.as_ref().unwrap().id();
+
+        // Execute transaction - this will show debug output but may error
+        // The error is expected for read-only operations or stack depth issues
+        let _ = self.client.new_transaction(registry_id, request).await;
+
+        Ok(storage_result)
+    }
+
+    // ================================================================================================
+    // INTERNAL HELPERS
+    // ================================================================================================
+
     async fn execute_transaction_with_note(&mut self, note: Note) -> Result<(), ClientError> {
         let nop_script_code = fs::read_to_string(Path::new(paths::NOP_SCRIPT)).unwrap();
         let transaction_script = create_tx_script(nop_script_code, None).unwrap();
@@ -1354,22 +1047,18 @@ impl RegistryTestHelper {
 // FREE FUNCTIONS
 // ================================================================================================
 
-/// Reads a MASM note file from the notes directory.
-///
-/// # Arguments
-///
-/// * `note_name` - Name of the note file without the `.masm` extension
-///
-/// # Returns
-///
-/// The note content as a String
-///
-/// # Panics
-///
-/// Panics if the note file cannot be read or does not exist
+/// Loads script code from file
+pub fn get_script_code(script_name: String) -> String {
+    fs::read_to_string(Path::new(&format!(
+        "{}/{}.masm",
+        paths::SCRIPTS_DIR,
+        script_name
+    )))
+    .unwrap()
+}
+
+/// Loads note code from file
 pub fn get_note_code(note_name: String) -> String {
-    // Construct the file path and read the MASM note content
-    // Used to load note templates like "init.masm", "register_name.masm", "update_price.masm", etc.
     fs::read_to_string(Path::new(&format!(
         "{}/{}.masm",
         paths::NOTES_DIR,

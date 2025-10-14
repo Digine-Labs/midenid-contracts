@@ -99,7 +99,7 @@ pub async fn create_public_note_with_library_and_inputs(
     creator_account: Account,
     assets: NoteAssets,
     library: Library,
-    inputs: NoteInputs
+    inputs: NoteInputs,
 ) -> Result<Note, Error> {
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)

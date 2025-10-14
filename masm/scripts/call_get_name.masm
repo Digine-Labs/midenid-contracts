@@ -1,0 +1,6 @@
+# Calls get_name export with account ID passed as script_arg
+use.external_contract::miden_id
+
+begin
+    call.miden_id::get_name
+end
