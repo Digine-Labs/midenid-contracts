@@ -2,7 +2,11 @@ use.miden_name::pricing
 use.miden::note
 use.std::sys
 
+const.NOTE_INPUT_PTR=0
 ## TODO: set price
 begin
-    nop
+    push.NOTE_INPUT_PTR
+    exec.note::get_inputs
+    debug.stack
+    exec.sys::truncate_stack
 end
