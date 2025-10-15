@@ -3,13 +3,15 @@ use std::{fs, path::Path, sync::Arc};
 
 use anyhow::Error;
 use miden_assembly::{ast::{Module, ModuleKind}, Assembler, DefaultSourceManager, Library, LibraryPath};
-use miden_client::{account::{AccountBuilder, AccountType, StorageMap, StorageSlot}, crypto::SecretKey, testing::NoteBuilder};
+use miden_client::{account::{AccountBuilder, AccountType, StorageMap, StorageSlot}, crypto::SecretKey, note::Note, testing::NoteBuilder};
 use miden_crypto::{Felt, Word};
 use miden_objects::account::{AccountComponent, AccountStorageMode, Account, AccountId};
 use miden_objects::note::{NoteType};
 use miden_lib::{account::{auth, wallets::BasicWallet}, transaction::TransactionKernel};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
+
+use crate::notes::create_price_set_note;
 
 pub fn naming_storage() -> Vec<StorageSlot> {
     let storage_slots: Vec<StorageSlot> = vec![
@@ -60,7 +62,19 @@ pub fn get_pricing_account_code() -> String {
     fs::read_to_string(Path::new(paths::PRICING_ACCOUNT)).unwrap()
 }
 
+pub fn get_test_prices() -> Vec<Felt> {
+    vec![Felt::new(123123), Felt::new(45645), Felt::new(789), Felt::new(555), Felt::new(123)]
+}
 
+pub async fn get_price_set_notes(sender_account: Account, pricing_contract: Account, prices: Vec<Felt>) -> Vec<Note> {
+    let note_1 = create_price_set_note(sender_account.clone(), vec![prices[0], Felt::new(1)], pricing_contract.clone()).await.unwrap();
+    let note_2 = create_price_set_note(sender_account.clone(), vec![prices[1], Felt::new(2)], pricing_contract.clone()).await.unwrap();
+    let note_3 = create_price_set_note(sender_account.clone(), vec![prices[2], Felt::new(3)], pricing_contract.clone()).await.unwrap();
+    let note_4 = create_price_set_note(sender_account.clone(), vec![prices[3], Felt::new(4)], pricing_contract.clone()).await.unwrap();
+    let note_5 = create_price_set_note(sender_account.clone(), vec![prices[4], Felt::new(5)], pricing_contract.clone()).await.unwrap();
+
+    vec![note_1, note_2, note_3, note_4, note_5]
+}
 
 pub fn create_account() -> anyhow::Result<Account> {
     let mut rng = ChaCha20Rng::from_os_rng();

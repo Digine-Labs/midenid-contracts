@@ -3,10 +3,16 @@ use.miden::note
 use.std::sys
 
 const.NOTE_INPUT_PTR=0
-## TODO: set price
+## Input (arguments): [letter_count, price]
 begin
     push.NOTE_INPUT_PTR
     exec.note::get_inputs
-    debug.stack
+    # [num_inputs, init_ptr]
+    drop drop push.NOTE_INPUT_PTR
+    mem_loadw
+    # [INPUTS]
+    drop drop 
+    # [letter_count, price]
+    call.pricing::set_price
     exec.sys::truncate_stack
 end

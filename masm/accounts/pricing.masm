@@ -45,41 +45,56 @@ export.init
     # []
 end
 
-# Input: [letter_count, PRICE]
+# Input: [letter_count, price]
 # Output: []
 export.set_price
     exec._assert_only_setter
+    # [letter_count, price]
     dup gt.5
-    # [letter_count > 5, letter_count, PRICE]
+    # [letter_count > 5, letter_count, price]
     if.true
         drop push.5
     end
-    # [letter_count, PRICE]
+    # [letter_count, price]
     push.0.0.0
-    # [LETTER_COUNT, PRICE]
+    # [LETTER_COUNT, price]
+    dup.4 push.0.0.0
+    # [PRICE, LETTER_COUNT, price]
+    swapw
+    # [LETTER_COUNT, PRICE, price]
     push.PRICE_SLOT
-    exec.account::set_map_item dropw dropw
+    exec.account::set_map_item dropw dropw drop
     # []
 end
 
 # Input: [DOMAIN]
+# Output: [cost]
 export.calculate_domain_cost
     dupw
     exec._validate_domain_length
+    # [DOMAIN]
     movdn.3
+    # [f1, f2, f3, len]
     drop drop drop dup
-    debug.stack
+    # [len, len]
     gt.5
-    # [letter_count > 5, DOMAIN]
+    # [len > 5, DOMAIN]
     if.true
-        drop drop
+        # [len]
+        drop
         push.5
     end
+    dup
+    # [len, len]
     push.0.0.0
-    # [LETTER_COUNT]
+    # [LETTER_COUNT, letter_count]
     push.PRICE_SLOT
     exec.account::get_map_item
-    debug.stack
+    # [PRICE, letter_count]
+    drop drop drop
+    # [price, letter_count]
+    mul
+    # [cost]
 end
 
 ## Internal methods

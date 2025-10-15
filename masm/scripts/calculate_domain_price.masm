@@ -12,7 +12,9 @@ begin
     # [num_inputs, init_ptr]
     drop drop push.CALCULATE_NOTE_INPUT_PTR
     mem_loadw
+    debug.stack
     # [length, felt1, felt2, felt3]
     call.pricing::calculate_domain_cost
+    debug.stack
     exec.sys::truncate_stack
 end
