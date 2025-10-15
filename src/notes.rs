@@ -84,7 +84,6 @@ pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word:
         push.{f4}.{f3}.{f2}.{length}
         call.pricing::calculate_domain_cost
         # [price]
-        debug.stack
         push.{expected_price}
         eq assert.err=WRONG_PRICE
         exec.sys::truncate_stack

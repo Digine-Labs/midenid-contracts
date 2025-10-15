@@ -514,6 +514,7 @@ async fn test_pricing_calculate_domain_cost_one_letter() -> anyhow::Result<()> {
     let init_flag = updated_pricing_account.storage().get_item(0)?.get(0).unwrap().as_int();
     assert_eq!(init_flag, 1, "Contract should be initialized");
 
+    // Execute price setting notes
     let setter_tx_inputs = mock_chain.get_transaction_inputs(
         updated_pricing_account.clone(),
         None,
@@ -622,6 +623,7 @@ async fn test_pricing_calculate_empty_domain_cost() -> anyhow::Result<()> {
     let init_flag = updated_pricing_account.storage().get_item(0)?.get(0).unwrap().as_int();
     assert_eq!(init_flag, 1, "Contract should be initialized");
 
+    // Execute price setting notes
     let setter_tx_inputs = mock_chain.get_transaction_inputs(
         updated_pricing_account.clone(),
         None,
@@ -655,7 +657,7 @@ async fn test_pricing_calculate_empty_domain_cost() -> anyhow::Result<()> {
     let result = tx_context_calc.execute().await;
 
     // Assert that the transaction executed successfully
-    assert!(result.is_err(), "calculate_domain_cost should revert on empty domain");
+    assert!(result.is_err(), "Tx must fail because domain length with zero must revert.");
 
     Ok(())
 }

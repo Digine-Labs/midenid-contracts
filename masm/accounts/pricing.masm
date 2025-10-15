@@ -10,6 +10,7 @@ const.ERR_ONLY_PRICE_SETTER="Only price setter"
 const.DOMAIN_PART_HIGH="Only 7 bits per felt"
 const.DOMAIN_LENGTH_TOO_HIGH="Maximum 21 characters allowed"
 const.ERR_INVALID_DOMAIN_LENGTH="Domain length field does not match actual character count"
+const.ERR_EMPTY_DOMAIN="Domain length zero"
 
 ## Constants
 const.INIT_FLAG_SLOT=0
@@ -104,6 +105,9 @@ end
 # Output: []
 proc._validate_domain_length
     # Stack: [length, felt1, felt2, felt3]
+    debug.stack
+    dup eq.0 assertz.err=ERR_EMPTY_DOMAIN
+    debug.stack
     movdn.3
     # [f1, f2, f3, length]
     exec._count_chars_in_felt
