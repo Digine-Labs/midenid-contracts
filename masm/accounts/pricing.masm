@@ -2,6 +2,7 @@
 use.miden::account
 use.miden::account_id
 use.miden::note
+use.std::sys
 
 ## Errors
 const.ERR_ALREADY_INITIALIZED="Contract already initialized"
@@ -84,16 +85,15 @@ export.calculate_domain_cost
         drop
         push.5
     end
-    dup
-    # [len, len]
+    # [len]
     push.0.0.0
-    # [LETTER_COUNT, letter_count]
+    # [LETTER_COUNT]
     push.PRICE_SLOT
     exec.account::get_map_item
-    # [PRICE, letter_count]
+    # [PRICE]
     drop drop drop
-    # [price, letter_count]
-    mul
+    exec.sys::truncate_stack
+    # Fix stack depth to 16
     # [cost]
 end
 

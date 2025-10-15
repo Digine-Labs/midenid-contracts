@@ -71,8 +71,32 @@ pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId
     Ok(note)
 }
 
-pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word: Word, pricing: Account) -> Result<Note, Error> {
-    let note_code = fs::read_to_string(Path::new("./masm/scripts/calculate_domain_price.masm")).unwrap();
+pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word: Word, pricing: Account, expected_price: u64) -> Result<Note, Error> {
+    let domain_price_note_code = format!(
+        r#"
+    use.miden_name::pricing
+    use.miden::note
+    use.std::sys
+
+    const.WRONG_PRICE="Wrong price returned"
+
+    begin
+        push.{f4}.{f3}.{f2}.{length}
+        call.pricing::calculate_domain_cost
+        # [price]
+        debug.stack
+        push.{expected_price}
+        eq assert.err=WRONG_PRICE
+        exec.sys::truncate_stack
+    end
+    "#,
+        length = domain_word[3],
+        f2 = domain_word[2],
+        f3 = domain_word[1],
+        f4 = domain_word[0],
+        expected_price = expected_price // Replace with actual expected price value
+    );
+    //let note_code = fs::read_to_string(Path::new("./masm/scripts/calculate_domain_price.masm")).unwrap();
     let account_code = get_pricing_account_code();
 
     let library_path = "miden_name::pricing";
@@ -81,7 +105,7 @@ pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word:
     let note_script = ScriptBuilder::new(true)
         .with_dynamically_linked_library(&library)
         .unwrap()
-        .compile_note_script(note_code)
+        .compile_note_script(domain_price_note_code)
         .unwrap();
 
     // domain_word format: [length, felt1, felt2, felt3]

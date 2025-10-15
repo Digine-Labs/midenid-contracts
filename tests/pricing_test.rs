@@ -265,7 +265,8 @@ async fn test_pricing_calculate_domain_cost() -> anyhow::Result<()> {
     let calculate_note = create_pricing_calculate_cost_note(
         tx_sender_account.clone(),
         domain_word,
-        pricing_account.clone()
+        pricing_account.clone(),
+        123
     ).await.unwrap();
 
     // Add both notes to the builder before building the chain
@@ -325,7 +326,6 @@ async fn test_pricing_calculate_domain_cost() -> anyhow::Result<()> {
         &[]
     )?;
 
-    // TODO: failing with InvalidStackDepthOnReturn. 
 
     let tx_context_calc = TransactionContextBuilder::new(updated_pricing_account.clone())
         .account_seed(None)
@@ -342,7 +342,6 @@ async fn test_pricing_calculate_domain_cost() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "reason"]
 async fn test_pricing_calculate_domain_cost_multiple_words() -> anyhow::Result<()> {
     let mut builder = MockChain::builder();
 
@@ -369,15 +368,25 @@ async fn test_pricing_calculate_domain_cost_multiple_words() -> anyhow::Result<(
         pricing_account.clone()
     ).await.unwrap();
 
+    let test_prices = get_test_prices();
+    let set_notes = get_price_set_notes(setter_account.clone(), pricing_account.clone(), test_prices).await;
+
+
     // Create the calculate_domain_cost note
     let calculate_note = create_pricing_calculate_cost_note(
         tx_sender_account.clone(),
         domain_word,
-        pricing_account.clone()
+        pricing_account.clone(),
+        123
     ).await.unwrap();
 
     // Add both notes to the builder before building the chain
     builder.add_note(OutputNote::Full(initialize_input_note.clone()));
+    builder.add_note(OutputNote::Full(set_notes[0].clone()));
+    builder.add_note(OutputNote::Full(set_notes[1].clone()));
+    builder.add_note(OutputNote::Full(set_notes[2].clone()));
+    builder.add_note(OutputNote::Full(set_notes[3].clone()));
+    builder.add_note(OutputNote::Full(set_notes[4].clone()));
     builder.add_note(OutputNote::Full(calculate_note.clone()));
 
     let mut mock_chain = builder.build()?;
@@ -401,6 +410,22 @@ async fn test_pricing_calculate_domain_cost_multiple_words() -> anyhow::Result<(
     // Verify initialization succeeded
     let init_flag = updated_pricing_account.storage().get_item(0)?.get(0).unwrap().as_int();
     assert_eq!(init_flag, 1, "Contract should be initialized");
+
+    let setter_tx_inputs = mock_chain.get_transaction_inputs(
+        updated_pricing_account.clone(),
+        None,
+        &[set_notes[0].id(), set_notes[1].id(), set_notes[2].id(), set_notes[3].id(), set_notes[4].id()],
+        &[]
+    )?;
+
+    let setter_tx_context = TransactionContextBuilder::new(updated_pricing_account.clone())
+        .account_seed(None)
+        .tx_inputs(setter_tx_inputs)
+        .build()?;
+
+    let _executed_tx = setter_tx_context.execute().await?;
+
+    let updated_pricing_account = mock_chain.add_pending_executed_transaction(&_executed_tx)?;
 
     // Now execute the calculate_domain_cost transaction
     let tx_inputs_calc = mock_chain.get_transaction_inputs(
@@ -425,7 +450,6 @@ async fn test_pricing_calculate_domain_cost_multiple_words() -> anyhow::Result<(
 }
 
 #[tokio::test]
-#[ignore = "reason"]
 async fn test_pricing_calculate_domain_cost_one_letter() -> anyhow::Result<()> {
     let mut builder = MockChain::builder();
 
@@ -444,7 +468,7 @@ async fn test_pricing_calculate_domain_cost_one_letter() -> anyhow::Result<()> {
         Felt::new(1),            // length
     ].into();
 
-    // First, initialize the pricing contract
+        // First, initialize the pricing contract
     let initialize_input_note = create_pricing_initialize_note(
         tx_sender_account.clone(),
         fungible_asset.faucet_id(),
@@ -452,15 +476,25 @@ async fn test_pricing_calculate_domain_cost_one_letter() -> anyhow::Result<()> {
         pricing_account.clone()
     ).await.unwrap();
 
+    let test_prices = get_test_prices();
+    let set_notes = get_price_set_notes(setter_account.clone(), pricing_account.clone(), test_prices).await;
+
+
     // Create the calculate_domain_cost note
     let calculate_note = create_pricing_calculate_cost_note(
         tx_sender_account.clone(),
         domain_word,
-        pricing_account.clone()
+        pricing_account.clone(),
+        123123
     ).await.unwrap();
 
     // Add both notes to the builder before building the chain
     builder.add_note(OutputNote::Full(initialize_input_note.clone()));
+    builder.add_note(OutputNote::Full(set_notes[0].clone()));
+    builder.add_note(OutputNote::Full(set_notes[1].clone()));
+    builder.add_note(OutputNote::Full(set_notes[2].clone()));
+    builder.add_note(OutputNote::Full(set_notes[3].clone()));
+    builder.add_note(OutputNote::Full(set_notes[4].clone()));
     builder.add_note(OutputNote::Full(calculate_note.clone()));
 
     let mut mock_chain = builder.build()?;
@@ -485,6 +519,22 @@ async fn test_pricing_calculate_domain_cost_one_letter() -> anyhow::Result<()> {
     let init_flag = updated_pricing_account.storage().get_item(0)?.get(0).unwrap().as_int();
     assert_eq!(init_flag, 1, "Contract should be initialized");
 
+    let setter_tx_inputs = mock_chain.get_transaction_inputs(
+        updated_pricing_account.clone(),
+        None,
+        &[set_notes[0].id(), set_notes[1].id(), set_notes[2].id(), set_notes[3].id(), set_notes[4].id()],
+        &[]
+    )?;
+
+    let setter_tx_context = TransactionContextBuilder::new(updated_pricing_account.clone())
+        .account_seed(None)
+        .tx_inputs(setter_tx_inputs)
+        .build()?;
+
+    let _executed_tx = setter_tx_context.execute().await?;
+
+    let updated_pricing_account = mock_chain.add_pending_executed_transaction(&_executed_tx)?;
+
     // Now execute the calculate_domain_cost transaction
     let tx_inputs_calc = mock_chain.get_transaction_inputs(
         updated_pricing_account.clone(),
@@ -503,6 +553,114 @@ async fn test_pricing_calculate_domain_cost_one_letter() -> anyhow::Result<()> {
 
     // Assert that the transaction executed successfully
     assert!(result.is_ok(), "calculate_domain_cost should validate the domain successfully: {:?}", result.err());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_pricing_calculate_empty_domain_cost() -> anyhow::Result<()> {
+    let mut builder = MockChain::builder();
+
+    let fungible_asset = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 100000).unwrap();
+
+    let tx_sender_account = builder.add_existing_wallet(Auth::BasicAuth)?;
+    let setter_account = builder.add_existing_wallet(Auth::BasicAuth)?;
+
+    let pricing_account = create_pricing_account();
+
+    // Sending reversed word so stack will init however we want
+    let domain_word = [
+        Felt::new(0),                          // 3rd part
+        Felt::new(0),                          // 2nd felt
+        Felt::new(0),             // 1st felt
+        Felt::new(0),            // length
+    ].into();
+
+        // First, initialize the pricing contract
+    let initialize_input_note = create_pricing_initialize_note(
+        tx_sender_account.clone(),
+        fungible_asset.faucet_id(),
+        setter_account.clone(),
+        pricing_account.clone()
+    ).await.unwrap();
+
+    let test_prices = get_test_prices();
+    let set_notes = get_price_set_notes(setter_account.clone(), pricing_account.clone(), test_prices).await;
+
+
+    // Create the calculate_domain_cost note
+    let calculate_note = create_pricing_calculate_cost_note(
+        tx_sender_account.clone(),
+        domain_word,
+        pricing_account.clone(),
+        123123
+    ).await.unwrap();
+
+    // Add both notes to the builder before building the chain
+    builder.add_note(OutputNote::Full(initialize_input_note.clone()));
+    builder.add_note(OutputNote::Full(set_notes[0].clone()));
+    builder.add_note(OutputNote::Full(set_notes[1].clone()));
+    builder.add_note(OutputNote::Full(set_notes[2].clone()));
+    builder.add_note(OutputNote::Full(set_notes[3].clone()));
+    builder.add_note(OutputNote::Full(set_notes[4].clone()));
+    builder.add_note(OutputNote::Full(calculate_note.clone()));
+
+    let mut mock_chain = builder.build()?;
+
+    // Execute initialization transaction first
+    let tx_inputs = mock_chain.get_transaction_inputs(
+        pricing_account.clone(),
+        None,
+        &[initialize_input_note.id()],
+        &[]
+    )?;
+
+    let tx_context = TransactionContextBuilder::new(pricing_account.clone())
+        .account_seed(None)
+        .tx_inputs(tx_inputs)
+        .build()?;
+
+    let _exec_tx = tx_context.execute().await?;
+    let updated_pricing_account = mock_chain.add_pending_executed_transaction(&_exec_tx)?;
+
+    // Verify initialization succeeded
+    let init_flag = updated_pricing_account.storage().get_item(0)?.get(0).unwrap().as_int();
+    assert_eq!(init_flag, 1, "Contract should be initialized");
+
+    let setter_tx_inputs = mock_chain.get_transaction_inputs(
+        updated_pricing_account.clone(),
+        None,
+        &[set_notes[0].id(), set_notes[1].id(), set_notes[2].id(), set_notes[3].id(), set_notes[4].id()],
+        &[]
+    )?;
+
+    let setter_tx_context = TransactionContextBuilder::new(updated_pricing_account.clone())
+        .account_seed(None)
+        .tx_inputs(setter_tx_inputs)
+        .build()?;
+
+    let _executed_tx = setter_tx_context.execute().await?;
+
+    let updated_pricing_account = mock_chain.add_pending_executed_transaction(&_executed_tx)?;
+
+    // Now execute the calculate_domain_cost transaction
+    let tx_inputs_calc = mock_chain.get_transaction_inputs(
+        updated_pricing_account.clone(),
+        None,
+        &[calculate_note.id()],
+        &[]
+    )?;
+
+    let tx_context_calc = TransactionContextBuilder::new(updated_pricing_account.clone())
+        .account_seed(None)
+        .tx_inputs(tx_inputs_calc)
+        .build()?;
+
+    // This should succeed if the domain validation passes
+    let result = tx_context_calc.execute().await;
+
+    // Assert that the transaction executed successfully
+    assert!(result.is_err(), "calculate_domain_cost should revert on empty domain");
 
     Ok(())
 }
