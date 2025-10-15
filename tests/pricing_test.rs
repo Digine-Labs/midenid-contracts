@@ -9,11 +9,6 @@ use midenid_contracts::{notes::{create_price_set_note, create_pricing_initialize
 use midenid_contracts::notes::{get_note_code, create_naming_initialize_note, create_pricing_calculate_cost_note};
 
 
-// Current todo: call set price before calculate domain costs
-
-// Develop test like that
-// https://github.com/0xMiden/miden-base/blob/719ff03d1482e6ce2ad4e986f59ec7b9a8ddf962/crates/miden-testing/src/kernel_tests/tx/test_fpi.rs#L515
-
 #[tokio::test]
 async fn test_pricing_init() -> anyhow::Result<()> {
     let mut builder = MockChain::builder();
