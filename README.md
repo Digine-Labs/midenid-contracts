@@ -28,6 +28,7 @@ Miden Name is actively developed and any functionality can be changed, removed, 
 All core logic is implemented in Miden Assembly (`.masm` files):
 
 #### Accounts
+
 - **[miden_id.masm](masm/accounts/miden_id.masm)**: Main name registry contract (will be renamed to miden_name.masm)
   - Storage slots:
     - `SLOT[0]`: Initialization flag
@@ -40,6 +41,7 @@ All core logic is implemented in Miden Assembly (`.masm` files):
 - **[identity.masm](masm/accounts/identity.masm)**: Identity contract that stores users public identities (Under development, will be renamed as miden_id.masm)
 
 #### Notes
+
 - **[init.masm](masm/notes/init.masm)**: Initialize naming registry with owner and price
 - **[register_name.masm](masm/notes/register_name.masm)**: Register a new name with payment (Hardcoded-name for example)
 - **[update_price.masm](masm/notes/update_price.masm)**: Update registration price (owner only)
@@ -47,9 +49,11 @@ All core logic is implemented in Miden Assembly (`.masm` files):
 - **[P2N.masm](masm/notes/P2N.masm)**: Pay-to-note for payment handling (TBD)
 
 #### Scripts
+
 - **[nop.masm](masm/scripts/nop.masm)**: No-operation script for testing
 
 #### Auth
+
 - **[no_auth.masm](masm/auth/no_auth.masm)**: No-auth authentication component for public access
 
 ### Testing Infrastructure (Rust)
@@ -137,17 +141,20 @@ cargo clippy
 For production deployment to testnet or mainnet, see the comprehensive **[DEPLOYMENT.md](DEPLOYMENT.md)** guide.
 
 **Quick Start:**
+
 ```bash
 cargo run --release --bin deploy -- <network> <payment_token_id> <price> [owner_account_id]
 ```
 
 Example:
+
 ```bash
 # Deploy to testnet with auto-created owner account
 cargo run --release --bin deploy -- testnet 0x97598f759deab5201e93e1aac55997 10
 ```
 
 The deployment script will:
+
 - Deploy the registry contract as public, immutable
 - Create or use an existing owner account
 - Initialize the registry with payment token and price
@@ -193,14 +200,14 @@ assert_eq!(price, 200);
 
 The contract uses Miden's storage system with numbered slots:
 
-| Slot | Content | Description |
-|------|---------|-------------|
-| 0 | Initialization flag | 0 = uninitialized, 1 = initialized |
-| 1 | Owner prefix | First part of owner account ID |
-| 2 | Owner suffix & Token | Owner suffix + payment token info |
-| 3 | Name→ID mapping | Sparse Merkle Tree root for name lookups |
-| 4 | ID→Name mapping | Sparse Merkle Tree root for reverse lookups |
-| 5 | Registration price | Cost in fungible tokens to register |
+| Slot | Content              | Description                                 |
+| ---- | -------------------- | ------------------------------------------- |
+| 0    | Initialization flag  | 0 = uninitialized, 1 = initialized          |
+| 1    | Owner prefix         | First part of owner account ID              |
+| 2    | Owner suffix & Token | Owner suffix + payment token info           |
+| 3    | Name→ID mapping      | Sparse Merkle Tree root for name lookups    |
+| 4    | ID→Name mapping      | Sparse Merkle Tree root for reverse lookups |
+| 5    | Registration price   | Cost in fungible tokens to register         |
 
 ## Contract Constraints
 
@@ -223,11 +230,101 @@ Tests run against Miden testnet and validate:
 - ✅ Ownership transfer
 - ✅ Payment token validation
 
+### Testing locally
+
+#### Run a local node
+
+For the detailed setup, you can find how to run a local node setup from miden-base repo [here](https://github.com/0xMiden/miden-node/blob/next/docs/src/operator/usage.md) or you can follow the instruction below
+
+##### 1. Install `miden-node`
+
+```bash
+cargo install miden-node
+```
+
+> Validate the installation was successful by running `miden-node --version`, it should return `miden-node 0.11.2`
+
+##### 2. Create a folder to store the node's data.
+
+```bash
+mkdir data
+```
+
+##### 3. Bootstrap the node.
+
+```bash
+miden-node bundled bootstrap \
+  --data-directory data \
+  --accounts-directory ./data
+```
+
+##### 4. Create a genesis configuration file
+
+```bash
+touch genesis.toml
+```
+
+##### 5. Write the initial configuration into `genesis.toml`
+
+```bash
+echo '# The UNIX timestamp of the genesis block. It will influence the hash of the genesis block.
+timestamp = 1717344256
+# Defines the format of the block protocol to use for the genesis block.
+version   = 1
+
+# The native faucet to use for fees.
+[native_faucet]
+symbol     = "MIDEN"
+decimals   = 6
+max_supply = 100_000_000_000_000_000
+
+# The fee parameters to use for the genesis block.
+[fee_parameters]
+verification_base_fee = 0
+
+# Another fungible faucet (optional) to initialize at genesis.
+[[fungible_faucet]]
+# The token symbol to use for the token
+symbol       = "FUZZY"
+# Number of decimals your token will have, it effectively defines the fixed point accuracy.
+decimals     = 6
+# Total supply, in _base units_
+#
+# e.g. a max supply of `1e15` _base units_ and decimals set to `6`, will yield you a total supply
+# of `1e15/1e6 = 1e9` `FUZZY`s.
+max_supply   = 1_000_000_000_000_000
+# Storage mode of the faucet account.
+storage_mode = "public"
+
+[[wallet]]
+# List of all assets the account should hold. Each token type _must_ have a corresponding faucet.
+# The number is in _base units_, e.g. specifying `999 FUZZY` at 6 decimals would become
+# `999_000_000`.
+assets       = [{ amount = 999_000_000, symbol = "FUZZY" }]
+# Storage mode of the wallet account.
+storage_mode = "private"
+# The code of the account can be updated or not.
+# has_updatable_code = false # default value' > genesis.toml
+```
+
+##### 6. Run the node
+
+```
+miden-node bundled start \
+  --data-directory data \
+  --rpc.url http://0.0.0.0:57291
+```
+
+#### Example Test Commands
+
+```bash
+# Test deployment flow
+cargo test test_deployment_flow --release -- --nocapture --test-threads=1
+```
+
 ## Resources
 
 - [Miden Name](https://miden.name)
 - [Miden Documentation](https://0xmiden.github.io/miden-docs/index.html)
 - [Miden VM Documentation](https://0xmiden.github.io/miden-docs/imported/miden-vm/src/intro/main.html)
 - [Miden](https://miden.xyz)
-
-
