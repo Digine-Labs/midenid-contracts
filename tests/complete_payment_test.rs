@@ -1,9 +1,10 @@
 use miden_client::ClientError;
 
-mod test_helper;
-use test_helper::{
-    RegistryTestHelper, get_or_init_shared_contract, mint_and_fund_account,
-    setup_helper_with_contract,
+mod helpers;
+use helpers::{
+    RegistryTestHelper, create_basic_wallet, get_account_for_name, get_or_init_shared_contract,
+    is_name_registered, mint_and_fund_account, register_name, setup_helper_with_contract,
+    update_registry_price,
 };
 
 #[tokio::test]
@@ -11,15 +12,23 @@ async fn register_with_payment() -> Result<(), ClientError> {
     let (contract_id, faucet_id, _owner_id) = get_or_init_shared_contract().await;
     let mut helper = setup_helper_with_contract(contract_id, faucet_id).await?;
 
-    let alice = helper.create_account("Alice1").await?;
+    let alice = create_basic_wallet(&mut helper.client, helper.keystore.clone(), "Alice1").await?;
     let alice = mint_and_fund_account(&mut helper, faucet_id, &alice, 200).await?;
 
-    helper
-        .register_name_for_account_with_payment(&alice, "alice", Some(100))
-        .await?;
+    register_name(
+        &mut helper.client,
+        contract_id,
+        &alice,
+        "alice",
+        helper.faucet_account.as_ref(),
+        Some(100),
+    )
+    .await?;
 
-    assert!(helper.is_name_registered("alice").await?);
-    if let Some((prefix, suffix)) = helper.get_account_for_name("alice").await? {
+    assert!(is_name_registered(&mut helper.client, contract_id, "alice").await?);
+    if let Some((prefix, suffix)) =
+        get_account_for_name(&mut helper.client, contract_id, "alice").await?
+    {
         assert_eq!(prefix, alice.id().prefix().as_felt().as_int());
         assert_eq!(suffix, alice.id().suffix().as_int());
     } else {
@@ -34,12 +43,18 @@ async fn register_with_payment_wrong_amount() -> Result<(), ClientError> {
     let (contract_id, faucet_id, _owner_id) = get_or_init_shared_contract().await;
     let mut helper = setup_helper_with_contract(contract_id, faucet_id).await?;
 
-    let alice = helper.create_account("Alice2").await?;
+    let alice = create_basic_wallet(&mut helper.client, helper.keystore.clone(), "Alice2").await?;
     let alice = mint_and_fund_account(&mut helper, faucet_id, &alice, 200).await?;
 
-    let result = helper
-        .register_name_for_account_with_payment(&alice, "alice2", Some(50))
-        .await;
+    let result = register_name(
+        &mut helper.client,
+        contract_id,
+        &alice,
+        "alice2",
+        helper.faucet_account.as_ref(),
+        Some(50),
+    )
+    .await;
 
     assert!(
         result.is_err(),
@@ -54,22 +69,34 @@ async fn test_price_update_validation() -> Result<(), ClientError> {
     let (contract_id, faucet_id, owner_id) = get_or_init_shared_contract().await;
     let mut helper = setup_helper_with_contract(contract_id, faucet_id).await?;
 
-    let user1 = helper.create_account("User1").await?;
-    let user2 = helper.create_account("User2").await?;
+    let user1 = create_basic_wallet(&mut helper.client, helper.keystore.clone(), "User1").await?;
+    let user2 = create_basic_wallet(&mut helper.client, helper.keystore.clone(), "User2").await?;
 
     let user1 = mint_and_fund_account(&mut helper, faucet_id, &user1, 200).await?;
     let user2 = mint_and_fund_account(&mut helper, faucet_id, &user2, 300).await?;
 
-    helper
-        .register_name_for_account_with_payment(&user1, "user1", Some(100))
-        .await?;
+    register_name(
+        &mut helper.client,
+        contract_id,
+        &user1,
+        "user1",
+        helper.faucet_account.as_ref(),
+        Some(100),
+    )
+    .await?;
 
     let owner = helper.client.get_account(owner_id).await?.unwrap().into();
-    helper.update_price(&owner, 200).await?;
+    update_registry_price(&mut helper.client, contract_id, &owner, 200).await?;
 
-    helper
-        .register_name_for_account_with_payment(&user2, "user2", Some(200))
-        .await?;
+    register_name(
+        &mut helper.client,
+        contract_id,
+        &user2,
+        "user2",
+        helper.faucet_account.as_ref(),
+        Some(200),
+    )
+    .await?;
 
     Ok(())
 }
