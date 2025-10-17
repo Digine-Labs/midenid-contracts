@@ -39,6 +39,13 @@ async fn test_pricing_init() -> anyhow::Result<()> {
     let init_flag = updated_pricing_account.storage().get_item(0)?.get(0).unwrap().as_int();
     let owner_slot = updated_pricing_account.storage().get_item(1)?;
     let trasury_slot = updated_pricing_account.storage().get_item(2)?;
+    let calc_root_slot = updated_pricing_account.storage().get_item(3)?;
+
+    // ensure root is non-zero
+    assert_ne!(calc_root_slot.get(0).unwrap().as_int(), 0);
+    assert_ne!(calc_root_slot.get(1).unwrap().as_int(), 0);
+    assert_ne!(calc_root_slot.get(2).unwrap().as_int(), 0);
+    assert_ne!(calc_root_slot.get(3).unwrap().as_int(), 0);
 
     assert_eq!(init_flag, 1);
     assert_eq!(setter_account.id().prefix().as_u64(), owner_slot.get(1).unwrap().as_int());

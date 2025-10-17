@@ -6,7 +6,7 @@ use miden_testing::{Auth, MockChain, MockChainBuilder, TransactionContext, Trans
 use rand_chacha::ChaCha20Rng;
 use rand::{Rng, SeedableRng};
 use miden_objects::{account::Account, note::NoteType};
-use midenid_contracts::{notes::{create_naming_set_payment_token_contract, create_price_set_note}, utils::{create_account, create_naming_account, create_naming_library, create_pricing_account, get_price_set_notes, get_test_prices}};
+use midenid_contracts::{notes::{create_naming_set_payment_token_contract, create_naming_set_pricing_root, create_price_set_note}, utils::{create_account, create_naming_account, create_naming_library, create_pricing_account, get_price_set_notes, get_test_prices}};
 use midenid_contracts::notes::{get_note_code, create_naming_initialize_note, create_pricing_initialize_note};
 
 
@@ -120,7 +120,7 @@ async fn test_naming_init() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn test_naming_set_pricing_contract() -> anyhow::Result<()> {
+async fn test_naming_set_pricing_contract_and_root() -> anyhow::Result<()> {
 
     let mut builder = MockChain::builder();
     let fungible_asset = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 100000).unwrap();
@@ -152,6 +152,8 @@ async fn test_naming_set_pricing_contract() -> anyhow::Result<()> {
         pricing_account.id(), 
         naming_account.clone()
     ).await?;
+
+    // TODO: set pricing root too
 
     let test_prices = get_test_prices();
     let set_notes = get_price_set_notes(pricing_setter_account.clone(), pricing_account.clone(), test_prices).await;

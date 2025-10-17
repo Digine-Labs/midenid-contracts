@@ -17,6 +17,7 @@ const.INIT_FLAG_SLOT=0
 const.PRICE_SETTER_SLOT=1 # [0, 0, prefix, suffix]
 const.PAYMENT_TOKEN_SLOT=2 # [0, 0, prefix, suffix]
 const.PRICE_SLOT=3 # map(letter_count -> price)
+const.CALCULATE_PRICE_ROOT=4 # PRICE_ROOT
 
 const.MAX_LENGTH=21
 const.MAX_FELT_PART=0xFFFFFFFFFFFFFF # 8*7 bits
@@ -43,6 +44,11 @@ export.init
     # []
     push.1.0.0.0
     push.INIT_FLAG_SLOT
+    exec.account::set_item dropw
+    # []
+    procref.calculate_domain_cost
+    # [ROOT]
+    push.CALCULATE_PRICE_ROOT
     exec.account::set_item dropw
     # []
 end

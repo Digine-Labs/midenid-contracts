@@ -32,7 +32,8 @@ pub fn pricing_storage() -> Vec<StorageSlot> {
         empty_storage_value(), // Init flag
         empty_storage_value(), // setter
         empty_storage_value(), // token
-        empty_storage_map() // prices
+        empty_storage_map(), // prices
+        empty_storage_value()
         ];
     return storage_slots;
 }
