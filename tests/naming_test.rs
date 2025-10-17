@@ -1,5 +1,6 @@
 use core::slice;
-use miden_client::{note::{NoteExecutionMode, NoteTag}, testing::NoteBuilder, transaction::{AccountInterface, OutputNote}};
+use anyhow::Ok;
+use miden_client::{asset::FungibleAsset, note::{NoteExecutionMode, NoteTag}, testing::{account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, NoteBuilder}, transaction::{AccountInterface, OutputNote}};
 use miden_crypto::Felt;
 use miden_testing::{Auth, MockChain, MockChainBuilder, TransactionContextBuilder};
 use rand_chacha::ChaCha20Rng;
@@ -48,5 +49,14 @@ async fn test_naming_init() -> anyhow::Result<()> {
     assert_eq!(owner_account.id().suffix().as_int(), owner_slot.get(0).unwrap().as_int());
     assert_eq!(treasury_account.id().prefix().as_u64(), trasury_slot.get(1).unwrap().as_int());
     assert_eq!(treasury_account.id().suffix().as_int(), trasury_slot.get(0).unwrap().as_int());
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_naming_register() -> anyhow::Result<()> {
+    let mut builder = MockChain::builder();
+    let fungible_asset = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 100000).unwrap();
+
+    // TODO
     Ok(())
 }
