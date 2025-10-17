@@ -235,7 +235,7 @@ pub async fn create_basic_account(
     let key_pair = SecretKey::with_rng(client.rng());
     let builder = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountUpdatableCode)
-        .storage_mode(AccountStorageMode::Public)
+        .storage_mode(AccountStorageMode::Network)
         .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
         .with_component(BasicWallet);
     let (account, seed) = builder.build().unwrap();
@@ -296,7 +296,7 @@ pub async fn create_public_immutable_contract(
     client.rng().fill_bytes(&mut init_seed);
     let (counter_contract, counter_seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Public)
+        .storage_mode(AccountStorageMode::Network)
         .with_auth_component(auth::NoAuth)
         .with_component(counter_component.clone())
         .build()
@@ -380,7 +380,7 @@ pub async fn create_faucet_account(
     // Build faucet account (must use FungibleFaucet account type)
     let builder = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
-        .storage_mode(AccountStorageMode::Public)
+        .storage_mode(AccountStorageMode::Network)
         .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
         .with_component(faucet);
 

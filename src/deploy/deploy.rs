@@ -1,7 +1,6 @@
 use std::{env, fs, path::Path};
 use midenid_contracts::common::{
-    create_library, create_public_immutable_contract, create_public_note_with_library_and_inputs,
-    create_tx_script, instantiate_client,
+    create_library, create_public_immutable_contract, create_public_note_with_library_and_inputs, create_tx_script, delete_keystore_and_store, instantiate_client
 };
 use miden_client::{
     account::AccountId,
@@ -63,7 +62,7 @@ fn parse_account_id(id_str: &str) -> Result<AccountId, String> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🚀 Miden ID Registry Deployment Script\n");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
+    delete_keystore_and_store().await;
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 3 {
