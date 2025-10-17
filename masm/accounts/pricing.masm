@@ -44,17 +44,9 @@ export.init
     push.1.0.0.0
     push.INIT_FLAG_SLOT
     exec.account::set_item dropw
-
-    procref.calculate_domain_cost
-    debug.stack
-    dropw
     # []
 end
-#──  0: 12524191526146524453
-#├──  1: 14777021424490213012
-#├──  2: 5901570038019373206
-#├──  3: 17847347482721284626
-# Input: [letter_count, price]
+
 # Output: []
 export.set_price
     exec._assert_only_setter

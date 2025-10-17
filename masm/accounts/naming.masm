@@ -17,6 +17,7 @@ const.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT=3
 const.ACCOUNT_ID_TO_DOMAIN_SLOT=4
 const.DOMAIN_TO_ACCOUNT_ID_SLOT=5
 const.DOMAIN_TO_OWNER_SLOT=6
+const.CALCULATE_PRICE_ROOT=7
 
 const.MAX_NAME_LENGTH=21
 
@@ -69,7 +70,9 @@ export.register
     # [isEqual, ZERO, PRICING_CONTRACT, DOMAIN]
     assertz.err=ERR_PAYMENT_TOKEN_NOT_ALLOWED dropw
     # [PRICING_CONTRACT, DOMAIN]
-    push.PRICING_CALCULATE_PROCEDURE_4.PRICING_CALCULATE_PROCEDURE_3.PRICING_CALCULATE_PROCEDURE_2.PRICING_CALCULATE_PROCEDURE_1
+    push.CALCULATE_PRICE_ROOT
+    exec.account::get_item
+    # [PROC_ROOT, PRICING_CONTRACT, DOMAIN]
     swapw
     drop drop
     # [pricing_prefix, pricing_suffix, PROC_ROOT, DOMAIN]
@@ -185,6 +188,15 @@ export.set_payment_token_contract
     exec.account::set_map_item
     # [OLD_VALUE, OLD_KEY]
     dropw dropw
+    # []
+end
+
+# Input: [PROC_ROOT]
+# Output: []
+export.set_calculate_price_root
+    exec._assert_only_owner
+    push.CALCULATE_PRICE_ROOT
+    exec.account::set_item dropw
     # []
 end
 

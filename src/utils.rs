@@ -22,6 +22,7 @@ pub fn naming_storage() -> Vec<StorageSlot> {
         empty_storage_map(), // account to domain
         empty_storage_map(), // domain to account
         empty_storage_map(), // domain to owner
+        empty_storage_value(), // calculate price root
         ];
     return storage_slots;
 }
