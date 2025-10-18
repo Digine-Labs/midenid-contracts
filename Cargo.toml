@@ -1,20 +1,8 @@
 [package]
-name = "midenid-contracts"
+name = "midenname-contracts"
 version = "0.1.0"
 edition = "2024"
-default-run = "midenid-contracts"
-
-[[bin]]
-name = "deploy"
-path = "src/deploy/deploy.rs"
-
-[[bin]]
-name = "list_accounts"
-path = "src/deploy/list_accounts.rs"
-
-[[bin]]
-name = "export_account"
-path = "src/deploy/export_account.rs"
+default-run = "midenname-contracts"
 
 [dependencies]
 miden-client = { version = "0.11.4", features = ["testing", "tonic", "sqlite"] }

@@ -110,9 +110,7 @@ end
 # Output: []
 proc._validate_domain_length
     # Stack: [length, felt1, felt2, felt3]
-    debug.stack
     dup eq.0 assertz.err=ERR_EMPTY_DOMAIN
-    debug.stack
     movdn.3
     # [f1, f2, f3, length]
     exec._count_chars_in_felt

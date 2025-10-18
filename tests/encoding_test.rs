@@ -1,5 +1,5 @@
 use miden_crypto::{Felt, Word};
-use midenid_contracts::utils::{encode_domain, decode_domain};
+use midenname_contracts::utils::{encode_domain, decode_domain};
 
 #[test]
 fn encode_letter() {

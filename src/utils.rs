@@ -1,12 +1,8 @@
-
 use std::{fs, path::Path, sync::Arc};
-
-use anyhow::Error;
 use miden_assembly::{ast::{Module, ModuleKind}, Assembler, DefaultSourceManager, Library, LibraryPath};
-use miden_client::{account::{AccountBuilder, AccountType, StorageMap, StorageSlot}, crypto::SecretKey, note::Note, testing::NoteBuilder};
+use miden_client::{account::{AccountBuilder, AccountType, StorageMap, StorageSlot}, crypto::SecretKey, note::Note};
 use miden_crypto::{Felt, Word};
-use miden_objects::account::{AccountComponent, AccountStorageMode, Account, AccountId};
-use miden_objects::note::{NoteType};
+use miden_objects::account::{AccountComponent, AccountStorageMode, Account};
 use miden_lib::{account::{auth, wallets::BasicWallet}, transaction::TransactionKernel};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -68,6 +64,12 @@ pub fn get_test_prices() -> Vec<Felt> {
     vec![Felt::new(123123), Felt::new(45645), Felt::new(789), Felt::new(555), Felt::new(123)]
 }
 
+pub fn get_calculate_price_root() -> [Felt; 4] {
+    //[Felt::new(15321474589252129342), Felt::new(17373224439259377994), Felt::new(15071539326562317628), Felt::new(3312677166725950353)]
+    [Felt::new(3312677166725950353), Felt::new(15071539326562317628), Felt::new(17373224439259377994), Felt::new(15321474589252129342)]
+}
+
+
 pub async fn get_price_set_notes(sender_account: Account, pricing_contract: Account, prices: Vec<Felt>) -> Vec<Note> {
     let note_1 = create_price_set_note(sender_account.clone(), vec![prices[0], Felt::new(1)], pricing_contract.clone()).await.unwrap();
     let note_2 = create_price_set_note(sender_account.clone(), vec![prices[1], Felt::new(2)], pricing_contract.clone()).await.unwrap();
@@ -81,7 +83,7 @@ pub async fn get_price_set_notes(sender_account: Account, pricing_contract: Acco
 pub fn create_account() -> anyhow::Result<Account> {
     let mut rng = ChaCha20Rng::from_os_rng();
     let key_pair = SecretKey::with_rng(&mut rng);
-    let (account, seed) = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
+    let (account, _seed) = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
         .account_type(AccountType::RegularAccountUpdatableCode)
         .storage_mode(AccountStorageMode::Public)
         .with_auth_component(auth::AuthRpoFalcon512::new(key_pair.public_key().clone()))

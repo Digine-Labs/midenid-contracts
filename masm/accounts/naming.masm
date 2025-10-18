@@ -75,6 +75,7 @@ export.register
     # [PROC_ROOT, PRICING_CONTRACT, DOMAIN]
     swapw
     drop drop
+    debug.stack
     # [pricing_prefix, pricing_suffix, PROC_ROOT, DOMAIN]
     exec.tx::execute_foreign_procedure
     # [<outputs>]

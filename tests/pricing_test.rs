@@ -1,12 +1,9 @@
-use core::slice;
-use miden_client::{note::{NoteExecutionMode, NoteTag}, testing::NoteBuilder, transaction::{AccountInterface, OutputNote}, asset::{Asset, FungibleAsset}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1};
+
+use miden_client::{transaction::{OutputNote}, asset::{FungibleAsset}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1};
 use miden_crypto::{Felt, Word};
-use miden_testing::{Auth, MockChain, MockChainBuilder, TransactionContextBuilder};
-use rand_chacha::ChaCha20Rng;
-use rand::{Rng, SeedableRng};
-use miden_objects::note::{NoteType};
-use midenid_contracts::{notes::{create_price_set_note, create_pricing_initialize_note}, utils::{create_account, create_naming_account, create_naming_library, create_pricing_account, get_price_set_notes, get_test_prices}};
-use midenid_contracts::notes::{get_note_code, create_naming_initialize_note, create_pricing_calculate_cost_note};
+use miden_testing::{Auth, MockChain, TransactionContextBuilder};
+use midenname_contracts::{notes::{create_price_set_note, create_pricing_initialize_note}, utils::{create_pricing_account, get_calculate_price_root, get_price_set_notes, get_test_prices}};
+use midenname_contracts::notes::{create_pricing_calculate_cost_note};
 
 
 #[tokio::test]
@@ -41,11 +38,12 @@ async fn test_pricing_init() -> anyhow::Result<()> {
     let trasury_slot = updated_pricing_account.storage().get_item(2)?;
     let calc_root_slot = updated_pricing_account.storage().get_item(3)?;
 
-    // ensure root is non-zero
-    assert_ne!(calc_root_slot.get(0).unwrap().as_int(), 0);
-    assert_ne!(calc_root_slot.get(1).unwrap().as_int(), 0);
-    assert_ne!(calc_root_slot.get(2).unwrap().as_int(), 0);
-    assert_ne!(calc_root_slot.get(3).unwrap().as_int(), 0);
+    // ensure root is not changed with our utils
+    let current_root = get_calculate_price_root();
+    assert_eq!(calc_root_slot.get(0).unwrap().as_int(), current_root[0].as_int());
+    assert_eq!(calc_root_slot.get(1).unwrap().as_int(), current_root[1].as_int());
+    assert_eq!(calc_root_slot.get(2).unwrap().as_int(), current_root[2].as_int());
+    assert_eq!(calc_root_slot.get(3).unwrap().as_int(), current_root[3].as_int());
 
     assert_eq!(init_flag, 1);
     assert_eq!(setter_account.id().prefix().as_u64(), owner_slot.get(1).unwrap().as_int());
