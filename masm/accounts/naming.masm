@@ -8,6 +8,8 @@ const.ERR_ONLY_OWNER="Only owner"
 const.ERR_ONLY_DOMAIN_OWNER="Only domain owner"
 const.ERR_ALREADY_INITIALIZED="Contract already initialized"
 const.ERR_PAYMENT_TOKEN_NOT_ALLOWED="This payment token not allowed"
+const.ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
+const.ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less that price"
 
 ## Constants
 const.INIT_FLAG_SLOT=0
@@ -62,23 +64,28 @@ end
 export.register
     push.0.0
     # [PAYMENT_TOKEN, DOMAIN]
+    dupw swapw.2 swapw
+    # [PAYMENT_TOKEN, DOMAIN, PAYMENT_TOKEN]
     push.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT exec.account::get_map_item
-    # [PRICING_CONTRACT, DOMAIN]
+    # [PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
     padw 
-    # [ZERO, PRICING_CONTRACT, DOMAIN]
+    # [ZERO, PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
     eqw
-    # [isEqual, ZERO, PRICING_CONTRACT, DOMAIN]
+    # [isEqual, ZERO, PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
     assertz.err=ERR_PAYMENT_TOKEN_NOT_ALLOWED dropw
-    # [PRICING_CONTRACT, DOMAIN]
+    # [PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
     push.CALCULATE_PRICE_ROOT
     exec.account::get_item
-    # [PROC_ROOT, PRICING_CONTRACT, DOMAIN]
-    swapw
-    drop drop
+    # [PROC_ROOT, PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
+    swapw drop drop
     debug.stack
-    # [pricing_prefix, pricing_suffix, PROC_ROOT, DOMAIN]
+    # [pricing_prefix, pricing_suffix, PROC_ROOT, DOMAIN, PAYMENT_TOKEN]
     exec.tx::execute_foreign_procedure
-    # [<outputs>]
+    # [<outputs>] expected: [cost, PAYMENT_TOKEN]
+    movdn.4 drop drop
+    # [prefix, suffix, cost]
+    exec._receive_payment
+    # []
     debug.stack
 end
 
@@ -298,11 +305,28 @@ proc._is_domain_exist
     # [1 or 0]
 end
 
-# Input: [payment_token_prefix, payment_token_suffix]
+# Input: [prefix, suffix]
 # Output: [balance]
 proc._get_balance
     exec.account::get_balance
     # [balance]
+end
+
+# Input: [prefix, suffix, min_amt]
+# Output: []
+proc._receive_payment
+    dup.1 dup.1
+    # [prefix, suffix, prefix, suffix, min_amt]
+    exec._get_balance
+    # [init_bal, prefix, suffix, min_amt]
+    exec.note::add_assets_to_account swap.2 swap
+    # [prefix, suffix, init_bal, min_amt]
+    exec._get_balance
+    # [final_bal, init_bal, min_amt]
+    swap u32overflowing_sub assertz.err=ERR_VALIDATE_PAYMENT_SUB_OVERFLOW
+    # [result, min_amt]
+    lte assert.err=ERR_INSUFFICIENT_AMOUNT_PAID
+    # []
 end
 
 # Input: []
@@ -333,4 +357,3 @@ proc._assert_only_domain_owner
     exec.account_id::is_equal assert.err=ERR_ONLY_DOMAIN_OWNER
     # []
 end
-
