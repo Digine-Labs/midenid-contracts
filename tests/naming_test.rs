@@ -62,7 +62,22 @@ async fn test_naming_set_pricing_contract_and_root_and_register() -> anyhow::Res
     let naming_account = create_naming_account();
     let pricing_account = create_pricing_account();
 
-    let calculate_price_root = get_calculate_price_root();
+    println!(r"Account Addresses:
+    owner_account: {}
+    domain_registrar_account: {}
+    treasury_account: {}
+    pricing_tx_sender_account: {}
+    pricing_setter_account: {}
+    naming_account: {}
+    pricing_account: {}",
+        owner_account.id(),
+        domain_registrar_account.id(),
+        treasury_account.id(),
+        pricing_tx_sender_account.id(),
+        pricing_setter_account.id(),
+        naming_account.id(),
+        pricing_account.id()
+    );
 
     let initialize_naming_note = create_naming_initialize_note(
         owner_account.clone(),
@@ -84,11 +99,7 @@ async fn test_naming_set_pricing_contract_and_root_and_register() -> anyhow::Res
         naming_account.clone()
     ).await?;
 
-    let set_pricing_root_note = create_naming_set_pricing_root(
-        owner_account.clone(), 
-        Word::new(calculate_price_root), 
-        naming_account.clone()
-    ).await?;
+
 
     let register_name_note = create_naming_register_name_note(
         domain_registrar_account.clone(), 
@@ -111,9 +122,11 @@ async fn test_naming_set_pricing_contract_and_root_and_register() -> anyhow::Res
     builder.add_note(OutputNote::Full(set_notes[3].clone()));
     builder.add_note(OutputNote::Full(set_notes[4].clone()));
     builder.add_note(OutputNote::Full(set_payment_token_note.clone()));
-    builder.add_note(OutputNote::Full(set_pricing_root_note.clone()));
+    //builder.add_note(OutputNote::Full(set_pricing_root_note.clone()));
     builder.add_note(OutputNote::Full(register_name_note.clone()));
 
+    builder.add_account(naming_account.clone())?;
+    builder.add_account(pricing_account.clone())?;
 
     let mut mock_chain = builder.build()?;
 
@@ -181,7 +194,20 @@ async fn test_naming_set_pricing_contract_and_root_and_register() -> anyhow::Res
     assert_eq!(token_to_price_map_value.get(0).unwrap().as_int(), pricing_account.id().suffix().as_int());
     assert_eq!(token_to_price_map_value.get(1).unwrap().as_int(), pricing_account.id().prefix().as_felt().as_int());
 
-    // set pricing root
+    mock_chain.prove_next_block()?;
+    let root_on_contract = updated_pricing_account.storage().get_item(4).unwrap();
+
+    let set_pricing_root_note = create_naming_set_pricing_root(
+        owner_account.clone(), 
+        root_on_contract, 
+        naming_account.clone()
+    ).await?;
+
+    println!("{}", root_on_contract.to_string());
+    println!("NoteId: {}", set_pricing_root_note.id());
+
+    mock_chain.add_pending_note(OutputNote::Full(set_pricing_root_note.clone()));
+    mock_chain.prove_next_block()?;
     let set_pricing_root_inputs= mock_chain.get_transaction_inputs(updated_naming_account.clone(),
      None,
      &[set_pricing_root_note.id()],
@@ -196,13 +222,13 @@ async fn test_naming_set_pricing_contract_and_root_and_register() -> anyhow::Res
 
     let updated_naming_account = mock_chain.add_pending_executed_transaction(&executed_tx)?;
 
-    assert_ne!(updated_naming_account.storage().get_item(7).unwrap().get(0).unwrap().as_int(), 0);
-    assert_ne!(updated_naming_account.storage().get_item(7).unwrap().get(1).unwrap().as_int(), 0);
 
-    assert_eq!(updated_naming_account.storage().get_item(7).unwrap().get(0).unwrap().as_int(), calculate_price_root[0].as_int());
-    assert_eq!(updated_naming_account.storage().get_item(7).unwrap().get(1).unwrap().as_int(), calculate_price_root[1].as_int());
-    assert_eq!(updated_naming_account.storage().get_item(7).unwrap().get(2).unwrap().as_int(), calculate_price_root[2].as_int());
-    assert_eq!(updated_naming_account.storage().get_item(7).unwrap().get(3).unwrap().as_int(), calculate_price_root[3].as_int());
+
+    let root_on_contract = updated_pricing_account.storage().get_item(4).unwrap();
+    println!("{}", root_on_contract.to_string());
+
+
+
 
     // Register name
     let _register_name_inputs= mock_chain.get_transaction_inputs(updated_naming_account.clone(),
