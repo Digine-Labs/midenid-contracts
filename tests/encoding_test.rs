@@ -21,8 +21,6 @@ fn encode_letters() {
     let encoded: Word = encode_domain(domain);
     let felts: Vec<Felt> = encoded.to_vec();
 
-    println!("0x{:x}", felts[2].as_int());
-
     assert_eq!(felts[0], Felt::new(0));
     assert_eq!(felts[1], Felt::new(0));
     assert_eq!(felts[2], Felt::new(0x503090c01));
@@ -45,11 +43,6 @@ fn encode_multiple_felts() {
     let encoded = encode_domain(domain);
 
     let felts = encoded.to_vec();
-    
-    println!("0x{:x}", felts[0].as_int());
-    println!("0x{:x}", felts[1].as_int());
-    println!("0x{:x}", felts[2].as_int());
-    println!("0x{:x}", felts[3].as_int());
 
     assert_eq!(felts[0], Felt::new(0x050f0a)); // joe
     assert_eq!(felts[1], Felt::new(0x40e01020f0204)); // dboband

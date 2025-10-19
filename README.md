@@ -15,11 +15,13 @@ Miden Name is actively developed and any functionality can be changed, removed, 
 ### Key Features
 
 - **Bidirectional Mapping**: Maps names to account IDs and vice versa
-- **Payment Integration**: Configurable registration fees with fungible asset support
+- **Multiple Payment Tokens**: Registration can be done by different tokens
 - **Owner Controls**: Registry owner can update prices and transfer ownership
-- **One Name Per Account**: Each account can only register one name
 - **Unique Names**: Each name can only be registered once
-- **Public & Immutable**: Deployed as a transparent, immutable smart contract
+- **Multiple Names**: Any accounts can own any amount of names
+- **Transferable Names**: Name owners can transfer names to another accounts
+- **Dynamic Pricing**: Registration fee depends on the length of the name
+- **External Pricing Contract**: Name prices calculated by pricing contract. Each tokens have different pricing contract.
 
 ## Architecture
 
@@ -28,22 +30,24 @@ Miden Name is actively developed and any functionality can be changed, removed, 
 All core logic is implemented in Miden Assembly (`.masm` files):
 
 #### Accounts
-- **[miden_id.masm](masm/accounts/miden_id.masm)**: Main name registry contract (will be renamed to miden_name.masm)
+- **[naming.masm](masm/accounts/miden_id.masm)**: Main name registry contract
   - Storage slots:
     - `SLOT[0]`: Initialization flag
-    - `SLOT[1]`: Owner account (prefix)
-    - `SLOT[2]`: Owner account (suffix) & Payment token info
-    - `SLOT[3]`: Name-to-ID mapping (SMT root)
-    - `SLOT[4]`: ID-to-Name reverse mapping (SMT root)
-    - `SLOT[5]`: Registration price
-- **[pricing.masm](masm/accounts/pricing.masm)**: Pricing contract that calculates price of a name (Under development)
-- **[identity.masm](masm/accounts/identity.masm)**: Identity contract that stores users public identities (Under development, will be renamed as miden_id.masm)
+    - `SLOT[1]`: Owner account
+    - `SLOT[2]`: Treasury account
+    - `SLOT[3]`: Payment token to Pricing contract mapping
+    - `SLOT[4]`: Account ID to Domain mapping
+    - `SLOT[5]`: Domain to Account ID mapping
+    - `SLOT[6]`: Domain to Domain owner mapping
+    - `SLOT[7]`: Pricing contract to calculate_price procedure root mapping
+- **[pricing.masm](masm/accounts/pricing.masm)**: Pricing contract that calculates price of a name. Each token should have different pricing contract instance.
+- **[identity.masm](masm/accounts/identity.masm)**: Identity contract that stores users public identities (Under development)
 
 #### Notes
-- **[init.masm](masm/notes/init.masm)**: Initialize naming registry with owner and price
-- **[register_name.masm](masm/notes/register_name.masm)**: Register a new name with payment (Hardcoded-name for example)
-- **[update_price.masm](masm/notes/update_price.masm)**: Update registration price (owner only)
-- **[update_owner.masm](masm/notes/update_owner.masm)**: Transfer ownership (owner only)
+- **[initialize_naming.masm](masm/notes/initialize_naming.masm)**: Initializes naming registry
+- **[initialize_pricing.masm](masm/notes/initialize_pricing.masm)**: Initializes pricing contract
+- **[register_name.masm](masm/notes/register_name.masm)**: Register a new name with payment
+- **[transfer_domain.masm](masm/notes/transfer_domain.masm)**: Transfers domain to another account
 - **[P2N.masm](masm/notes/P2N.masm)**: Pay-to-note for payment handling (TBD)
 
 #### Scripts
@@ -56,12 +60,12 @@ All core logic is implemented in Miden Assembly (`.masm` files):
 
 The `src/` and `tests/` directories contain Rust code exclusively for testing and validating the Miden Assembly contracts:
 
-- **[tests/test_helper.rs](tests/test_helper.rs)**: Test utilities and helper functions
-- **[tests/init_registry_test.rs](tests/init_registry_test.rs)**: Registry initialization tests
-- **[tests/name_registration_test.rs](tests/name_registration_test.rs)**: Name registration tests
-- **[tests/price_update_test.rs](tests/price_update_test.rs)**: Price update functionality tests
-- **[tests/owner_test.rs](tests/owner_test.rs)**: Ownership management tests
-- **[tests/complete_payment_test.rs](tests/complete_payment_test.rs)**: End-to-end payment flow tests
+- **[src/notes.rs](src/notes.rs)**: Note related utility functions that widely used on tests
+- **[src/utils.rs](src/utils.rs)**: Utilities that widely used on tests
+
+- **[tests/encoding_test.rs](tests/encoding_test.rs)**: Encoding and decoding of domain tests
+- **[tests/naming_test.rs](tests/naming_test.rs)**: Naming registry tests
+- **[tests/pricing_test.rs](tests/pricing_test.rs)**: Pricing tests
 
 ## Getting Started
 
