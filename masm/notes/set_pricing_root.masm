@@ -10,7 +10,7 @@ begin
     exec.note::get_inputs
     drop drop
     mem_loadw.ROOT_PTR padw mem_loadw.PRICING_CONTRACT_PTR
-    # [prefix, suffix, DOMAIN]
+    # [PRICING_CONTRACT, DOMAIN]
     call.naming::set_calculate_price_root
     exec.sys::truncate_stack
 end
