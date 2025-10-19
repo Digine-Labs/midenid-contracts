@@ -243,6 +243,49 @@ pub fn encode_domain(domain: String) -> Word {
     ])
 }
 
+pub fn unsafe_encode_domain(domain: String) -> Word {
+    // Validate length: must be > 0 and <= 20
+    let len = domain.len();
+
+    // Encode each character and store in a vector
+    let mut encoded_chars: Vec<u8> = Vec::new();
+    for c in domain.chars() {
+        let char_code = encode_char(c)
+            .expect(&format!("Invalid character '{}' in domain name", c));
+        encoded_chars.push(char_code);
+    }
+
+    // Pack characters into Felts (7 characters per Felt, 8 bits each)
+    // First 7 characters go into felt3, next 7 into felt2, next 6 into felt1
+    let mut felt1: u64 = 0;
+    let mut felt2: u64 = 0;
+    let mut felt3: u64 = 0;
+
+    for (i, &char_code) in encoded_chars.iter().enumerate() {
+        let bit_shift = (i % 7) * 8;
+
+        if i < 7 {
+            // First 7 characters go into felt3
+            felt3 |= (char_code as u64) << bit_shift;
+        } else if i < 14 {
+            // Next 7 characters go into felt2
+            felt2 |= (char_code as u64) << bit_shift;
+        } else {
+            // Remaining characters go into felt1
+            felt1 |= (char_code as u64) << bit_shift;
+        }
+    }
+
+    // Format: [felt1, felt2, felt3, length]
+    // This is reversed for MASM storage (becomes [length, felt3, felt2, felt1] on stack)
+    Word::new([
+        Felt::new(felt1),
+        Felt::new(felt2),
+        Felt::new(felt3),
+        Felt::new(len as u64),
+    ])
+}
+
 pub fn decode_domain(encoded_domain: Word) -> String {
     let felts = encoded_domain.to_vec();
 

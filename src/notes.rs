@@ -102,6 +102,35 @@ pub async fn create_naming_set_pricing_root(tx_sender: Account, root: Word, nami
     Ok(note)  
 }
 
+pub async fn create_naming_transfer_owner_note(tx_sender: Account, new_owner: AccountId, naming: Account) -> Result<Note, Error> {
+    let note_code = get_note_code("transfer_ownership".to_string());
+    let account_code= get_naming_account_code();
+
+    let library_path = "miden_name::naming";
+    let library = create_library(account_code, library_path).unwrap();
+
+    let note_script = ScriptBuilder::new(true)
+        .with_dynamically_linked_library(&library)
+        .unwrap()
+        .compile_note_script(note_code)
+        .unwrap();
+
+    let note_inputs =NoteInputs::new([
+        Felt::new(new_owner.suffix().into()),
+        Felt::new(new_owner.prefix().into()),
+    ].to_vec()).unwrap();
+
+    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+
+    let note_tag = NoteTag::from_account_id(naming.id());
+
+    let note_metadata = NoteMetadata::new(tx_sender.id(), NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
+
+    let note_assets = NoteAssets::new(vec![]).unwrap();
+    let note = Note::new(note_assets, note_metadata, note_recipient);
+    Ok(note)
+}
+
 pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId, setter: Account, pricing: Account) -> Result<Note, Error> {
     let note_code = get_note_code("initialize_pricing".to_string());
     let account_code= get_pricing_account_code();
