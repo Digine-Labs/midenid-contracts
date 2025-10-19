@@ -7,9 +7,6 @@ use miden_objects::{account::Account, transaction::AccountInputs};
 use midenname_contracts::{notes::{create_naming_register_name_note, create_naming_set_payment_token_contract, create_naming_set_pricing_root}, utils::{create_naming_account, create_pricing_account, encode_domain, get_price_set_notes, get_test_prices}};
 use midenname_contracts::notes::{create_naming_initialize_note, create_pricing_initialize_note};
 
-// Develop test like that
-// https://github.com/0xMiden/miden-base/blob/719ff03d1482e6ce2ad4e986f59ec7b9a8ddf962/crates/miden-testing/src/kernel_tests/tx/test_fpi.rs#L515
-
 pub struct InitializedNamingAndPricing {
     pub mock_chain: MockChain,
     pub owner_account: Account,

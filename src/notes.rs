@@ -1,7 +1,7 @@
 use anyhow::Error;
 use miden_crypto::{Felt, Word};
 use std::{fs, path::Path};
-use miden_client::{account::{Account, AccountId}, asset::{Asset, FungibleAsset}, note::{Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, ScriptBuilder};
+use miden_client::{account::{Account, AccountId}, asset::{FungibleAsset}, note::{Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, ScriptBuilder};
 
 use crate::utils::{create_library, get_naming_account_code, get_pricing_account_code};
 
