@@ -2,6 +2,9 @@ use.miden::account
 use.miden::account_id
 use.miden::active_note
 
+## QUESTION
+## Should we pass registry address as input or constant???
+
 # ERRORS
 # =================================================================================================
 
