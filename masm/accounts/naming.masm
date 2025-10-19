@@ -150,6 +150,17 @@ export.owner_of_domain
     # [owner_prefix, owner_suffix]
 end
 
+# Input: [ASSET]
+# Output: [pad(16)]
+export.receive_asset
+    exec.account::add_asset
+    # => [ASSET', pad(12)]
+
+    # drop the final asset
+    dropw
+    # => [pad(16)]
+end
+
 ## Only Owner
 # Input: [new_owner_prefix, new_owner_suffix]
 # Output: []
@@ -160,6 +171,13 @@ export.update_registry_owner
     push.OWNER_SLOT
     exec.account::set_item
     dropw
+end
+
+# Input: [prefix, suffix]
+# Output: []
+export.withdraw_assets
+    # TODO
+    nop
 end
 
 # Input: [new_treasury_prefix, new_treasury_suffix]
@@ -205,17 +223,6 @@ export.set_calculate_price_root
     push.CALCULATE_PRICE_ROOT
     exec.account::set_item dropw
     # []
-end
-
-# Input: [ASSET]
-# Output: [pad(16)]
-export.receive_asset
-    exec.account::add_asset
-    # => [ASSET', pad(12)]
-
-    # drop the final asset
-    dropw
-    # => [pad(16)]
 end
 
 ## Internal procedures
