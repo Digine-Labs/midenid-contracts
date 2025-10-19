@@ -19,6 +19,7 @@ pub struct InitializedNamingAndPricing {
     pub pricing_setter_account: Account,
     pub naming_account: Account,
     pub pricing_account: Account,
+    //pub faucet: Account,
     pub fungible_asset: FungibleAsset,
 }
 
@@ -26,10 +27,14 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     
     let mut builder = MockChain::builder();
     let fungible_asset = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 100000).unwrap();
-    
+    //let faucet = builder.create_new_faucet(Auth::Noop, "TEST", 1_000_000)?;
 
     let owner_account = builder.add_existing_wallet(Auth::BasicAuth)?;
-    let domain_registrar_account = builder.add_existing_wallet(Auth::BasicAuth)?;
+    let domain_registrar_account = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset.into()])?;
+    
+    let amount = domain_registrar_account.vault().get_balance(fungible_asset.faucet_id())?;
+    println!("Registrar initial balance: {}", amount);
+
     let treasury_account = builder.add_existing_wallet(Auth::BasicAuth)?;
     let pricing_tx_sender_account = builder.add_existing_wallet(Auth::BasicAuth)?;
     let pricing_setter_account= builder.add_existing_wallet(Auth::BasicAuth)?;
@@ -96,6 +101,7 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
 
     builder.add_account(naming_account.clone())?;
     builder.add_account(pricing_account.clone())?;
+    //builder.add_existing_faucet(auth_method, token_symbol, max_supply, total_issuance)
 
     let mut mock_chain = builder.build()?;
 
@@ -246,13 +252,15 @@ async fn test_naming_register() -> anyhow::Result<()> {
 
     let mut setup = initiate_pricing_and_naming().await?;
 
-    /// TODO: add assets to register note.
+    let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
 
     let register_name_note = create_naming_register_name_note(
         setup.domain_registrar_account.clone(), 
         setup.fungible_asset.faucet_id(), 
         encode_domain("test".to_string()), 
+        asset,
         setup.naming_account.clone()
+        
     ).await?;
 
     setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));

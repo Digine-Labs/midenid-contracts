@@ -1,7 +1,7 @@
 use anyhow::Error;
 use miden_crypto::{Felt, Word};
 use std::{fs, path::Path};
-use miden_client::{account::{Account, AccountId}, asset::Asset, note::{Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, ScriptBuilder};
+use miden_client::{account::{Account, AccountId}, asset::{Asset, FungibleAsset}, note::{Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, ScriptBuilder};
 
 use crate::utils::{create_library, get_naming_account_code, get_pricing_account_code};
 
@@ -133,7 +133,7 @@ pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId
     Ok(note)
 }
 
-pub async fn create_naming_register_name_note(tx_sender: Account, payment_token: AccountId, domain: Word, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_register_name_note(tx_sender: Account, payment_token: AccountId, domain: Word, asset: FungibleAsset, naming: Account) -> Result<Note, Error> {
        let note_code = get_note_code("register_name".to_string());
     let account_code= get_naming_account_code();
 
@@ -163,7 +163,7 @@ pub async fn create_naming_register_name_note(tx_sender: Account, payment_token:
 
     let note_metadata = NoteMetadata::new(tx_sender.id(), NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
-    let note_assets = NoteAssets::new(vec![]).unwrap();
+    let note_assets = NoteAssets::new(vec![asset.into()]).unwrap();
     let note = Note::new(note_assets, note_metadata, note_recipient);
     Ok(note)   
 }

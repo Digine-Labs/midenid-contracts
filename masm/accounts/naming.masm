@@ -78,7 +78,6 @@ export.register
     exec.account::get_item
     # [PROC_ROOT, PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
     swapw drop drop
-    debug.stack
     # [pricing_prefix, pricing_suffix, PROC_ROOT, DOMAIN, PAYMENT_TOKEN]
     exec.tx::execute_foreign_procedure
     # [<outputs>] expected: [cost, PAYMENT_TOKEN]
@@ -208,6 +207,17 @@ export.set_calculate_price_root
     # []
 end
 
+# Input: [ASSET]
+# Output: [pad(16)]
+export.receive_asset
+    exec.account::add_asset
+    # => [ASSET', pad(12)]
+
+    # drop the final asset
+    dropw
+    # => [pad(16)]
+end
+
 ## Internal procedures
 
 ### Clears domain to account and account to domain mapping if this domain set as default domain.
@@ -315,12 +325,15 @@ end
 # Input: [prefix, suffix, min_amt]
 # Output: []
 proc._receive_payment
+    debug.stack
     dup.1 dup.1
     # [prefix, suffix, prefix, suffix, min_amt]
     exec._get_balance
+    debug.stack
     # [init_bal, prefix, suffix, min_amt]
     exec.note::add_assets_to_account swap.2 swap
     # [prefix, suffix, init_bal, min_amt]
+    debug.stack
     exec._get_balance
     # [final_bal, init_bal, min_amt]
     swap u32overflowing_sub assertz.err=ERR_VALIDATE_PAYMENT_SUB_OVERFLOW
