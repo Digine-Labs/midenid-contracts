@@ -11,6 +11,7 @@ pub struct InitializedNamingAndPricing {
     pub mock_chain: MockChain,
     pub owner_account: Account,
     pub domain_registrar_account: Account,
+    pub domain_registrar_account_2: Account,
     pub treasury_account: Account,
     pub pricing_tx_sender_account: Account,
     pub pricing_setter_account: Account,
@@ -23,14 +24,13 @@ pub struct InitializedNamingAndPricing {
 async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPricing>{
     
     let mut builder = MockChain::builder();
-    let fungible_asset = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 100000).unwrap();
+    let fungible_asset_1 = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 100000).unwrap();
+    let fungible_asset_2 = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 50000).unwrap();
     //let faucet = builder.create_new_faucet(Auth::Noop, "TEST", 1_000_000)?;
 
     let owner_account = builder.add_existing_wallet(Auth::BasicAuth)?;
-    let domain_registrar_account = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset.into()])?;
-    
-    let amount = domain_registrar_account.vault().get_balance(fungible_asset.faucet_id())?;
-    println!("Registrar initial balance: {}", amount);
+    let domain_registrar_account = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_1.into()])?;
+    let domain_registrar_account_2 = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_2.into()])?;
 
     let treasury_account = builder.add_existing_wallet(Auth::BasicAuth)?;
     let pricing_tx_sender_account = builder.add_existing_wallet(Auth::BasicAuth)?;
@@ -39,7 +39,7 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     let naming_account = create_naming_account();
     let pricing_account = create_pricing_account();
 
-    println!(r"Account Addresses:
+    /*println!(r"Account Addresses:
     owner_account: {}
     domain_registrar_account: {}
     treasury_account: {}
@@ -55,8 +55,8 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
         pricing_setter_account.id(),
         naming_account.id(),
         pricing_account.id(),
-        fungible_asset.faucet_id()
-    );
+        fungible_asset_1.faucet_id()
+    );*/
 
     let initialize_naming_note = create_naming_initialize_note(
         owner_account.clone(),
@@ -66,20 +66,17 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
 
     let initialize_pricing_note = create_pricing_initialize_note(
         pricing_tx_sender_account.clone(), 
-        fungible_asset.faucet_id(), 
+        fungible_asset_1.faucet_id(), 
         pricing_setter_account.clone(), 
         pricing_account.clone()
     ).await.unwrap();
 
     let set_payment_token_note = create_naming_set_payment_token_contract(
         owner_account.clone(), 
-        fungible_asset.faucet_id(), 
+        fungible_asset_1.faucet_id(), 
         pricing_account.id(), 
         naming_account.clone()
     ).await?;
-
-
-
 
     let test_prices = get_test_prices();
     let set_notes = get_price_set_notes(pricing_setter_account.clone(), pricing_account.clone(), test_prices).await;
@@ -161,7 +158,7 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     let updated_naming_account = mock_chain.add_pending_executed_transaction(&executed_tx)?;
 
     let token_to_price_map_value = updated_naming_account.storage()
-        .get_map_item(3, Word::new([fungible_asset.faucet_id().suffix(),fungible_asset.faucet_id().prefix().into(),Felt::new(0),Felt::new(0)]))?;
+        .get_map_item(3, Word::new([fungible_asset_1.faucet_id().suffix(),fungible_asset_1.faucet_id().prefix().into(),Felt::new(0),Felt::new(0)]))?;
 
     assert_eq!(token_to_price_map_value.get(0).unwrap().as_int(), pricing_account.id().suffix().as_int());
     assert_eq!(token_to_price_map_value.get(1).unwrap().as_int(), pricing_account.id().prefix().as_felt().as_int());
@@ -198,12 +195,13 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
         mock_chain,
         owner_account,
         domain_registrar_account,
+        domain_registrar_account_2,
         treasury_account,
         pricing_tx_sender_account,
         pricing_setter_account,
         naming_account: updated_naming_account,
         pricing_account: updated_pricing_account,
-        fungible_asset,
+        fungible_asset: fungible_asset_1,
     })
 }
 
@@ -313,3 +311,218 @@ async fn test_naming_register() -> anyhow::Result<()> {
     
     Ok(())
 }
+
+#[tokio::test]
+async fn test_naming_register_exist_name() -> anyhow::Result<()> {
+
+    let mut setup = initiate_pricing_and_naming().await?;
+
+    let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
+
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account.clone(), 
+        setup.fungible_asset.faucet_id(), 
+        encode_domain("test".to_string()), 
+        asset,
+        setup.naming_account.clone()
+        
+    ).await?;
+
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    // Register name
+    let _register_name_inputs= setup.mock_chain.get_transaction_inputs(setup.naming_account.clone(),
+     None,
+     &[register_name_note.id()],
+     &[])?;
+    let pricing_account_id = setup.pricing_account.id();
+
+    let pricing_account_from_chain = setup.mock_chain.account_tree().open(pricing_account_id);
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let pricing_account_witnesses = setup.mock_chain.account_witnesses(vec![pricing_account_id]);
+    
+    let _pricing_account_witness = pricing_account_witnesses
+        .get(&pricing_account_id)
+        .unwrap()
+        .clone();
+    let foreign_pricing_account_input = AccountInputs::new(
+        setup.pricing_account.clone().into(),
+        pricing_account_from_chain
+    );
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .foreign_accounts(vec![foreign_pricing_account_input])
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await?;
+    setup.mock_chain.prove_next_block()?;
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+    
+    // Try to register test domain again
+
+        let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
+
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account_2.clone(), 
+        setup.fungible_asset.faucet_id(), 
+        encode_domain("test".to_string()), 
+        asset,
+        updated_naming_account.clone()
+        
+    ).await?;
+
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    let _register_name_inputs= setup.mock_chain.get_transaction_inputs(updated_naming_account.clone(),
+     None,
+     &[register_name_note.id()],
+     &[])?;
+    let pricing_account_id = setup.pricing_account.id();
+
+    let pricing_account_from_chain = setup.mock_chain.account_tree().open(pricing_account_id);
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        updated_naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let pricing_account_witnesses = setup.mock_chain.account_witnesses(vec![pricing_account_id]);
+    
+    let _pricing_account_witness = pricing_account_witnesses
+        .get(&pricing_account_id)
+        .unwrap()
+        .clone();
+    let foreign_pricing_account_input = AccountInputs::new(
+        setup.pricing_account.clone().into(),
+        pricing_account_from_chain
+    );
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .foreign_accounts(vec![foreign_pricing_account_input])
+        .build()?;
+
+    let _executed_tx = register_name_tx_context.execute().await;
+    let _updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+    assert!(_executed_tx.is_err());
+    
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_naming_register_wrong_payment() -> anyhow::Result<()> {
+
+    let mut setup = initiate_pricing_and_naming().await?;
+
+    let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 350)?;
+
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account.clone(), 
+        setup.fungible_asset.faucet_id(), 
+        encode_domain("test".to_string()), 
+        asset,
+        setup.naming_account.clone()
+        
+    ).await?;
+
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    // Register name
+    let _register_name_inputs= setup.mock_chain.get_transaction_inputs(setup.naming_account.clone(),
+     None,
+     &[register_name_note.id()],
+     &[])?;
+    let pricing_account_id = setup.pricing_account.id();
+
+    let pricing_account_from_chain = setup.mock_chain.account_tree().open(pricing_account_id);
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let pricing_account_witnesses = setup.mock_chain.account_witnesses(vec![pricing_account_id]);
+    
+    let _pricing_account_witness = pricing_account_witnesses
+        .get(&pricing_account_id)
+        .unwrap()
+        .clone();
+    let foreign_pricing_account_input = AccountInputs::new(
+        setup.pricing_account.clone().into(),
+        pricing_account_from_chain
+    );
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .foreign_accounts(vec![foreign_pricing_account_input])
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await;
+
+    //let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+    assert!(executed_tx.is_err());
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_transfer_domain() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_update_default_domain() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_update_default_domain_to_not_owner_domain() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_transfer_domain_not_from_owner() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_register_empty_domain() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_register_two_felts_domain() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_register_three_felts_domain() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_register_max_length_domain() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_register_domain_length_too_high() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_ownership_transfer_owner() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_ownership_update_treasury() {}
+
+#[tokio::test]
+#[ignore = "not implemented"]
+async fn test_naming_ownership_withdraw_assets() {}

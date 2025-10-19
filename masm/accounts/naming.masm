@@ -11,6 +11,7 @@ const.ERR_PAYMENT_TOKEN_NOT_ALLOWED="This payment token not allowed"
 const.ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
 const.ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less that price"
 const.ERR_DOMAIN_NOT_AVAILABLE="Domain is already taken"
+const.ERR_DOMAIN_LENGTH_TOO_HIGH="21 characters allowed"
 
 ## Constants
 const.INIT_FLAG_SLOT=0
@@ -68,6 +69,8 @@ export.register
     swapw dupw
     # [DOMAIN, DOMAIN, PAYMENT_TOKEN]
     dupw exec._assert_domain_available
+    # [DOMAIN, DOMAIN, PAYMENT_TOKEN]
+    dupw exec._assert_domain_rules
     # [DOMAIN, DOMAIN, PAYMENT_TOKEN]
     exec.note::get_sender
     # [caller_prefix, caller_suffix, DOMAIN, DOMAIN, PAYMENT_TOKEN]
@@ -339,7 +342,19 @@ proc._assert_domain_available
     push.DOMAIN_TO_OWNER_SLOT
     exec.account::get_map_item drop drop
     push.0.0 exec.account_id::is_equal
+
     assert.err=ERR_DOMAIN_NOT_AVAILABLE
+end
+
+# Input: [DOMAIN]
+# Output: []
+proc._assert_domain_rules
+    debug.stack
+    lte.MAX_NAME_LENGTH
+    # [len_check, f1, f2, f3]
+    assert.err=ERR_DOMAIN_LENGTH_TOO_HIGH
+    # [f1, f2, f3]
+    drop drop drop
 end
 
 # Input: [prefix, suffix]
