@@ -85,7 +85,6 @@ export.register
     # [prefix, suffix, cost]
     exec._receive_payment
     # []
-    debug.stack
 end
 
 # Input: [new_owner_prefix, new_owner_suffix, DOMAIN]
@@ -332,15 +331,12 @@ end
 # Input: [prefix, suffix, min_amt]
 # Output: []
 proc._receive_payment
-    debug.stack
     dup.1 dup.1
     # [prefix, suffix, prefix, suffix, min_amt]
     exec._get_balance
-    debug.stack
     # [init_bal, prefix, suffix, min_amt]
     exec.note::add_assets_to_account swap.2 swap
     # [prefix, suffix, init_bal, min_amt]
-    debug.stack
     exec._get_balance
     # [final_bal, init_bal, min_amt]
     swap u32overflowing_sub assertz.err=ERR_VALIDATE_PAYMENT_SUB_OVERFLOW
