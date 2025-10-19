@@ -2,16 +2,15 @@ use.miden_name::naming
 use.miden::note
 use.std::sys
 
-const.INITIALIZE_NOTE_INPUT_PTR=0
-
-# Input (arguments): [ROOT]
+const.PRICING_CONTRACT_PTR=0
+const.ROOT_PTR=4
+# Input (arguments): [PRICING_CONTRACT, ROOT]
 begin
-    push.INITIALIZE_NOTE_INPUT_PTR
+    push.0
     exec.note::get_inputs
-    # [num_inputs, init_ptr]
-    drop drop push.INITIALIZE_NOTE_INPUT_PTR
-    mem_loadw
-    # [INPUTS]
+    drop drop
+    mem_loadw.ROOT_PTR padw mem_loadw.PRICING_CONTRACT_PTR
+    # [prefix, suffix, DOMAIN]
     call.naming::set_calculate_price_root
     exec.sys::truncate_stack
 end

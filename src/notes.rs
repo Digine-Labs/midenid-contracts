@@ -71,7 +71,7 @@ pub async fn create_naming_set_payment_token_contract(tx_sender: Account, token:
     Ok(note)  
 }
 
-pub async fn create_naming_set_pricing_root(tx_sender: Account, root: Word, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_set_pricing_root(tx_sender: Account, root: Word, pricing_contract: AccountId, naming: Account) -> Result<Note, Error> {
     let note_code = get_note_code("set_pricing_root".to_string());
     let account_code= get_naming_account_code();
 
@@ -85,6 +85,10 @@ pub async fn create_naming_set_pricing_root(tx_sender: Account, root: Word, nami
         .unwrap();
 
     let note_inputs =NoteInputs::new([
+        Felt::new(pricing_contract.suffix().as_int()),
+        Felt::new(pricing_contract.prefix().as_felt().as_int()),
+        Felt::new(0),
+        Felt::new(0),
         Felt::new(root.get(0).unwrap().as_int()),
         Felt::new(root.get(1).unwrap().as_int()),
         Felt::new(root.get(2).unwrap().as_int()),

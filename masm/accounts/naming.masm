@@ -21,15 +21,9 @@ const.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT=3
 const.ACCOUNT_ID_TO_DOMAIN_SLOT=4
 const.DOMAIN_TO_ACCOUNT_ID_SLOT=5
 const.DOMAIN_TO_OWNER_SLOT=6
-const.CALCULATE_PRICE_ROOT=7
+const.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT=7
 
 const.MAX_NAME_LENGTH=21
-
-# Pricing contract endpoints
-const.PRICING_CALCULATE_PROCEDURE_1=12524191526146524453
-const.PRICING_CALCULATE_PROCEDURE_2=14777021424490213012
-const.PRICING_CALCULATE_PROCEDURE_3=5901570038019373206
-const.PRICING_CALCULATE_PROCEDURE_4=17847347482721284626
 
 ## Storage
 # 0: init flag [0, 0, 0, flag]
@@ -39,6 +33,7 @@ const.PRICING_CALCULATE_PROCEDURE_4=17847347482721284626
 # 4: Account to domain map([0, 0, account_prefix, account_suffix] -> DOMAIN)
 # 5: Domain to account map(DOMAIN -> [0, 0, account_prefix, account_suffix])
 # 6: Domain to owner map(DOMAIN -> [0, 0, owner_prefix, owner_suffix])
+# 7: Pricing contract to calculate_price procedure root hash map([0, 0, prefix, suffix] -> ROOT)
 
 # Input: [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
 export.init
@@ -88,9 +83,8 @@ export.register
     # [isEqual, ZERO, PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
     assertz.err=ERR_PAYMENT_TOKEN_NOT_ALLOWED dropw
     # [PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
-    push.CALCULATE_PRICE_ROOT
-    exec.account::get_item
-    # [PROC_ROOT, PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
+    dupw drop drop exec._get_calculate_price_root
+    # [ROOT, PRICING_CONTRACT, DOMAIN, PAYMENT_TOKEN]
     swapw drop drop
     # [pricing_prefix, pricing_suffix, PROC_ROOT, DOMAIN, PAYMENT_TOKEN]
     exec.tx::execute_foreign_procedure
@@ -230,16 +224,24 @@ export.set_payment_token_contract
     # []
 end
 
-# Input: [PROC_ROOT]
+# Input: [PRICING_CONTRACT, PROC_ROOT]
 # Output: []
 export.set_calculate_price_root
     exec._assert_only_owner
-    push.CALCULATE_PRICE_ROOT
-    exec.account::set_item dropw
+    push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT
+    exec.account::set_map_item dropw dropw
     # []
 end
 
 ## Internal procedures
+# Input: [pricing_contract_prefix, pricing_contract_suffix]
+# Output: [ROOT]
+proc._get_calculate_price_root
+    push.0.0
+    push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT
+    exec.account::get_map_item
+    # [ROOT]
+end
 
 ### Clears domain to account and account to domain mapping if this domain set as default domain.
 # Input: [prefix, suffix, DOMAIN]

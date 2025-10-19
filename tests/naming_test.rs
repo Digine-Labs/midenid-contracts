@@ -172,6 +172,7 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     let set_pricing_root_note = create_naming_set_pricing_root(
         owner_account.clone(), 
         root_on_contract, 
+        pricing_account.id(),
         naming_account.clone()
     ).await?;
 
