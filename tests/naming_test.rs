@@ -300,7 +300,19 @@ async fn test_naming_register() -> anyhow::Result<()> {
 
     let executed_tx = register_name_tx_context.execute().await?;
 
-    let _updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+
+    let domain_to_id_map = updated_naming_account.storage().get_map_item(5, encode_domain("test".to_string())).unwrap();
+    let id_to_domain_map =updated_naming_account.storage().get_map_item(4, Word::new([Felt::new(setup.domain_registrar_account.id().suffix().as_int()), Felt::new(setup.domain_registrar_account.id().prefix().as_felt().as_int()), Felt::new(0), Felt::new(0)])).unwrap();
+    let domain_to_owner_map = updated_naming_account.storage().get_map_item(6, encode_domain("test".to_string())).unwrap();
+
+    assert_eq!(domain_to_id_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_id_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    assert_eq!(id_to_domain_map, encode_domain("test".to_string()));
+
+    assert_eq!(domain_to_owner_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_owner_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
     
     Ok(())
 }
