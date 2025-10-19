@@ -8,7 +8,7 @@ use.miden::active_note
 # ERRORS
 # =================================================================================================
 
-const.ERR_P2N_WRONG_NUMBER_OF_INPUTS="P2IDN note expects exactly 4 note inputs"
+const.ERR_P2N_WRONG_NUMBER_OF_INPUTS="P2N note expects exactly 4 note inputs"
 const.ERR_NAME_NOT_REGISTERED="Target name is not registered on registry"
 
 const.ERR_P2N_TARGET_NAME_MISMATCH="P2N's target name address and resolved address do not match"
