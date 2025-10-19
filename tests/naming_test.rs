@@ -42,25 +42,6 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     let naming_account = create_naming_account();
     let pricing_account = create_pricing_account();
 
-    /*println!(r"Account Addresses:
-    owner_account: {}
-    domain_registrar_account: {}
-    treasury_account: {}
-    pricing_tx_sender_account: {}
-    pricing_setter_account: {}
-    naming_account: {}
-    pricing_account: {}
-    faucet_account: {}",
-        owner_account.id(),
-        domain_registrar_account.id(),
-        treasury_account.id(),
-        pricing_tx_sender_account.id(),
-        pricing_setter_account.id(),
-        naming_account.id(),
-        pricing_account.id(),
-        fungible_asset_1.faucet_id()
-    );*/
-
     let initialize_naming_note = create_naming_initialize_note(
         owner_account.clone(),
         treasury_account.clone(),
