@@ -4,7 +4,7 @@ use miden_client::{asset::FungibleAsset, testing::{account_id::ACCOUNT_ID_PUBLIC
 use miden_crypto::{Felt, Word};
 use miden_testing::{Auth, MockChain, TransactionContextBuilder};
 use miden_objects::{account::Account, transaction::AccountInputs};
-use midenname_contracts::{notes::{create_naming_register_name_note, create_naming_set_payment_token_contract, create_naming_set_pricing_root}, utils::{create_naming_account, create_pricing_account, encode_domain, get_price_set_notes, get_test_prices}};
+use midenname_contracts::{notes::{create_naming_register_name_note, create_naming_set_payment_token_contract, create_naming_set_pricing_root, create_naming_transfer_note}, utils::{create_naming_account, create_pricing_account, encode_domain, get_price_set_notes, get_test_prices}};
 use midenname_contracts::notes::{create_naming_initialize_note, create_pricing_initialize_note};
 
 pub struct InitializedNamingAndPricing {
@@ -423,7 +423,6 @@ async fn test_naming_register_exist_name() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_naming_register_wrong_payment() -> anyhow::Result<()> {
-
     let mut setup = initiate_pricing_and_naming().await?;
 
     let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 350)?;
@@ -480,8 +479,84 @@ async fn test_naming_register_wrong_payment() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "not implemented"]
-async fn test_naming_transfer_domain() {}
+async fn test_naming_transfer_domain() -> anyhow::Result<()> {
+    let mut setup = initiate_pricing_and_naming().await?;
+
+    let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
+    let domain = encode_domain("test".to_string());
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account.clone(), 
+        setup.fungible_asset.faucet_id(), 
+        domain, 
+        asset,
+        setup.naming_account.clone()
+        
+    ).await?;
+
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    // Register name
+    let _register_name_inputs= setup.mock_chain.get_transaction_inputs(setup.naming_account.clone(),
+     None,
+     &[register_name_note.id()],
+     &[])?;
+    let pricing_account_id = setup.pricing_account.id();
+
+    let pricing_account_from_chain = setup.mock_chain.account_tree().open(pricing_account_id);
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let pricing_account_witnesses = setup.mock_chain.account_witnesses(vec![pricing_account_id]);
+    
+    let _pricing_account_witness = pricing_account_witnesses
+        .get(&pricing_account_id)
+        .unwrap()
+        .clone();
+    let foreign_pricing_account_input = AccountInputs::new(
+        setup.pricing_account.clone().into(),
+        pricing_account_from_chain
+    );
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .foreign_accounts(vec![foreign_pricing_account_input])
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await?;
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+
+    // Transfer domain
+
+    let transfer_domain_note = create_naming_transfer_note(setup.domain_registrar_account, setup.domain_registrar_account_2.id(), domain, updated_naming_account.clone()).await?;
+
+    setup.mock_chain.add_pending_note(OutputNote::Full(transfer_domain_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    let transfer_domain_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[transfer_domain_note.id()],
+        &[]
+    )?;
+
+    let transfer_domain_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(transfer_domain_inputs)
+        .build()?;
+
+    let executed_tx = transfer_domain_tx_context.execute().await?;
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+    Ok(())
+
+}
 
 #[tokio::test]
 #[ignore = "not implemented"]

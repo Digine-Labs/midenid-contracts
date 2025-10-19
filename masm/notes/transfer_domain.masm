@@ -1,0 +1,17 @@
+use.miden_name::naming
+use.miden::note
+use.std::sys
+
+const.NEW_OWNER_PTR=0
+const.DOMAIN_PTR=4
+
+# Input (arguments): [NEW_OWNER, DOMAIN]
+begin
+    push.0
+    exec.note::get_inputs
+    drop drop
+    mem_loadw.DOMAIN_PTR padw mem_loadw.NEW_OWNER_PTR drop drop
+    # [prefix, suffix, DOMAIN]
+    call.naming::transfer
+    exec.sys::truncate_stack
+end

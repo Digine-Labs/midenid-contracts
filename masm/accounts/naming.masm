@@ -349,7 +349,6 @@ end
 # Input: [DOMAIN]
 # Output: []
 proc._assert_domain_rules
-    debug.stack
     lte.MAX_NAME_LENGTH
     # [len_check, f1, f2, f3]
     assert.err=ERR_DOMAIN_LENGTH_TOO_HIGH
