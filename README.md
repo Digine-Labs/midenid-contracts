@@ -23,6 +23,15 @@ Miden Name is actively developed and any functionality can be changed, removed, 
 - **Dynamic Pricing**: Registration fee depends on the length of the name
 - **External Pricing Contract**: Name prices calculated by pricing contract. Each tokens have different pricing contract.
 
+If you are learning Miden as a developer. You can find practices for following examples;
+- Calling external contract from another contract
+- Initializing network contracts
+- Ownership implementation
+- Storage handling
+- Note input handling
+- Receiving assets to contract
+- Using mockchain to write tests
+
 ## Architecture
 
 ### Smart Contracts (Miden Assembly)
