@@ -4,6 +4,46 @@
 
 This guide explains how to deploy the Miden ID Registry contract to the Miden network.
 
+## NEW: Environment-Based Configuration
+
+The main binary now supports environment-based configuration for easier deployment automation.
+
+### Setup
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` with your configuration:
+   ```env
+   MIDEN_NETWORK=testnet          # or mainnet
+   INITIAL_PRICE=100              # Registration price
+   # CONTRACT_ADDRESS=0x...       # Optional: for existing contracts
+   ```
+
+### Running with Environment Config
+
+Simply run:
+```bash
+cargo run --release
+```
+
+Or for development:
+```bash
+cargo run
+```
+
+The tool will:
+- Load configuration from `.env` file
+- Validate all settings
+- Display configuration before deployment
+- Deploy to the specified network
+
+**Recommendation**: Use `--release` for production deployments (faster and optimized).
+
+---
+
 ## Prerequisites
 
 1. **Miden Node Running**: Ensure you have a Miden node running locally or access to a testnet/devnet endpoint
