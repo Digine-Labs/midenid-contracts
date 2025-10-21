@@ -6,8 +6,8 @@ use miden_objects::account::AccountComponent;
 use rand::{Rng, SeedableRng, RngCore, rngs::StdRng};
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
-
-use crate::{notes::{create_naming_initialize_note, create_pricing_initialize_note}, utils::{get_naming_account_code, get_pricing_account_code, naming_storage, pricing_storage}};
+use std::{fs, path::Path};
+use crate::{notes::{create_naming_initialize_note, create_pricing_initialize_note}, utils::{create_tx_script, get_naming_account_code, get_pricing_account_code, naming_storage, pricing_storage}};
 
 type ClientType = Client<FilesystemKeyStore<rand::prelude::StdRng>>;
 
@@ -40,7 +40,7 @@ pub async fn delete_keystore_and_store() {
 }
 
 pub async fn instantiate_client(endpoint: Endpoint) -> Result<ClientType, ClientError> {
-    let timeout_ms = 10_000;
+    let timeout_ms = 30_000;
     let rpc_api = Arc::new(TonicRpcClient::new(&endpoint, timeout_ms));
 
     let client = ClientBuilder::new()
@@ -51,6 +51,28 @@ pub async fn instantiate_client(endpoint: Endpoint) -> Result<ClientType, Client
         .await?;
 
     Ok(client)
+}
+
+pub async fn create_deployer_account(
+    client: &mut Client<FilesystemKeyStore<StdRng>>,
+     keystore: FilesystemKeyStore<StdRng>
+) -> Result<(miden_client::account::Account, SecretKey), ClientError> {
+    let mut init_seed = [0_u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let key_pair = SecretKey::with_rng(client.rng());
+    let builder = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountUpdatableCode)
+        .storage_mode(AccountStorageMode::Network)
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
+        .with_component(BasicWallet);
+    let (account, seed) = builder.build().unwrap();
+    client.add_account(&account, Some(seed), false).await?;
+    keystore
+        .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
+        .unwrap();
+
+    Ok((account, key_pair))
 }
 
 pub async fn create_network_naming_account() -> (Account, Word) {
@@ -91,28 +113,6 @@ pub async fn create_network_pricing_account() -> (Account, Word) {
     return (account, word);
 }
 
-pub async fn create_deployer_account(
-    client: &mut Client<FilesystemKeyStore<StdRng>>,
-     keystore: FilesystemKeyStore<StdRng>
-) -> Result<(miden_client::account::Account, SecretKey), ClientError> {
-    let mut init_seed = [0_u8; 32];
-    client.rng().fill_bytes(&mut init_seed);
-
-    let key_pair = SecretKey::with_rng(client.rng());
-    let builder = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountUpdatableCode)
-        .storage_mode(AccountStorageMode::Network)
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
-        .with_component(BasicWallet);
-    let (account, seed) = builder.build().unwrap();
-    client.add_account(&account, Some(seed), false).await?;
-    keystore
-        .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
-        .unwrap();
-
-    Ok((account, key_pair))
-}
-
 pub async fn deploy_pricing_contract(client: &mut Client<FilesystemKeyStore<StdRng>>) -> anyhow::Result<(Account, Word)> {
     let (pricing_account, pricing_seed) = create_network_pricing_account().await;
     client.add_account(&pricing_account, Some(pricing_seed), false).await?;
@@ -121,9 +121,17 @@ pub async fn deploy_pricing_contract(client: &mut Client<FilesystemKeyStore<StdR
 }
 
 pub async fn initialize_pricing_contract(client: &mut Client<FilesystemKeyStore<StdRng>>, initializer_account: AccountId, token: AccountId, setter: AccountId, contract: Account) -> anyhow::Result<()> {
-    let initialize_note = create_pricing_initialize_note(initializer_account, token, setter, contract).await?;
-    let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![OutputNote::Full(initialize_note.clone())]).build()?;
-    let tx_result = client.new_transaction(initializer_account, tx_request).await?;
+    let initialize_note = create_pricing_initialize_note(initializer_account, token, setter, contract.clone()).await?;
+    let nop_script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm"))?;
+    let tx_script = create_tx_script(nop_script_code, None)?;
+
+    //let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![OutputNote::Full(initialize_note.clone())]).build()?;
+    let tx_request = TransactionRequestBuilder::new()
+        .unauthenticated_input_notes([(initialize_note, None)])
+        .custom_script(tx_script)
+        .build()?;
+    
+    let tx_result = client.new_transaction(contract.id(), tx_request).await?;
 
     let _ = client.submit_transaction(tx_result).await?;
     client.sync_state().await?;
@@ -138,9 +146,15 @@ pub async fn deploy_naming_contract(client: &mut Client<FilesystemKeyStore<StdRn
 }
 
 pub async fn initialize_naming_contract(client: &mut Client<FilesystemKeyStore<StdRng>>,initializer_account: AccountId, owner: AccountId, treasury: AccountId, contract: Account) -> anyhow::Result<()> {
-    let initialize_note = create_naming_initialize_note(initializer_account, owner, treasury, contract).await?;
-    let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![OutputNote::Full(initialize_note.clone())]).build()?;
-    let tx_result = client.new_transaction(initializer_account, tx_request).await?;
+    let initialize_note = create_naming_initialize_note(initializer_account, owner, treasury, contract.clone()).await?;
+    let nop_script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm"))?;
+    let tx_script = create_tx_script(nop_script_code, None)?;
+
+    let tx_request = TransactionRequestBuilder::new()
+        .unauthenticated_input_notes([(initialize_note, None)])
+        .custom_script(tx_script)
+        .build()?;
+    let tx_result = client.new_transaction(contract.id(), tx_request).await?;
 
     let _ = client.submit_transaction(tx_result).await?;
     client.sync_state().await?;

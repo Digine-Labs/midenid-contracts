@@ -93,6 +93,8 @@ pub fn create_account() -> anyhow::Result<Account> {
     Ok(account)
 }
 
+
+
 pub fn create_naming_account() -> Account {
     let storage_slots = naming_storage();
     let account_code = get_naming_account_code();
