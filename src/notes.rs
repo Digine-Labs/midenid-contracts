@@ -135,7 +135,7 @@ pub async fn create_naming_transfer_owner_note(tx_sender: Account, new_owner: Ac
     Ok(note)
 }
 
-pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId, setter: AccountId, pricing: Account) -> Result<Note, Error> {
+pub async fn create_pricing_initialize_note(tx_sender: AccountId, token: AccountId, setter: AccountId, pricing: Account) -> Result<Note, Error> {
     let note_code = get_note_code("initialize_pricing".to_string());
     let account_code= get_pricing_account_code();
 
@@ -159,14 +159,14 @@ pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId
 
     let note_tag = NoteTag::from_account_id(pricing.id());
 
-    let note_metadata = NoteMetadata::new(tx_sender.id(), NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
+    let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note = Note::new(note_assets, note_metadata, note_recipient);
     Ok(note)
 }
 
-pub async fn create_naming_register_name_note(tx_sender: Account, payment_token: AccountId, domain: Word, asset: FungibleAsset, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_register_name_note(tx_sender: AccountId, payment_token: AccountId, domain: Word, asset: FungibleAsset, naming: Account) -> Result<Note, Error> {
        let note_code = get_note_code("register_name".to_string());
     let account_code= get_naming_account_code();
 
@@ -194,7 +194,7 @@ pub async fn create_naming_register_name_note(tx_sender: Account, payment_token:
 
     let note_tag = NoteTag::from_account_id(naming.id());
 
-    let note_metadata = NoteMetadata::new(tx_sender.id(), NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
+    let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
     let note_assets = NoteAssets::new(vec![asset.into()]).unwrap();
     let note = Note::new(note_assets, note_metadata, note_recipient);

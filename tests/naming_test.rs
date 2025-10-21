@@ -49,7 +49,7 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     ).await.unwrap();
 
     let initialize_pricing_note = create_pricing_initialize_note(
-        pricing_tx_sender_account.clone(), 
+        pricing_tx_sender_account.id(), 
         fungible_asset_1.faucet_id(), 
         pricing_setter_account.id(), 
         pricing_account.clone()
@@ -232,7 +232,7 @@ async fn test_naming_register() -> anyhow::Result<()> {
     let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
     let domain = encode_domain("test".to_string());
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -292,7 +292,7 @@ async fn test_naming_register_exist_name() -> anyhow::Result<()> {
     let domain = encode_domain("test".to_string());
 
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -334,7 +334,7 @@ async fn test_naming_register_exist_name() -> anyhow::Result<()> {
         let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
 
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account_2.clone(), 
+        setup.domain_registrar_account_2.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -380,7 +380,7 @@ async fn test_naming_register_wrong_payment() -> anyhow::Result<()> {
     let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 350)?;
     let domain = encode_domain("test".to_string());
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -426,7 +426,7 @@ async fn test_naming_transfer_domain() -> anyhow::Result<()> {
     let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
     let domain = encode_domain("test".to_string());
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -508,7 +508,7 @@ async fn test_naming_transfer_domain_not_from_owner() -> anyhow::Result<()> {
     let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
     let domain = encode_domain("test".to_string());
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -585,7 +585,7 @@ async fn test_naming_register_empty_domain() -> anyhow::Result<()> {
     let domain = unsafe_encode_domain("".to_string());
 
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -632,7 +632,7 @@ async fn test_naming_register_two_felts_domain() -> anyhow::Result<()> {
     let domain = unsafe_encode_domain("testtest".to_string());
 
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -691,7 +691,7 @@ async fn test_naming_register_three_felts_domain() -> anyhow::Result<()> {
     let domain = unsafe_encode_domain("testtesttesttesttest".to_string());
 
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -750,7 +750,7 @@ async fn test_naming_register_max_length_domain() -> anyhow::Result<()> {
     let domain = unsafe_encode_domain("testmaxlendomain12345".to_string());
 
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
@@ -809,7 +809,7 @@ async fn test_naming_register_domain_length_too_high() -> anyhow::Result<()> {
     let domain = unsafe_encode_domain("testmaxlendomain12345123".to_string());
 
     let register_name_note = create_naming_register_name_note(
-        setup.domain_registrar_account.clone(), 
+        setup.domain_registrar_account.id(), 
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,

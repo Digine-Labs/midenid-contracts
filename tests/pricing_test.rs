@@ -17,7 +17,7 @@ async fn test_pricing_init() -> anyhow::Result<()> {
 
     let pricing_account = create_pricing_account();
 
-    let initialize_input_note = create_pricing_initialize_note(tx_sender_account.clone(), fungible_asset.faucet_id(), setter_account.id(), pricing_account.clone()).await.unwrap();
+    let initialize_input_note = create_pricing_initialize_note(tx_sender_account.id(), fungible_asset.faucet_id(), setter_account.id(), pricing_account.clone()).await.unwrap();
 
     builder.add_note(OutputNote::Full(initialize_input_note.clone()));
 
@@ -66,7 +66,7 @@ async fn test_pricing_set_price() -> anyhow::Result<()> {
 
     // First, initialize the pricing contract
     let initialize_input_note = create_pricing_initialize_note(
-        tx_sender_account.clone(),
+        tx_sender_account.id(),
         fungible_asset.faucet_id(),
         setter_account.id(),
         pricing_account.clone()
@@ -142,7 +142,7 @@ async fn test_pricing_set_price_all_letters() -> anyhow::Result<()> {
 
     // First, initialize the pricing contract
     let initialize_input_note = create_pricing_initialize_note(
-        tx_sender_account.clone(),
+        tx_sender_account.id(),
         fungible_asset.faucet_id(),
         setter_account.id(),
         pricing_account.clone()
@@ -250,7 +250,7 @@ async fn test_pricing_calculate_domain_cost() -> anyhow::Result<()> {
 
     // First, initialize the pricing contract
     let initialize_input_note = create_pricing_initialize_note(
-        tx_sender_account.clone(),
+        tx_sender_account.id(),
         fungible_asset.faucet_id(),
         setter_account.id(),
         pricing_account.clone()
@@ -362,7 +362,7 @@ async fn test_pricing_calculate_domain_cost_multiple_words() -> anyhow::Result<(
 
     // First, initialize the pricing contract
     let initialize_input_note = create_pricing_initialize_note(
-        tx_sender_account.clone(),
+        tx_sender_account.id(),
         fungible_asset.faucet_id(),
         setter_account.id(),
         pricing_account.clone()
@@ -470,7 +470,7 @@ async fn test_pricing_calculate_domain_cost_one_letter() -> anyhow::Result<()> {
 
         // First, initialize the pricing contract
     let initialize_input_note = create_pricing_initialize_note(
-        tx_sender_account.clone(),
+        tx_sender_account.id(),
         fungible_asset.faucet_id(),
         setter_account.id(),
         pricing_account.clone()
@@ -579,7 +579,7 @@ async fn test_pricing_calculate_empty_domain_cost() -> anyhow::Result<()> {
 
         // First, initialize the pricing contract
     let initialize_input_note = create_pricing_initialize_note(
-        tx_sender_account.clone(),
+        tx_sender_account.id(),
         fungible_asset.faucet_id(),
         setter_account.id(),
         pricing_account.clone()

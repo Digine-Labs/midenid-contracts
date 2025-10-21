@@ -1,7 +1,5 @@
 use miden_client::{
-    account::{Account, AccountBuilder, AccountStorageMode, AccountType}, builder::ClientBuilder, keystore::FilesystemKeyStore, rpc::{Endpoint, TonicRpcClient},
-    crypto::SecretKey, Client, ClientError, DebugMode, auth::AuthSecretKey,
-};
+    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::AuthSecretKey, builder::ClientBuilder, crypto::SecretKey, keystore::FilesystemKeyStore, rpc::{Endpoint, TonicRpcClient}, transaction::{OutputNote, TransactionRequestBuilder}, Client, ClientError, DebugMode};
 use miden_crypto::Word;
 use miden_lib::{account::auth::{self, AuthRpoFalcon512}, account::wallets::BasicWallet, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
@@ -9,7 +7,7 @@ use rand::{Rng, SeedableRng, RngCore, rngs::StdRng};
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
 
-use crate::utils::{get_naming_account_code, get_pricing_account_code, naming_storage, pricing_storage};
+use crate::{notes::create_pricing_initialize_note, utils::{get_naming_account_code, get_pricing_account_code, naming_storage, pricing_storage}};
 
 type ClientType = Client<FilesystemKeyStore<rand::prelude::StdRng>>;
 
@@ -94,7 +92,7 @@ pub async fn create_network_pricing_account() -> (Account, Word) {
 }
 
 pub async fn create_deployer_account(
-    client: &mut miden_client::Client<miden_client::keystore::FilesystemKeyStore<rand::prelude::StdRng>>,
+    client: &mut Client<FilesystemKeyStore<StdRng>>,
      keystore: FilesystemKeyStore<StdRng>
 ) -> Result<(miden_client::account::Account, SecretKey), ClientError> {
     let mut init_seed = [0_u8; 32];
@@ -114,3 +112,29 @@ pub async fn create_deployer_account(
 
     Ok((account, key_pair))
 }
+
+pub async fn deploy_pricing_contract(client: &mut Client<FilesystemKeyStore<StdRng>>) -> anyhow::Result<(Account, Word)> {
+    let (pricing_account, pricing_seed) = create_network_pricing_account().await;
+    client.add_account(&pricing_account, Some(pricing_seed), false).await?;
+
+    Ok((pricing_account, pricing_seed))
+}
+
+pub async fn initialize_pricing_contract(client: &mut Client<FilesystemKeyStore<StdRng>>, initializer_account: AccountId, token: AccountId, setter: AccountId, contract: Account) -> anyhow::Result<()> {
+    let initialize_note = create_pricing_initialize_note(initializer_account, token, setter, contract).await?;
+    let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![OutputNote::Full(initialize_note.clone())]).build()?;
+    let tx_result = client.new_transaction(initializer_account, tx_request).await?;
+
+    let _ = client.submit_transaction(tx_result).await?;
+    client.sync_state().await?;
+    Ok(())
+}
+
+pub async fn deploy_naming_contract(client: &mut Client<FilesystemKeyStore<StdRng>>) -> anyhow::Result<(Account, Word)> {
+    let (naming_account, naming_seed) = create_network_naming_account().await;
+    client.add_account(&naming_account, Some(naming_seed), false).await?;
+
+    Ok((naming_account, naming_seed))
+}
+
+pub async fn initialize_naming_contract() {}

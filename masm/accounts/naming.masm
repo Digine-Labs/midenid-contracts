@@ -21,7 +21,7 @@ const.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT=3
 const.ACCOUNT_ID_TO_DOMAIN_SLOT=4
 const.DOMAIN_TO_ACCOUNT_ID_SLOT=5
 const.DOMAIN_TO_OWNER_SLOT=6
-const.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT=7
+const.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT=7
 
 const.MAX_NAME_LENGTH=21
 
@@ -228,7 +228,7 @@ end
 # Output: []
 export.set_calculate_price_root
     exec._assert_only_owner
-    push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT
+    push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT
     exec.account::set_map_item dropw dropw
     # []
 end
@@ -238,7 +238,7 @@ end
 # Output: [ROOT]
 proc._get_calculate_price_root
     push.0.0
-    push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT
+    push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT
     exec.account::get_map_item
     # [ROOT]
 end
