@@ -1,11 +1,12 @@
 use std::{fs, path::Path, sync::Arc};
 use miden_assembly::{ast::{Module, ModuleKind}, Assembler, DefaultSourceManager, Library, LibraryPath};
-use miden_client::{account::{AccountBuilder, AccountType, StorageMap, StorageSlot}, crypto::SecretKey, note::Note};
+use miden_client::{account::{AccountBuilder, AccountType, StorageMap, StorageSlot}, crypto::SecretKey, note::Note, transaction::{TransactionScript}, ScriptBuilder};
 use miden_crypto::{Felt, Word};
 use miden_objects::account::{AccountComponent, AccountStorageMode, Account};
 use miden_lib::{account::{auth, wallets::BasicWallet}, transaction::TransactionKernel};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
+use serde::de::value::Error;
 
 use crate::notes::create_price_set_note;
 
@@ -156,6 +157,23 @@ pub fn create_naming_library() -> Result<Library, Box<dyn std::error::Error>> {
     )?;
     let library = assembler.clone().assemble_library([module])?;
     Ok(library)
+}
+
+pub fn create_tx_script(
+    script_code: String,
+    library: Option<Library>,
+) -> Result<TransactionScript, Error> {
+    if let Some(lib) = library {
+        return Ok(ScriptBuilder::new(true)
+            .with_dynamically_linked_library(&lib)
+            .unwrap()
+            .compile_tx_script(script_code)
+            .unwrap());
+    };
+
+    Ok(ScriptBuilder::new(true)
+        .compile_tx_script(script_code)
+        .unwrap())
 }
 
 // Helper function to encode a single character to its numeric representation

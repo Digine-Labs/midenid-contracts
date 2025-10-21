@@ -1,10 +1,11 @@
 use miden_client::{
-    account::{Account, AccountBuilder, AccountStorageMode, AccountType}, builder::ClientBuilder, keystore::FilesystemKeyStore, rpc::{Endpoint, TonicRpcClient}, Client, ClientError, DebugMode
+    account::{Account, AccountBuilder, AccountStorageMode, AccountType}, builder::ClientBuilder, keystore::FilesystemKeyStore, rpc::{Endpoint, TonicRpcClient},
+    crypto::SecretKey, Client, ClientError, DebugMode, auth::AuthSecretKey,
 };
 use miden_crypto::Word;
-use miden_lib::{account::auth, transaction::TransactionKernel};
+use miden_lib::{account::auth::{self, AuthRpoFalcon512}, account::wallets::BasicWallet, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, SeedableRng, RngCore, rngs::StdRng};
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
 
@@ -90,4 +91,26 @@ pub async fn create_network_pricing_account() -> (Account, Word) {
         .storage_mode(AccountStorageMode::Network)
         .build().unwrap();
     return (account, word);
+}
+
+pub async fn create_deployer_account(
+    client: &mut miden_client::Client<miden_client::keystore::FilesystemKeyStore<rand::prelude::StdRng>>,
+     keystore: FilesystemKeyStore<StdRng>
+) -> Result<(miden_client::account::Account, SecretKey), ClientError> {
+    let mut init_seed = [0_u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let key_pair = SecretKey::with_rng(client.rng());
+    let builder = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountUpdatableCode)
+        .storage_mode(AccountStorageMode::Network)
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
+        .with_component(BasicWallet);
+    let (account, seed) = builder.build().unwrap();
+    client.add_account(&account, Some(seed), false).await?;
+    keystore
+        .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
+        .unwrap();
+
+    Ok((account, key_pair))
 }

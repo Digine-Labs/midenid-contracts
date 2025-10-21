@@ -135,7 +135,7 @@ pub async fn create_naming_transfer_owner_note(tx_sender: Account, new_owner: Ac
     Ok(note)
 }
 
-pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId, setter: Account, pricing: Account) -> Result<Note, Error> {
+pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId, setter: AccountId, pricing: Account) -> Result<Note, Error> {
     let note_code = get_note_code("initialize_pricing".to_string());
     let account_code= get_pricing_account_code();
 
@@ -149,8 +149,8 @@ pub async fn create_pricing_initialize_note(tx_sender: Account, token: AccountId
         .unwrap();
 
     let note_inputs =NoteInputs::new([
-        Felt::new(setter.id().suffix().into()),
-        Felt::new(setter.id().prefix().into()),
+        Felt::new(setter.suffix().into()),
+        Felt::new(setter.prefix().into()),
         Felt::new(token.suffix().into()),
         Felt::new(token.prefix().into())
     ].to_vec()).unwrap();

@@ -51,7 +51,7 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     let initialize_pricing_note = create_pricing_initialize_note(
         pricing_tx_sender_account.clone(), 
         fungible_asset_1.faucet_id(), 
-        pricing_setter_account.clone(), 
+        pricing_setter_account.id(), 
         pricing_account.clone()
     ).await.unwrap();
 
