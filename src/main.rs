@@ -2,9 +2,10 @@ use miden_client::keystore::{self, FilesystemKeyStore};
 use miden_client::rpc::Endpoint;
 use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
 use miden_client::{account::AccountId};
+use miden_crypto::Felt;
 use midenname_contracts::config::DeploymentConfig;
-use midenname_contracts::deploy::{create_deployer_account, create_network_pricing_account, delete_keystore_and_store, instantiate_client};
-use midenname_contracts::notes::create_pricing_initialize_note;
+use midenname_contracts::deploy::{create_deployer_account, create_network_naming_account, create_network_pricing_account, delete_keystore_and_store, instantiate_client};
+use midenname_contracts::notes::{create_naming_initialize_note, create_price_set_note, create_pricing_initialize_note};
 use miden_objects::{address::Address};
 use midenname_contracts::utils::create_tx_script;
 use std::{env, fs, path::Path};
@@ -93,8 +94,8 @@ async fn main() -> anyhow::Result<()> {
     sleep(Duration::from_secs(5)).await;
 
     // Init pricing
-
-    let pricing_initialize_note = create_pricing_initialize_note(deployer_account.clone(), pricing_token_address, pricing_setter_account, pricing_account.clone()).await?;
+        // Initially we set current deployer as price setter
+    let pricing_initialize_note = create_pricing_initialize_note(deployer_account.clone(), pricing_token_address, deployer_account.id(), pricing_account.clone()).await?;
     
     let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![OutputNote::Full(pricing_initialize_note.clone())]).build().unwrap();
     let tx_result = client.new_transaction(deployer_account.id(), tx_request).await?;
@@ -112,6 +113,84 @@ async fn main() -> anyhow::Result<()> {
 
     let tx_result = client.new_transaction(pricing_account.id(), request).await?;
     client.submit_transaction(tx_result).await?;
+
     println!("✅ Pricing contract initialized!\n");
+    sleep(Duration::from_secs(5)).await;
+
+    // Create naming account
+    let (naming_account, naming_seed) = create_network_naming_account().await;
+    client.add_account(&naming_account, Some(naming_seed), false).await?;
+
+    println!("Naming contract deployed: {}", naming_account.id());
+    // Init naming
+        // Initially we set current deployer as owner
+    let naming_initialize_note = create_naming_initialize_note(deployer_account.id(), naming_treasury_account, naming_account.clone()).await?;
+
+    let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![OutputNote::Full(naming_initialize_note.clone())]).build().unwrap();
+    let tx_result = client.new_transaction(deployer_account.id(), tx_request).await?;
+
+    let _ = client.submit_transaction(tx_result).await?;
+    client.sync_state().await.unwrap();
+    sleep(Duration::from_secs(5)).await;
+
+    let nop_script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm"))?;
+    let transaction_script = create_tx_script(nop_script_code, None)?;
+
+    let request = TransactionRequestBuilder::new()
+        .unauthenticated_input_notes([(naming_initialize_note, None)])
+        .custom_script(transaction_script)
+        .build()?;
+
+    let tx_result = client.new_transaction(pricing_account.id(), request).await?;
+    client.submit_transaction(tx_result).await?;
+    sleep(Duration::from_secs(5)).await;
+    println!("✅ Naming contract initialized!\n");
+    
+    // Set prices on pricing contract
+    let price_1 = Felt::new(config.price_1_letter);
+    let price_2 = Felt::new(config.price_2_letter);
+    let price_3 = Felt::new(config.price_3_letter);
+    let price_4 = Felt::new(config.price_4_letter);
+    let price_5 = Felt::new(config.price_5_letter);
+    let set_1_letter_note = create_price_set_note(deployer_account.clone(), vec![price_1, Felt::new(1)], pricing_account.clone()).await?;
+    let set_2_letter_note = create_price_set_note(deployer_account.clone(), vec![price_2, Felt::new(2)], pricing_account.clone()).await?;
+    let set_3_letter_note = create_price_set_note(deployer_account.clone(), vec![price_3, Felt::new(3)], pricing_account.clone()).await?;
+    let set_4_letter_note = create_price_set_note(deployer_account.clone(), vec![price_4, Felt::new(4)], pricing_account.clone()).await?;
+    let set_5_letter_note = create_price_set_note(deployer_account.clone(), vec![price_5, Felt::new(5)], pricing_account.clone()).await?;
+
+    let tx_request = TransactionRequestBuilder::new()
+        .own_output_notes(vec![
+            OutputNote::Full(set_1_letter_note.clone()),
+            OutputNote::Full(set_2_letter_note.clone()),
+            OutputNote::Full(set_3_letter_note.clone()),
+            OutputNote::Full(set_4_letter_note.clone()),
+            OutputNote::Full(set_5_letter_note.clone())]).build().unwrap();
+    let tx_result = client.new_transaction(deployer_account.id(), tx_request).await?;
+
+    let _ = client.submit_transaction(tx_result).await?;
+    client.sync_state().await.unwrap();
+
+    let nop_script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm"))?;
+    let transaction_script = create_tx_script(nop_script_code, None)?;
+
+    let request = TransactionRequestBuilder::new()
+        .unauthenticated_input_notes([(set_1_letter_note, None), (set_2_letter_note, None), (set_3_letter_note, None), (set_4_letter_note, None), (set_5_letter_note, None)])
+        .custom_script(transaction_script)
+        .build()?;
+
+    let tx_result = client.new_transaction(pricing_account.id(), request).await?;
+    client.submit_transaction(tx_result).await?;
+    client.sync_state().await.unwrap();        
+    println!("✅ Prices are set!\n");
+
+    let pricing_contract_record = client.get_account(pricing_account.id()).await.unwrap();
+
+    if let Some(record) = pricing_contract_record {
+        let pricing_calc_procedure_root = record.account().storage().get_item(4).unwrap();
+        println!("{}", pricing_calc_procedure_root.to_string());
+    } else {
+        // TODO throw error
+    }
     Ok(())
 }
+

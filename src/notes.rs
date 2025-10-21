@@ -9,7 +9,7 @@ pub fn get_note_code(note_name: String) -> String {
     fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", note_name))).unwrap()
 }
 
-pub async fn create_naming_initialize_note(owner: Account, treasury: Account, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_initialize_note(owner: AccountId, treasury: AccountId, naming: Account) -> Result<Note, Error> {
     let note_code = get_note_code("initialize_naming".to_string());
     let account_code= get_naming_account_code();
 
@@ -23,17 +23,17 @@ pub async fn create_naming_initialize_note(owner: Account, treasury: Account, na
         .unwrap();
 
     let note_inputs =NoteInputs::new([
-        Felt::new(treasury.id().suffix().into()),
-        Felt::new(treasury.id().prefix().into()),
-        Felt::new(owner.id().suffix().into()),
-        Felt::new(owner.id().prefix().into())
+        Felt::new(treasury.suffix().into()),
+        Felt::new(treasury.prefix().into()),
+        Felt::new(owner.suffix().into()),
+        Felt::new(owner.prefix().into())
     ].to_vec()).unwrap();
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
     let note_tag = NoteTag::from_account_id(naming.id());
 
-    let note_metadata = NoteMetadata::new(owner.id(), NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
+    let note_metadata = NoteMetadata::new(owner, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note = Note::new(note_assets, note_metadata, note_recipient);
@@ -291,7 +291,7 @@ pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word:
     Ok(note)
 }
 
-pub async fn create_price_set_note(tx_sender: Account,inputs: Vec<Felt>, pricing: Account) -> Result<Note, Error> {
+pub async fn create_price_set_note(tx_sender: Account, inputs: Vec<Felt>, pricing: Account) -> Result<Note, Error> {
     let note_code = get_note_code("pricing_set_price".to_string());
     let account_code = get_pricing_account_code();
 
