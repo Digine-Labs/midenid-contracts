@@ -1,25 +1,19 @@
 use anyhow::Ok;
-use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
+use miden_client::account::{AccountBuilder, AccountId, AccountStorageMode, AccountType};
 use miden_client::auth::AuthSecretKey;
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::SecretKey;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::{Endpoint, TonicRpcClient};
-use miden_client::transaction::{OutputNote, TransactionRequestBuilder};
-use miden_client::{Client, ClientError, DebugMode};
-use miden_crypto::Felt;
+use miden_client::{Client, DebugMode};
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
 use rand::{RngCore, rngs::StdRng};
 use crate::config::DeploymentConfig;
 use crate::deploy::{
-    create_deployer_account, create_network_naming_account, create_network_pricing_account, delete_keystore_and_store, initialize_naming_contract, initialize_pricing_contract, instantiate_client
+    create_network_naming_account, create_network_pricing_account, delete_keystore_and_store, initialize_naming_contract, initialize_pricing_contract, instantiate_client
 };
-use crate::notes::{create_naming_initialize_note, create_price_set_note, create_pricing_initialize_note};
-use crate::utils::create_tx_script;
 use std::sync::Arc;
-use std::{fs, path::Path};
-use tokio::time::{sleep, Duration};
 
 
 pub async fn initialize_keystore() -> anyhow::Result<()> {
@@ -138,7 +132,7 @@ pub async fn deploy_naming() -> anyhow::Result<()> {
     println!("✅ Naming contract deployed: {}", naming_account.id());
 
     client.sync_state().await?;
-    
+
     initialize_naming_contract(&mut client, deployer_address, owner_address, treasury_address, naming_account.clone()).await?;
     client.sync_state().await?;
     println!("✅ Naming contract initialized");
@@ -149,7 +143,7 @@ pub async fn deploy_naming() -> anyhow::Result<()> {
 pub async fn init_pricing() -> anyhow::Result<()> {
     println!("\n🔧 Initializing Pricing Contract\n");
 
-    let config = DeploymentConfig::from_env()?;
+    let _config = DeploymentConfig::from_env()?;
     let mut client = instantiate_client(Endpoint::testnet()).await?;
     client.sync_state().await?;
 
@@ -163,7 +157,7 @@ pub async fn init_pricing() -> anyhow::Result<()> {
 pub async fn set_prices() -> anyhow::Result<()> {
     println!("\n💰 Setting Prices\n");
 
-    let config = DeploymentConfig::from_env()?;
+    let _config = DeploymentConfig::from_env()?;
     let mut client = instantiate_client(Endpoint::testnet()).await?;
     client.sync_state().await?;
 

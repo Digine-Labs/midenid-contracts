@@ -1,5 +1,5 @@
 use miden_client::{
-    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::AuthSecretKey, builder::ClientBuilder, crypto::SecretKey, keystore::FilesystemKeyStore, rpc::{Endpoint, TonicRpcClient}, transaction::{OutputNote, TransactionRequestBuilder}, Client, ClientError, DebugMode};
+    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::AuthSecretKey, builder::ClientBuilder, crypto::SecretKey, keystore::FilesystemKeyStore, rpc::{Endpoint, TonicRpcClient}, transaction::{TransactionRequestBuilder}, Client, ClientError, DebugMode};
 use miden_crypto::Word;
 use miden_lib::{account::auth::{self, AuthRpoFalcon512}, account::wallets::BasicWallet, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
