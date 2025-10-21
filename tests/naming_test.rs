@@ -44,6 +44,7 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
 
     let initialize_naming_note = create_naming_initialize_note(
         owner_account.id(),
+        owner_account.id(),
         treasury_account.id(),
         naming_account.clone()
     ).await.unwrap();
@@ -197,7 +198,7 @@ async fn test_naming_init() -> anyhow::Result<()> {
 
     let naming_account = create_naming_account();
 
-    let initialize_input_note = create_naming_initialize_note(owner_account.id(), treasury_account.id(), naming_account.clone()).await.unwrap();
+    let initialize_input_note = create_naming_initialize_note(owner_account.id(), owner_account.id(), treasury_account.id(), naming_account.clone()).await.unwrap();
 
     builder.add_note(OutputNote::Full(initialize_input_note.clone()));
 

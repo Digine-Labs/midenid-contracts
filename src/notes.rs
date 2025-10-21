@@ -9,7 +9,7 @@ pub fn get_note_code(note_name: String) -> String {
     fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", note_name))).unwrap()
 }
 
-pub async fn create_naming_initialize_note(owner: AccountId, treasury: AccountId, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountId, treasury: AccountId, naming: Account) -> Result<Note, Error> {
     let note_code = get_note_code("initialize_naming".to_string());
     let account_code= get_naming_account_code();
 
@@ -33,7 +33,7 @@ pub async fn create_naming_initialize_note(owner: AccountId, treasury: AccountId
 
     let note_tag = NoteTag::from_account_id(naming.id());
 
-    let note_metadata = NoteMetadata::new(owner, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
+    let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
     let note_assets = NoteAssets::new(vec![]).unwrap();
     let note = Note::new(note_assets, note_metadata, note_recipient);

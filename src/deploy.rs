@@ -7,7 +7,7 @@ use rand::{Rng, SeedableRng, RngCore, rngs::StdRng};
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
 
-use crate::{notes::create_pricing_initialize_note, utils::{get_naming_account_code, get_pricing_account_code, naming_storage, pricing_storage}};
+use crate::{notes::{create_naming_initialize_note, create_pricing_initialize_note}, utils::{get_naming_account_code, get_pricing_account_code, naming_storage, pricing_storage}};
 
 type ClientType = Client<FilesystemKeyStore<rand::prelude::StdRng>>;
 
@@ -137,4 +137,12 @@ pub async fn deploy_naming_contract(client: &mut Client<FilesystemKeyStore<StdRn
     Ok((naming_account, naming_seed))
 }
 
-pub async fn initialize_naming_contract() {}
+pub async fn initialize_naming_contract(client: &mut Client<FilesystemKeyStore<StdRng>>,initializer_account: AccountId, owner: AccountId, treasury: AccountId, contract: Account) -> anyhow::Result<()> {
+    let initialize_note = create_naming_initialize_note(initializer_account, owner, treasury, contract).await?;
+    let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![OutputNote::Full(initialize_note.clone())]).build()?;
+    let tx_result = client.new_transaction(initializer_account, tx_request).await?;
+
+    let _ = client.submit_transaction(tx_result).await?;
+    client.sync_state().await?;
+    Ok(())
+}
