@@ -138,7 +138,7 @@ pub async fn deploy_naming() -> anyhow::Result<()> {
     println!("✅ Naming contract deployed: {}", naming_account.id());
 
     client.sync_state().await?;
-    println!("Initializing naming contract...");
+    
     initialize_naming_contract(&mut client, deployer_address, owner_address, treasury_address, naming_account.clone()).await?;
     client.sync_state().await?;
     println!("✅ Naming contract initialized");
