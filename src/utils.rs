@@ -1,6 +1,6 @@
 use std::{fs, path::Path, sync::Arc};
 use miden_assembly::{ast::{Module, ModuleKind}, Assembler, DefaultSourceManager, Library, LibraryPath};
-use miden_client::{account::{AccountBuilder, AccountType, StorageMap, StorageSlot}, crypto::SecretKey, note::Note, transaction::{TransactionScript}, ScriptBuilder};
+use miden_client::{account::{AccountBuilder, AccountType, StorageMap, StorageSlot, AccountId}, crypto::SecretKey, note::Note, transaction::TransactionScript, ScriptBuilder};
 use miden_crypto::{Felt, Word};
 use miden_objects::account::{AccountComponent, AccountStorageMode, Account};
 use miden_lib::{account::{auth, wallets::BasicWallet}, transaction::TransactionKernel};
@@ -71,12 +71,13 @@ pub fn get_calculate_price_root() -> [Felt; 4] {
 }
 
 
-pub async fn get_price_set_notes(sender_account: Account, pricing_contract: Account, prices: Vec<Felt>) -> Vec<Note> {
-    let note_1 = create_price_set_note(sender_account.clone(), vec![prices[0], Felt::new(1)], pricing_contract.clone()).await.unwrap();
-    let note_2 = create_price_set_note(sender_account.clone(), vec![prices[1], Felt::new(2)], pricing_contract.clone()).await.unwrap();
-    let note_3 = create_price_set_note(sender_account.clone(), vec![prices[2], Felt::new(3)], pricing_contract.clone()).await.unwrap();
-    let note_4 = create_price_set_note(sender_account.clone(), vec![prices[3], Felt::new(4)], pricing_contract.clone()).await.unwrap();
-    let note_5 = create_price_set_note(sender_account.clone(), vec![prices[4], Felt::new(5)], pricing_contract.clone()).await.unwrap();
+
+pub async fn get_price_set_notes(sender_account: AccountId, pricing_contract: AccountId, prices: Vec<Felt>) -> Vec<Note> {
+    let note_1 = create_price_set_note(sender_account, vec![prices[0], Felt::new(1)], pricing_contract).await.unwrap();
+    let note_2 = create_price_set_note(sender_account, vec![prices[1], Felt::new(2)], pricing_contract).await.unwrap();
+    let note_3 = create_price_set_note(sender_account, vec![prices[2], Felt::new(3)], pricing_contract).await.unwrap();
+    let note_4 = create_price_set_note(sender_account, vec![prices[3], Felt::new(4)], pricing_contract).await.unwrap();
+    let note_5 = create_price_set_note(sender_account, vec![prices[4], Felt::new(5)], pricing_contract).await.unwrap();
 
     vec![note_1, note_2, note_3, note_4, note_5]
 }

@@ -39,7 +39,6 @@ pub struct DeploymentConfig {
     pub naming_owner_account: String,
     pub naming_treasury_account: String,
     pub pricing_token_address: String,
-    pub deployer_account: String,
 }
 
 impl DeploymentConfig {
@@ -100,9 +99,6 @@ impl DeploymentConfig {
         let pricing_token_address = env::var("PRICING_TOKEN_ADDRESS")
             .map_err(|_| anyhow!("PRICING_TOKEN_ADDRESS environment variable not set"))?;
 
-        let deployer_account = env::var("DEPLOYER_ACCOUNT")
-            .map_err(|_| anyhow!("PRICING_TOKEN_ADDRESS environment variable not set"))?;
-
         Ok(DeploymentConfig {
             network,
             price_1_letter,
@@ -114,7 +110,6 @@ impl DeploymentConfig {
             naming_owner_account,
             naming_treasury_account,
             pricing_token_address,
-            deployer_account
         })
     }
 
@@ -136,11 +131,6 @@ impl DeploymentConfig {
     pub fn pricing_token_address(&self) -> &str {
         &self.pricing_token_address
     }
-
-    pub fn deployer_account(&self) -> &str {
-        &self.deployer_account
-    }
-
     /// Print configuration details
     pub fn print(&self) {
         println!("📋 Deployment Configuration:");

@@ -57,14 +57,14 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     ).await.unwrap();
 
     let set_payment_token_note = create_naming_set_payment_token_contract(
-        owner_account.clone(), 
+        owner_account.id(), 
         fungible_asset_1.faucet_id(), 
         pricing_account.id(), 
-        naming_account.clone()
+        naming_account.id()
     ).await?;
 
     let test_prices = get_test_prices();
-    let set_notes = get_price_set_notes(pricing_setter_account.clone(), pricing_account.clone(), test_prices).await;
+    let set_notes = get_price_set_notes(pricing_setter_account.id(), pricing_account.id(), test_prices).await;
 
     builder.add_note(OutputNote::Full(initialize_naming_note.clone()));
     builder.add_note(OutputNote::Full(initialize_pricing_note.clone()));
@@ -854,9 +854,9 @@ async fn test_naming_ownership_transfer_owner() -> anyhow::Result<()> {
     let mut setup = initiate_pricing_and_naming().await?;
 
     let transfer_owner_note = create_naming_transfer_owner_note(
-        setup.owner_account.clone(),
+        setup.owner_account.id(),
         setup.domain_registrar_account_3.id(), 
-        setup.naming_account.clone()
+        setup.naming_account.id()
     ).await?;
 
     setup.mock_chain.add_pending_note(OutputNote::Full(transfer_owner_note.clone()));
@@ -890,9 +890,9 @@ async fn test_naming_ownership_transfer_not_owner() -> anyhow::Result<()> {
         let mut setup = initiate_pricing_and_naming().await?;
 
     let transfer_owner_note = create_naming_transfer_owner_note(
-        setup.domain_registrar_account_2.clone(),
+        setup.domain_registrar_account_2.id(),
         setup.domain_registrar_account_3.id(), 
-        setup.naming_account.clone()
+        setup.naming_account.id()
     ).await?;
 
     setup.mock_chain.add_pending_note(OutputNote::Full(transfer_owner_note.clone()));

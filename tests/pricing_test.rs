@@ -73,9 +73,9 @@ async fn test_pricing_set_price() -> anyhow::Result<()> {
     ).await.unwrap();
 
     let set_price_note = create_price_set_note(
-        setter_account.clone(),
+        setter_account.id(),
         vec![Felt::new(123), Felt::new(1)],
-        pricing_account.clone()
+        pricing_account.id()
     ).await.unwrap();
 
     // Add both notes to the builder before building the chain
@@ -149,7 +149,7 @@ async fn test_pricing_set_price_all_letters() -> anyhow::Result<()> {
     ).await.unwrap();
 
     let test_prices = get_test_prices();
-    let set_notes = get_price_set_notes(setter_account.clone(), pricing_account.clone(), test_prices).await;
+    let set_notes = get_price_set_notes(setter_account.id(), pricing_account.id(), test_prices).await;
 
     // Add both notes to the builder before building the chain
     builder.add_note(OutputNote::Full(initialize_input_note.clone()));
@@ -259,7 +259,7 @@ async fn test_pricing_calculate_domain_cost() -> anyhow::Result<()> {
     // price setter notes
 
     let test_prices = get_test_prices();
-    let set_notes = get_price_set_notes(setter_account.clone(), pricing_account.clone(), test_prices).await;
+    let set_notes = get_price_set_notes(setter_account.id(), pricing_account.id(), test_prices).await;
 
     // Create the calculate_domain_cost note
     let calculate_note = create_pricing_calculate_cost_note(
@@ -369,7 +369,7 @@ async fn test_pricing_calculate_domain_cost_multiple_words() -> anyhow::Result<(
     ).await.unwrap();
 
     let test_prices = get_test_prices();
-    let set_notes = get_price_set_notes(setter_account.clone(), pricing_account.clone(), test_prices).await;
+    let set_notes = get_price_set_notes(setter_account.id(), pricing_account.id(), test_prices).await;
 
 
     // Create the calculate_domain_cost note
@@ -477,7 +477,7 @@ async fn test_pricing_calculate_domain_cost_one_letter() -> anyhow::Result<()> {
     ).await.unwrap();
 
     let test_prices = get_test_prices();
-    let set_notes = get_price_set_notes(setter_account.clone(), pricing_account.clone(), test_prices).await;
+    let set_notes = get_price_set_notes(setter_account.id(), pricing_account.id(), test_prices).await;
 
 
     // Create the calculate_domain_cost note
@@ -586,7 +586,7 @@ async fn test_pricing_calculate_empty_domain_cost() -> anyhow::Result<()> {
     ).await.unwrap();
 
     let test_prices = get_test_prices();
-    let set_notes = get_price_set_notes(setter_account.clone(), pricing_account.clone(), test_prices).await;
+    let set_notes = get_price_set_notes(setter_account.id(), pricing_account.id(), test_prices).await;
 
 
     // Create the calculate_domain_cost note

@@ -1,20 +1,60 @@
 use anyhow::Ok;
-use miden_client::account::{AccountBuilder, AccountId, AccountStorageMode, AccountType};
+use miden_client::account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType};
 use miden_client::auth::AuthSecretKey;
 use miden_client::builder::ClientBuilder;
 use miden_client::crypto::SecretKey;
 use miden_client::keystore::FilesystemKeyStore;
 use miden_client::rpc::{Endpoint, TonicRpcClient};
 use miden_client::{Client, DebugMode};
+use miden_crypto::Felt;
 use miden_lib::account::auth::AuthRpoFalcon512;
 use miden_lib::account::wallets::BasicWallet;
 use rand::{RngCore, rngs::StdRng};
 use crate::config::DeploymentConfig;
 use crate::deploy::{
-    create_network_naming_account, create_network_pricing_account, delete_keystore_and_store, initialize_naming_contract, initialize_pricing_contract, instantiate_client
+    create_network_naming_account, create_network_pricing_account, delete_keystore_and_store, initialize_all, initialize_naming_contract, initialize_pricing_contract, instantiate_client
 };
 use std::sync::Arc;
 
+async fn create_tx_sender_account() -> anyhow::Result<(Account)> {
+    let keystore = FilesystemKeyStore::new("./keystore".into())?;
+    
+    let mut client = create_client().await?;
+    let mut init_seed = [0_u8; 32];
+    client.rng().fill_bytes(&mut init_seed);
+
+    let key_pair = SecretKey::with_rng(client.rng());
+    let builder = AccountBuilder::new(init_seed)
+        .account_type(AccountType::RegularAccountUpdatableCode)
+        .storage_mode(AccountStorageMode::Network)
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
+        .with_component(BasicWallet);
+    let (account, seed) = builder.build().unwrap();
+
+    client.add_account(&account, Some(seed), false).await?;
+    keystore
+        .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
+        .unwrap();
+
+    client.sync_state().await?;
+    let last_block = client.get_sync_height().await?;
+    
+    println!("Client latest block heigh: {}", last_block.as_u64());
+
+    let account_record = client.get_account(account.id()).await?;
+
+    let seed = if let Some(record) = account_record {
+        record.seed().cloned()
+    } else {
+        None
+    };
+
+    if let Some(ref seed_value) = seed {
+        println!("Created new tx sender account: {}", account.id());
+    }
+
+    Ok(account)
+}
 
 pub async fn initialize_keystore() -> anyhow::Result<()> {
     let keystore = FilesystemKeyStore::new("./keystore".into())?;
@@ -87,41 +127,23 @@ pub async fn show_config() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Deploy the pricing contract to the network
-pub async fn deploy_pricing() -> anyhow::Result<()> {
-    println!("\n📦 Deploying Pricing Contract\n");
-
-    let config = DeploymentConfig::from_env()?;
-    let payment_token_address = AccountId::from_hex(config.pricing_token_address())?;
-    let setter_address = AccountId::from_hex(config.pricing_setter_account())?;
-    let deployer_address = AccountId::from_hex(config.deployer_account())?;
-
-    let mut client = instantiate_client(Endpoint::testnet()).await?;
-    client.sync_state().await?;
-
-    let (pricing_account, pricing_seed) = create_network_pricing_account().await;
-    client.add_account(&pricing_account, Some(pricing_seed), false).await?;
-
-    println!("✅ Pricing contract deployed: {}", pricing_account.id());
-
-    client.sync_state().await?;
-
-    initialize_pricing_contract(&mut client, deployer_address, payment_token_address, setter_address, pricing_account.clone()).await?;
-    client.sync_state().await?;
-    println!("✅ Pricing contract initialized");
-    Ok(())
-}
 
 // TODOS
 
-/// Deploy the naming contract to the network
-pub async fn deploy_naming() -> anyhow::Result<()> {
-    println!("\n📦 Deploying Naming Contract\n");
+pub async fn deploy_all() -> anyhow::Result<()> {
+    println!("\n📦 Deploying Naming & Pricing\n");
+
+    let tx_sender_1 = create_tx_sender_account().await?;
+    let tx_sender_2 = create_tx_sender_account().await?;
+    let tx_sender_3 = create_tx_sender_account().await?;
 
     let config = DeploymentConfig::from_env()?;
     let owner_address = AccountId::from_hex(config.naming_owner_account())?;
     let treasury_address = AccountId::from_hex(config.naming_treasury_account())?;
-    let deployer_address = AccountId::from_hex(config.deployer_account())?;
+    //let deployer_address = AccountId::from_hex(config.deployer_account())?;
+    let payment_token_address = AccountId::from_hex(config.pricing_token_address())?;
+    let setter_address = AccountId::from_hex(config.pricing_setter_account())?;
+    let prices = get_prices();
 
     let mut client = instantiate_client(Endpoint::testnet()).await?;
     client.sync_state().await?;
@@ -131,13 +153,31 @@ pub async fn deploy_naming() -> anyhow::Result<()> {
 
     println!("✅ Naming contract deployed: {}", naming_account.id());
 
+    let (pricing_account, pricing_seed) = create_network_pricing_account().await;
+    client.add_account(&pricing_account, Some(pricing_seed), false).await?;
+
+    println!("✅ Pricing contract deployed: {}", pricing_account.id());
     client.sync_state().await?;
 
-    initialize_naming_contract(&mut client, deployer_address, owner_address, treasury_address, naming_account.clone()).await?;
+    initialize_all(
+        &mut client, 
+        tx_sender_1.id(),
+        tx_sender_2.id(), 
+        owner_address, 
+        treasury_address, 
+        payment_token_address, 
+        setter_address, 
+        naming_account.clone(), 
+        pricing_account.clone(),
+        prices
+    ).await?;
+
+    //initialize_naming_contract(&mut client, deployer_address, owner_address, treasury_address, naming_account.clone()).await?;
     client.sync_state().await?;
-    println!("✅ Naming contract initialized");
+    println!("✅ All contracts are initialized");
     Ok(())
 }
+
 
 /// Set prices on the pricing contract
 pub async fn set_prices() -> anyhow::Result<()> {
@@ -151,4 +191,16 @@ pub async fn set_prices() -> anyhow::Result<()> {
     println!("⚠️  This script needs the deployer and pricing contract IDs");
 
     Ok(())
+}
+
+fn get_prices() -> Vec<Felt> {
+    let config = DeploymentConfig::from_env().unwrap();
+
+    let price_1 = config.price_1_letter;
+    let price_2 = config.price_2_letter;
+    let price_3 = config.price_3_letter;
+    let price_4 = config.price_4_letter;
+    let price_5 = config.price_5_letter;
+
+    vec![Felt::new(price_1),Felt::new(price_2),Felt::new(price_3),Felt::new(price_4),Felt::new(price_5)]
 }

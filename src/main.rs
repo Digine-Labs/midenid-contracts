@@ -14,10 +14,8 @@ struct Cli {
 enum Commands {
     /// Initializes keystore
     InitKeystore,
-    /// Deploy the pricing contract
-    DeployPricing,
-    /// Deploy the naming contract
-    DeployNaming,
+    /// Deploy all
+    DeployAll,
     /// Set prices on the pricing contract
     SetPrices,
     /// Clean keystore and database
@@ -31,8 +29,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Commands::InitKeystore => scripts::initialize_keystore().await?,
-        Commands::DeployPricing => scripts::deploy_pricing().await?,
-        Commands::DeployNaming => scripts::deploy_naming().await?,
+        Commands::DeployAll => scripts::deploy_all().await?,
         Commands::SetPrices => scripts::set_prices().await?,
         Commands::Clean => scripts::clean().await?,
         Commands::Config => scripts::show_config().await?
