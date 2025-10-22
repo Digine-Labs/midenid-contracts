@@ -3,8 +3,7 @@ use miden_client::{
 use miden_crypto::{Felt, Word};
 use miden_lib::{account::auth::{self, AuthRpoFalcon512}, account::wallets::BasicWallet, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
-use rand::{Rng, SeedableRng, RngCore, rngs::StdRng};
-use rand_chacha::ChaCha20Rng;
+use rand::{RngCore, rngs::StdRng};
 use std::{sync::Arc, time::Duration};
 use crate::{notes::{create_naming_initialize_note, create_naming_set_payment_token_contract, create_naming_set_pricing_root, create_naming_transfer_owner_note, create_pricing_initialize_note}, utils::{get_naming_account_code, get_price_set_notes, get_pricing_account_code, naming_storage, pricing_storage}};
 use tokio::time::sleep;
@@ -186,7 +185,7 @@ pub async fn initialize_all(
     owner: AccountId, 
     treasury: AccountId, 
     token: AccountId, 
-    setter: AccountId, 
+    _setter: AccountId, 
     naming_contract: Account, 
     pricing_contract: Account,
     prices: Vec<Felt>

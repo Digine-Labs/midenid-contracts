@@ -12,11 +12,11 @@ use miden_lib::account::wallets::BasicWallet;
 use rand::{RngCore, rngs::StdRng};
 use crate::config::DeploymentConfig;
 use crate::deploy::{
-    create_network_naming_account, create_network_pricing_account, delete_keystore_and_store, initialize_all, initialize_naming_contract, initialize_pricing_contract, instantiate_client
+    create_network_naming_account, create_network_pricing_account, delete_keystore_and_store, initialize_all, instantiate_client
 };
 use std::sync::Arc;
 
-async fn create_tx_sender_account() -> anyhow::Result<(Account)> {
+async fn create_tx_sender_account() -> anyhow::Result<Account> {
     let keystore = FilesystemKeyStore::new("./keystore".into())?;
     
     let mut client = create_client().await?;
@@ -49,7 +49,7 @@ async fn create_tx_sender_account() -> anyhow::Result<(Account)> {
         None
     };
 
-    if let Some(ref seed_value) = seed {
+    if let Some(ref _seed_value) = seed {
         println!("Created new tx sender account: {}", account.id());
     }
 
@@ -131,6 +131,7 @@ pub async fn show_config() -> anyhow::Result<()> {
 // TODOS
 
 pub async fn deploy_all() -> anyhow::Result<()> {
+    clean().await?;
     println!("\n📦 Deploying Naming & Pricing\n");
 
     let tx_sender_1 = create_tx_sender_account().await?;
