@@ -139,20 +139,6 @@ pub async fn deploy_naming() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Initialize the pricing contract
-pub async fn init_pricing() -> anyhow::Result<()> {
-    println!("\n🔧 Initializing Pricing Contract\n");
-
-    let _config = DeploymentConfig::from_env()?;
-    let mut client = instantiate_client(Endpoint::testnet()).await?;
-    client.sync_state().await?;
-
-    // TODO: Get pricing contract ID from environment or config
-    println!("⚠️  This script needs the pricing contract ID to be configured");
-
-    Ok(())
-}
-
 /// Set prices on the pricing contract
 pub async fn set_prices() -> anyhow::Result<()> {
     println!("\n💰 Setting Prices\n");

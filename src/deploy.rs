@@ -113,13 +113,6 @@ pub async fn create_network_pricing_account() -> (Account, Word) {
     return (account, word);
 }
 
-pub async fn deploy_pricing_contract(client: &mut Client<FilesystemKeyStore<StdRng>>) -> anyhow::Result<(Account, Word)> {
-    let (pricing_account, pricing_seed) = create_network_pricing_account().await;
-    client.add_account(&pricing_account, Some(pricing_seed), false).await?;
-
-    Ok((pricing_account, pricing_seed))
-}
-
 pub async fn initialize_pricing_contract(client: &mut Client<FilesystemKeyStore<StdRng>>, initializer_account: AccountId, token: AccountId, setter: AccountId, contract: Account) -> anyhow::Result<()> {
     let initialize_note = create_pricing_initialize_note(initializer_account, token, setter, contract.clone()).await?;
     let nop_script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm"))?;
@@ -136,13 +129,6 @@ pub async fn initialize_pricing_contract(client: &mut Client<FilesystemKeyStore<
     let _ = client.submit_transaction(tx_result).await?;
     client.sync_state().await?;
     Ok(())
-}
-
-pub async fn deploy_naming_contract(client: &mut Client<FilesystemKeyStore<StdRng>>) -> anyhow::Result<(Account, Word)> {
-    let (naming_account, naming_seed) = create_network_naming_account().await;
-    client.add_account(&naming_account, Some(naming_seed), false).await?;
-
-    Ok((naming_account, naming_seed))
 }
 
 pub async fn initialize_naming_contract(client: &mut Client<FilesystemKeyStore<StdRng>>,initializer_account: AccountId, owner: AccountId, treasury: AccountId, contract: Account) -> anyhow::Result<()> {
