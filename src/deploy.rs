@@ -6,7 +6,7 @@ use miden_objects::account::AccountComponent;
 use rand::{Rng, SeedableRng, RngCore, rngs::StdRng};
 use rand_chacha::ChaCha20Rng;
 use std::{sync::Arc, time::Duration};
-use crate::{notes::{create_naming_initialize_note, create_naming_set_payment_token_contract, create_naming_transfer_owner_note, create_pricing_initialize_note}, utils::{get_naming_account_code, get_price_set_notes, get_pricing_account_code, naming_storage, pricing_storage}};
+use crate::{notes::{create_naming_initialize_note, create_naming_set_payment_token_contract, create_naming_set_pricing_root, create_naming_transfer_owner_note, create_pricing_initialize_note}, utils::{get_naming_account_code, get_price_set_notes, get_pricing_account_code, naming_storage, pricing_storage}};
 use tokio::time::sleep;
 type ClientType = Client<FilesystemKeyStore<rand::prelude::StdRng>>;
 
@@ -74,7 +74,7 @@ pub async fn create_deployer_account(
     Ok((account, key_pair))
 }
 
-pub async fn create_network_naming_account() -> (Account, Word) {
+pub async fn create_network_naming_account(client: &mut Client<FilesystemKeyStore<StdRng>>) -> (Account, Word) {
     let storage_slots = naming_storage();
     let account_code = get_naming_account_code();
 
@@ -84,18 +84,25 @@ pub async fn create_network_naming_account() -> (Account, Word) {
         storage_slots
     ).unwrap().with_supports_all_types();
 
-    let (account, word) = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth::NoAuth)
+    let mut seed = [0_u8; 32];
+    client.rng().fill_bytes(&mut seed);
+
+    let (account, word) = AccountBuilder::new(seed)
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_component(account_component)
         .storage_mode(AccountStorageMode::Network)
-        .build().unwrap();
+        .with_component(account_component)
+        .with_auth_component(auth::NoAuth)
+        .build()
+        .unwrap();
     return (account, word);
 }
 
-pub async fn create_network_pricing_account() -> (Account, Word) {
+pub async fn create_network_pricing_account(client: &mut Client<FilesystemKeyStore<StdRng>>) -> (Account, Word) {
     let storage_slots = pricing_storage();
     let account_code = get_pricing_account_code();
+
+    let mut seed = [0_u8; 32];
+    client.rng().fill_bytes(&mut seed);
 
     let account_component = AccountComponent::compile(
         account_code.clone(), 
@@ -103,12 +110,13 @@ pub async fn create_network_pricing_account() -> (Account, Word) {
         storage_slots
     ).unwrap().with_supports_all_types();
 
-    let (account, word) = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .with_auth_component(auth::NoAuth)
+    let (account, word) = AccountBuilder::new(seed)
         .account_type(AccountType::RegularAccountImmutableCode)
-        .with_component(account_component)
         .storage_mode(AccountStorageMode::Network)
-        .build().unwrap();
+        .with_component(account_component)
+        .with_auth_component(auth::NoAuth)
+        .build()
+        .unwrap();
     return (account, word);
 }
 
@@ -198,33 +206,129 @@ pub async fn initialize_all(
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![
-            OutputNote::Full(init_naming_note), 
-            OutputNote::Full(init_pricing_note),
+            OutputNote::Full(init_naming_note.clone()), 
+            OutputNote::Full(init_pricing_note.clone()),
             OutputNote::Full(set_price_notes[0].clone()),
             OutputNote::Full(set_price_notes[1].clone()),
             OutputNote::Full(set_price_notes[2].clone()),
             OutputNote::Full(set_price_notes[3].clone()),
             OutputNote::Full(set_price_notes[4].clone()),
-            OutputNote::Full(set_payment_token),
-            OutputNote::Full(transfer_ownership),
+            OutputNote::Full(set_payment_token.clone()),
+            OutputNote::Full(transfer_ownership.clone()),
         ])
         .build()?;
     let tx_result = client.new_transaction(initializer_account, tx_request).await?;
     let _ = client.submit_transaction(tx_result.clone()).await?;
+    client.sync_state().await?;
+    println!("Submitted notes");
 
-    let tx_id = tx_result.executed_transaction().id();
+    // Consume notes
 
-    wait_for_tx(client, tx_id).await.unwrap();
+
+    let consume_naming_notes_request = TransactionRequestBuilder::new()
+            .unauthenticated_input_notes([
+                    (init_naming_note, None), 
+                    (set_payment_token, None),
+                    (transfer_ownership, None),
+                ])
+            .build()
+            .unwrap();
+    
+    let consume_pricing_notes_request = TransactionRequestBuilder::new()
+        .unauthenticated_input_notes([
+                (init_pricing_note, None),
+                (set_price_notes[0].clone(), None),
+                (set_price_notes[1].clone(), None),
+                (set_price_notes[2].clone(), None),
+                (set_price_notes[3].clone(), None),
+                (set_price_notes[4].clone(), None),
+            ])
+        .build()
+        .unwrap();
+    let consume_naming_notes_tx_result = client
+        .new_transaction(naming_contract.id(), consume_naming_notes_request)
+        .await
+        .unwrap();
+    
+    let consume_pricing_notes_tx_result = client
+        .new_transaction(pricing_contract.id(), consume_pricing_notes_request)
+        .await
+        .unwrap();
+    
+    let _ = client.submit_transaction(consume_naming_notes_tx_result.clone()).await;
+    client.sync_state().await?;
+    
+    let _ = client.submit_transaction(consume_pricing_notes_tx_result.clone()).await;
+    client.sync_state().await?;
+    
+    let naming_notes_consume_tx_id = consume_naming_notes_tx_result.executed_transaction().id();
+
+    wait_for_tx(client, naming_notes_consume_tx_id).await.unwrap();
     sleep(Duration::from_secs(2)).await;
     client.sync_state().await?;
 
-    // Now we should update procedure root
+    
+    let pricing_notes_consume_tx_id = consume_pricing_notes_tx_result.executed_transaction().id();
 
-    let pricing_account = client.get_account(naming_contract.id()).await?;
+    wait_for_tx(client, pricing_notes_consume_tx_id).await.unwrap();
+    sleep(Duration::from_secs(2)).await;
+    client.sync_state().await?;
+
+    println!("Consumed all noted. Initialization success. Ensuring initializations");
+
+    let pricing_account = client.get_account(pricing_contract.id()).await?;
     let pricing_account_data = pricing_account.unwrap().account().clone();
 
-    println!("pricing storage: {:?}", pricing_account_data.storage().get_item(0));
+    let naming_account = client.get_account(naming_contract.id()).await?;
+    let naming_account_data = naming_account.unwrap().account().clone();
 
-    // At final we should update setter address to final address
+    assert_eq!(pricing_account_data.storage().get_item(0).unwrap().get(0).unwrap().as_int(), 1);
+    assert_eq!(naming_account_data.storage().get_item(0).unwrap().get(0).unwrap().as_int(), 1);
+
+    println!("Naming current owner: {:?}", naming_account_data.storage().get_item(1));
+
+    // Now we should update procedure root
+    
+    let pricing_root = pricing_account_data.storage().get_item(4).unwrap();
+    
+    let naming_root_set_note = create_naming_set_pricing_root(updated_account, pricing_root, pricing_contract.id(), naming_contract.id()).await?;
+        
+    let transfer_ownership = create_naming_transfer_owner_note(updated_account, owner, naming_contract.id()).await?;
+
+    let tx_request = TransactionRequestBuilder::new()
+        .own_output_notes(vec![
+            OutputNote::Full(naming_root_set_note.clone()), 
+            OutputNote::Full(transfer_ownership.clone()),
+        ])
+        .build()?;
+    let tx_result = client.new_transaction(updated_account, tx_request).await?;
+    let _ = client.submit_transaction(tx_result.clone()).await?;
+    client.sync_state().await?;
+    println!("Submitted update notes");
+
+    let consume_naming_notes_request = TransactionRequestBuilder::new()
+        .unauthenticated_input_notes([
+                (naming_root_set_note, None), 
+                (transfer_ownership, None),
+            ])
+        .build()
+        .unwrap();
+
+    let consume_naming_notes_tx_result = client
+        .new_transaction(naming_contract.id(), consume_naming_notes_request)
+        .await
+        .unwrap();
+
+    let _ = client.submit_transaction(consume_naming_notes_tx_result.clone()).await;
+    client.sync_state().await?;
+
+    let update_notes_tx_id = consume_naming_notes_tx_result.executed_transaction().id();
+
+    wait_for_tx(client, update_notes_tx_id).await.unwrap();
+    sleep(Duration::from_secs(2)).await;
+    client.sync_state().await?;
+    
+    println!("Everything is done. Now ensuring contract states are correct.");
+
     Ok(())
 }

@@ -135,7 +135,7 @@ pub async fn deploy_all() -> anyhow::Result<()> {
 
     let tx_sender_1 = create_tx_sender_account().await?;
     let tx_sender_2 = create_tx_sender_account().await?;
-    let tx_sender_3 = create_tx_sender_account().await?;
+    //let tx_sender_3 = create_tx_sender_account().await?;
 
     let config = DeploymentConfig::from_env()?;
     let owner_address = AccountId::from_hex(config.naming_owner_account())?;
@@ -148,12 +148,12 @@ pub async fn deploy_all() -> anyhow::Result<()> {
     let mut client = instantiate_client(Endpoint::testnet()).await?;
     client.sync_state().await?;
 
-    let (naming_account, naming_seed) = create_network_naming_account().await;
+    let (naming_account, naming_seed) = create_network_naming_account(&mut client).await;
     client.add_account(&naming_account, Some(naming_seed), false).await?;
 
     println!("✅ Naming contract deployed: {}", naming_account.id());
 
-    let (pricing_account, pricing_seed) = create_network_pricing_account().await;
+    let (pricing_account, pricing_seed) = create_network_pricing_account(&mut client).await;
     client.add_account(&pricing_account, Some(pricing_seed), false).await?;
 
     println!("✅ Pricing contract deployed: {}", pricing_account.id());

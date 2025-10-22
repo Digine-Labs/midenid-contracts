@@ -152,10 +152,10 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     let root_on_contract = updated_pricing_account.storage().get_item(4).unwrap();
 
     let set_pricing_root_note = create_naming_set_pricing_root(
-        owner_account.clone(), 
+        owner_account.id(), 
         root_on_contract, 
         pricing_account.id(),
-        naming_account.clone()
+        naming_account.id()
     ).await?;
 
     mock_chain.add_pending_note(OutputNote::Full(set_pricing_root_note.clone()));
