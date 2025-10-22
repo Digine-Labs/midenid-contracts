@@ -1,11 +1,12 @@
 use miden_client::{
-    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::AuthSecretKey, builder::ClientBuilder, crypto::SecretKey, keystore::FilesystemKeyStore, rpc::{Endpoint, TonicRpcClient}, transaction::{TransactionRequestBuilder}, Client, ClientError, DebugMode};
+    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::AuthSecretKey, builder::ClientBuilder, crypto::SecretKey, keystore::FilesystemKeyStore, rpc::{Endpoint, TonicRpcClient}, transaction::{OutputNote, TransactionRequestBuilder}, Client, ClientError, DebugMode};
 use miden_crypto::Word;
 use miden_lib::{account::auth::{self, AuthRpoFalcon512}, account::wallets::BasicWallet, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
 use rand::{Rng, SeedableRng, RngCore, rngs::StdRng};
 use rand_chacha::ChaCha20Rng;
-use std::sync::Arc;
+use tokio::time::sleep;
+use std::{sync::Arc, time::Duration};
 use std::{fs, path::Path};
 use crate::{notes::{create_naming_initialize_note, create_pricing_initialize_note}, utils::{create_tx_script, get_naming_account_code, get_pricing_account_code, naming_storage, pricing_storage}};
 
@@ -115,16 +116,13 @@ pub async fn create_network_pricing_account() -> (Account, Word) {
 
 pub async fn initialize_pricing_contract(client: &mut Client<FilesystemKeyStore<StdRng>>, initializer_account: AccountId, token: AccountId, setter: AccountId, contract: Account) -> anyhow::Result<()> {
     let initialize_note = create_pricing_initialize_note(initializer_account, token, setter, contract.clone()).await?;
-    let nop_script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm"))?;
-    let tx_script = create_tx_script(nop_script_code, None)?;
 
     //let tx_request = TransactionRequestBuilder::new().own_output_notes(vec![OutputNote::Full(initialize_note.clone())]).build()?;
     let tx_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes([(initialize_note, None)])
-        .custom_script(tx_script)
+        .own_output_notes(vec![OutputNote::Full(initialize_note)])
         .build()?;
     
-    let tx_result = client.new_transaction(contract.id(), tx_request).await?;
+    let tx_result = client.new_transaction(initializer_account, tx_request).await?;
 
     let _ = client.submit_transaction(tx_result).await?;
     client.sync_state().await?;
@@ -133,15 +131,11 @@ pub async fn initialize_pricing_contract(client: &mut Client<FilesystemKeyStore<
 
 pub async fn initialize_naming_contract(client: &mut Client<FilesystemKeyStore<StdRng>>,initializer_account: AccountId, owner: AccountId, treasury: AccountId, contract: Account) -> anyhow::Result<()> {
     let initialize_note = create_naming_initialize_note(initializer_account, owner, treasury, contract.clone()).await?;
-    let nop_script_code = fs::read_to_string(Path::new("./masm/scripts/nop.masm"))?;
-    let tx_script = create_tx_script(nop_script_code, None)?;
 
     let tx_request = TransactionRequestBuilder::new()
-        .unauthenticated_input_notes([(initialize_note, None)])
-        .custom_script(tx_script)
+        .own_output_notes(vec![OutputNote::Full(initialize_note)])
         .build()?;
-    let tx_result = client.new_transaction(contract.id(), tx_request).await?;
-
+    let tx_result = client.new_transaction(initializer_account, tx_request).await?;
     let _ = client.submit_transaction(tx_result).await?;
     client.sync_state().await?;
     Ok(())
