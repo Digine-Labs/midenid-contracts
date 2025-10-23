@@ -255,9 +255,11 @@ pub async fn initialize_all(
         .unwrap();
     
     let _ = client.submit_transaction(consume_naming_notes_tx_result.clone()).await;
+    sleep(Duration::from_secs(2)).await;
     client.sync_state().await?;
     
     let _ = client.submit_transaction(consume_pricing_notes_tx_result.clone()).await;
+    sleep(Duration::from_secs(2)).await;
     client.sync_state().await?;
     
     let naming_notes_consume_tx_id = consume_naming_notes_tx_result.executed_transaction().id();
@@ -328,6 +330,27 @@ pub async fn initialize_all(
     client.sync_state().await?;
     
     println!("Everything is done. Now ensuring contract states are correct.");
+
+    let pricing_account = client.get_account(pricing_contract.id()).await?;
+    let pricing_account_data = pricing_account.unwrap().account().clone();
+
+    let naming_account = client.get_account(naming_contract.id()).await?;
+    let naming_account_data = naming_account.unwrap().account().clone();
+
+    println!("Naming owner: {:?}", naming_account_data.storage().get_item(1).unwrap());
+    println!("Naming treasury: {:?}", naming_account_data.storage().get_item(2).unwrap());
+    println!("Naming token to pricing: {:?}", naming_account_data.storage().get_map_item(3, Word::new([Felt::new(token.suffix().as_int()),token.prefix().as_felt(), Felt::new(0), Felt::new(0) ])).unwrap());
+    println!("Naming pricing root: {:?}", naming_account_data.storage().get_map_item(7, Word::new([Felt::new(pricing_contract.id().suffix().as_int()),pricing_contract.id().prefix().as_felt(), Felt::new(0), Felt::new(0) ])).unwrap());
+    
+    println!("Pricing setter: {:?}", pricing_account_data.storage().get_item(1).unwrap());
+    println!("Pricing token: {:?}", pricing_account_data.storage().get_item(2).unwrap());
+    println!("Pricing Letter(1) price: {:?}", pricing_account_data.storage().get_map_item(3, Word::new([Felt::new(1),Felt::new(0),Felt::new(0),Felt::new(0)])).unwrap());
+    println!("Pricing Letter(2) price: {:?}", pricing_account_data.storage().get_map_item(3, Word::new([Felt::new(2),Felt::new(0),Felt::new(0),Felt::new(0)])).unwrap());
+    println!("Pricing Letter(3) price: {:?}", pricing_account_data.storage().get_map_item(3, Word::new([Felt::new(3),Felt::new(0),Felt::new(0),Felt::new(0)])).unwrap());
+    println!("Pricing Letter(4) price: {:?}", pricing_account_data.storage().get_map_item(3, Word::new([Felt::new(4),Felt::new(0),Felt::new(0),Felt::new(0)])).unwrap());
+    println!("Pricing Letter(5) price: {:?}", pricing_account_data.storage().get_map_item(3, Word::new([Felt::new(5),Felt::new(0),Felt::new(0),Felt::new(0)])).unwrap());
+    println!("Pricing calculate root: {:?}", pricing_account_data.storage().get_item(4).unwrap());
+
 
     Ok(())
 }
