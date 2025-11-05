@@ -233,6 +233,24 @@ pub async fn initialize_all(
             .build()
             .unwrap();
     
+
+    let consume_naming_notes_tx_result = client
+        .new_transaction(naming_contract.id(), consume_naming_notes_request)
+        .await
+        .unwrap();
+
+    let _ = client.submit_transaction(consume_naming_notes_tx_result.clone()).await;
+    sleep(Duration::from_secs(2)).await;
+    client.sync_state().await?;
+
+    let naming_notes_consume_tx_id = consume_naming_notes_tx_result.executed_transaction().id();
+
+    wait_for_tx(client, naming_notes_consume_tx_id).await.unwrap();
+    sleep(Duration::from_secs(2)).await;
+    client.sync_state().await?;
+
+    println!("Naming notes consumed.");
+
     let consume_pricing_notes_request = TransactionRequestBuilder::new()
         .unauthenticated_input_notes([
                 (init_pricing_note, None),
@@ -244,30 +262,16 @@ pub async fn initialize_all(
             ])
         .build()
         .unwrap();
-    let consume_naming_notes_tx_result = client
-        .new_transaction(naming_contract.id(), consume_naming_notes_request)
-        .await
-        .unwrap();
     
     let consume_pricing_notes_tx_result = client
         .new_transaction(pricing_contract.id(), consume_pricing_notes_request)
         .await
         .unwrap();
     
-    let _ = client.submit_transaction(consume_naming_notes_tx_result.clone()).await;
-    sleep(Duration::from_secs(2)).await;
-    client.sync_state().await?;
-    
     let _ = client.submit_transaction(consume_pricing_notes_tx_result.clone()).await;
     sleep(Duration::from_secs(2)).await;
     client.sync_state().await?;
     
-    let naming_notes_consume_tx_id = consume_naming_notes_tx_result.executed_transaction().id();
-
-    wait_for_tx(client, naming_notes_consume_tx_id).await.unwrap();
-    sleep(Duration::from_secs(2)).await;
-    client.sync_state().await?;
-
     
     let pricing_notes_consume_tx_id = consume_pricing_notes_tx_result.executed_transaction().id();
 
