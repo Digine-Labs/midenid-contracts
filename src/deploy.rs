@@ -325,6 +325,7 @@ pub async fn initialize_all(
         .unwrap();
 
     let _ = client.submit_transaction(consume_naming_notes_tx_result.clone()).await;
+    sleep(Duration::from_secs(2)).await;
     client.sync_state().await?;
 
     let update_notes_tx_id = consume_naming_notes_tx_result.executed_transaction().id();

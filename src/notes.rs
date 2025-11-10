@@ -1,9 +1,10 @@
 use anyhow::Error;
-use miden_crypto::{Felt, Word};
+use miden_crypto::{Felt, Word, rand::FeltRng};
 use std::{fs, path::Path};
-use miden_client::{ScriptBuilder, account::{Account, AccountId}, asset::FungibleAsset, note::{Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}};
+use miden_client::{ScriptBuilder, account::{Account, AccountId}, asset::FungibleAsset, note::{Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, rpc::Endpoint};
 
 use crate::utils::{create_library, get_naming_account_code, get_pricing_account_code};
+use crate::deploy::{instantiate_client};
 
 pub fn get_note_code(note_name: String) -> String {
     fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", note_name))).unwrap()
@@ -29,7 +30,12 @@ pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountI
         Felt::new(owner.prefix().into())
     ].to_vec()).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
+
+    //let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
     let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming.id());
 
@@ -60,7 +66,10 @@ pub async fn create_naming_set_payment_token_contract(tx_sender: AccountId, toke
         Felt::new(token.prefix().into())
     ].to_vec()).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
 
     let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming);
 
@@ -95,7 +104,10 @@ pub async fn create_naming_set_pricing_root(tx_sender: AccountId, root: Word, pr
         Felt::new(root.get(3).unwrap().as_int())
     ].to_vec()).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
 
     let note_tag =  NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?;//NoteTag::from_account_id(naming);
 
@@ -124,7 +136,10 @@ pub async fn create_naming_transfer_owner_note(tx_sender: AccountId, new_owner: 
         Felt::new(new_owner.prefix().into()),
     ].to_vec()).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
 
     let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?;//NoteTag::from_account_id(naming);
 
@@ -155,7 +170,10 @@ pub async fn create_pricing_initialize_note(tx_sender: AccountId, token: Account
         Felt::new(token.prefix().into())
     ].to_vec()).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
 
     let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(pricing.id());
 
@@ -190,7 +208,10 @@ pub async fn create_naming_register_name_note(tx_sender: AccountId, payment_toke
         Felt::new(domain.get(3).unwrap().as_int())
     ].to_vec()).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
 
     let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming.id());
 
@@ -225,7 +246,10 @@ pub async fn create_naming_transfer_note(tx_sender: Account, receiver: AccountId
         Felt::new(domain.get(3).unwrap().as_int())
     ].to_vec()).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
 
     let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming.id());
 
@@ -280,7 +304,10 @@ pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word:
         domain_word[3]
     ]).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
 
     let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?;// NoteTag::from_account_id(pricing.id());
 
@@ -306,7 +333,10 @@ pub async fn create_price_set_note(tx_sender: AccountId, inputs: Vec<Felt>, pric
 
     let note_inputs = NoteInputs::new(inputs).unwrap();
 
-    let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
 
     let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(pricing);
 
