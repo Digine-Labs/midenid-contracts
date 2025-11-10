@@ -1,7 +1,7 @@
 use anyhow::Error;
 use miden_crypto::{Felt, Word};
 use std::{fs, path::Path};
-use miden_client::{account::{Account, AccountId}, asset::{FungibleAsset}, note::{Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, ScriptBuilder};
+use miden_client::{ScriptBuilder, account::{Account, AccountId}, asset::FungibleAsset, note::{Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}};
 
 use crate::utils::{create_library, get_naming_account_code, get_pricing_account_code};
 
@@ -31,7 +31,7 @@ pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountI
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(naming.id());
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming.id());
 
     let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
@@ -62,7 +62,7 @@ pub async fn create_naming_set_payment_token_contract(tx_sender: AccountId, toke
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(naming);
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming);
 
     let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
@@ -97,7 +97,7 @@ pub async fn create_naming_set_pricing_root(tx_sender: AccountId, root: Word, pr
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(naming);
+    let note_tag =  NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?;//NoteTag::from_account_id(naming);
 
     let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
@@ -126,7 +126,7 @@ pub async fn create_naming_transfer_owner_note(tx_sender: AccountId, new_owner: 
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(naming);
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?;//NoteTag::from_account_id(naming);
 
     let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
@@ -157,7 +157,7 @@ pub async fn create_pricing_initialize_note(tx_sender: AccountId, token: Account
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(pricing.id());
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(pricing.id());
 
     let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
@@ -192,7 +192,7 @@ pub async fn create_naming_register_name_note(tx_sender: AccountId, payment_toke
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(naming.id());
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming.id());
 
     let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
@@ -227,7 +227,7 @@ pub async fn create_naming_transfer_note(tx_sender: Account, receiver: AccountId
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(naming.id());
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming.id());
 
     let note_metadata = NoteMetadata::new(tx_sender.id(), NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
@@ -282,7 +282,7 @@ pub async fn create_pricing_calculate_cost_note(tx_sender: Account, domain_word:
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(pricing.id());
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?;// NoteTag::from_account_id(pricing.id());
 
     let note_metadata = NoteMetadata::new(tx_sender.id(), NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
@@ -308,7 +308,7 @@ pub async fn create_price_set_note(tx_sender: AccountId, inputs: Vec<Felt>, pric
 
     let note_recipient = NoteRecipient::new(Word::default(), note_script, note_inputs.clone());
 
-    let note_tag = NoteTag::from_account_id(pricing);
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(pricing);
 
     let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
 
