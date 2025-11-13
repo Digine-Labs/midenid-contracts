@@ -22,6 +22,10 @@ const.ACCOUNT_ID_TO_DOMAIN_SLOT=4
 const.DOMAIN_TO_ACCOUNT_ID_SLOT=5
 const.DOMAIN_TO_OWNER_SLOT=6
 const.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT=7
+const.REF_RATE_SLOT=8
+const.REF_TOTAL_REVENUE_SLOT=9
+const.REF_CLAIMED_REVENUE_SLOT=10
+const.DOMAIN_COUNT=11
 
 const.MAX_NAME_LENGTH=21
 
@@ -34,6 +38,11 @@ const.MAX_NAME_LENGTH=21
 # 5: Domain to account map(DOMAIN -> [0, 0, account_prefix, account_suffix])
 # 6: Domain to owner map(DOMAIN -> [0, 0, owner_prefix, owner_suffix])
 # 7: Pricing contract to calculate_price procedure root hash map([0, 0, prefix, suffix] -> ROOT)
+# 8: referral rate map([0, 0, ref_prefix, ref_suffix] -> rate)
+# 9: referal revenue map([ref_prefix, ref_suffix, token_prefix, token_suffix] -> revenue)
+# 10: claimed ref earnings map([ref_prefix, ref_suffix, token_prefix, token_suffix] -> claimed_revenue)
+# 11: total registered domains [0, 0, 0, total_supply]
+
 
 # Input: [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
 export.init
@@ -92,6 +101,8 @@ export.register
     movdn.4 drop drop
     # [prefix, suffix, cost]
     exec._receive_payment
+    # []
+    exec._increase_domain_count
     # []
 end
 
@@ -409,4 +420,15 @@ proc._assert_only_domain_owner
     # [caller_prefix, caller_suffix, owner_prefix, owner_suffix]
     exec.account_id::is_equal assert.err=ERR_ONLY_DOMAIN_OWNER
     # []
+end
+
+# Input: []
+# Output: []
+proc._increase_domain_count
+    push.DOMAIN_COUNT
+    exec.account::get_item drop drop drop
+    # [total_supply]
+    add.1 push.0.0.0
+    # [0, 0, 0, total_supply + 1]
+    push.DOMAIN_COUNT exec.account::set_item dropw
 end
