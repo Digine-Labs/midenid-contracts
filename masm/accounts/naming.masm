@@ -12,6 +12,8 @@ const.ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
 const.ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less that price"
 const.ERR_DOMAIN_NOT_AVAILABLE="Domain is already taken"
 const.ERR_DOMAIN_LENGTH_TOO_HIGH="21 characters allowed"
+const.ERR_REF_RATE_TOO_HIGH="Max 2500 ref rate"
+const.ERR_REF_NOT_EXIST="Referrer rate is zero"
 
 ## Constants
 const.INIT_FLAG_SLOT=0
@@ -25,9 +27,19 @@ const.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT=7
 const.REF_RATE_SLOT=8
 const.REF_TOTAL_REVENUE_SLOT=9
 const.REF_CLAIMED_REVENUE_SLOT=10
-const.DOMAIN_COUNT=11
+const.DOMAIN_COUNT_SLOT=11
+const.TOTAL_REVENUE_SLOT=12
+const.CLAIMED_REVENUE_SLOT=13
 
 const.MAX_NAME_LENGTH=21
+const.MAX_REF_RATE=10000 # Basis point
+const.REF_RATE_LIMIT=2500 # %25
+
+## Memory Addresses
+const.MEM_REFERRER_RATE=0x0040
+const.MEM_REFERRER=0x0020
+const.MEM_PAYMENT_TOKEN=0x0024
+const.MEM_DOMAIN=0x0028
 
 ## Storage
 # 0: init flag [0, 0, 0, flag]
@@ -42,6 +54,8 @@ const.MAX_NAME_LENGTH=21
 # 9: referal revenue map([ref_prefix, ref_suffix, token_prefix, token_suffix] -> revenue)
 # 10: claimed ref earnings map([ref_prefix, ref_suffix, token_prefix, token_suffix] -> claimed_revenue)
 # 11: total registered domains [0, 0, 0, total_supply]
+# 12: protocol total revenue map([0, 0, token_prefix, token_suffix] -> amount)
+# 13: claimed protocol revenue map([0, 0, token_prefix, token_suffix] -> amount)
 
 
 # Input: [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
@@ -63,6 +77,41 @@ export.init
     push.INIT_FLAG_SLOT
     exec.account::set_item dropw
     # []
+end
+
+# Input: [referrer_prefix, referrer_suffix, token_prefix, token_suffix, DOMAIN]
+export.register_with_referrer
+    push.0.0
+    mem_storew.MEM_REFERRER dropw
+    # [token_prefix, token_suffix, DOMAIN]
+    push.0.0
+    mem_storew.MEM_PAYMENT_TOKEN dropw
+    # [DOMAIN]
+    mem_storew.MEM_DOMAIN dropw
+    # []
+    padw mem_loadw.MEM_REFERRER
+    # [REFERRER]
+    exec._assert_referrer_exist
+    # []
+    padw mem_loadw.MEM_DOMAIN dupw dupw dupw
+    # [DOMAIN, DOMAIN, DOMAIN]
+    exec._assert_domain_available
+    exec._assert_domain_rules
+    # [DOMAIN, DOMAIN]
+    exec.note::get_sender
+    # [caller_prefix, caller_suffix, DOMAIN, DOMAIN]
+    exec._update_domain_map
+    # [DOMAIN]
+    exec.note::get_sender
+    exec._update_domain_owner
+    # []
+    padw mem_loadw.MEM_DOMAIN
+    padw mem_loadw.MEM_PAYMENT_TOKEN
+    push.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT exec.account::get_map_item
+    # [PRICING_CONTRACT]
+    padw eqw assertz.err=ERR_PAYMENT_TOKEN_NOT_ALLOWED dropw
+    # []
+    # TODO: Remove pricing contract
 end
 
 # Input: [payment_token_prefix, payment_token_suffix, DOMAIN]
@@ -240,6 +289,29 @@ end
 export.set_calculate_price_root
     exec._assert_only_owner
     push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT
+    exec.account::set_map_item dropw dropw
+    # []
+end
+
+# Input: [ref_prefix, ref_suffix, rate]
+# Output: []
+export.set_referral_rate
+    exec._assert_only_owner
+    movup.3
+    # [rate, ref_prefix, ref_suffix]
+    dup lte.REF_RATE_LIMIT assert.err=ERR_REF_RATE_TOO_HIGH
+    # [rate, ref_prefix, ref_suffix]
+    mem_store.MEM_REFERRER_RATE
+    # [ref_prefix, ref_suffix]
+    push.0.0
+    # [REFERRER]
+    mem_load.MEM_REFERRER_RATE
+    # [rate, REFERRER]
+    push.0.0.0
+    # [RATE, REFERRER]
+    swapw
+    # [REFERRER, RATE]
+    push.REF_RATE_SLOT
     exec.account::set_map_item dropw dropw
     # []
 end
@@ -425,10 +497,25 @@ end
 # Input: []
 # Output: []
 proc._increase_domain_count
-    push.DOMAIN_COUNT
+    push.DOMAIN_COUNT_SLOT
     exec.account::get_item drop drop drop
     # [total_supply]
     add.1 push.0.0.0
     # [0, 0, 0, total_supply + 1]
-    push.DOMAIN_COUNT exec.account::set_item dropw
+    push.DOMAIN_COUNT_SLOT exec.account::set_item dropw
+end
+
+# Input: [REFERRER]
+# Output: []
+proc._assert_referrer_exist
+    push.REF_RATE_SLOT
+    exec.account::get_map_item drop drop drop
+    # [rate]
+    gt.0 assert.err=ERR_REF_NOT_EXIST
+    # []
+end
+
+# Input: [REFERRER, TOKEN, amount]
+# Output: []
+proc._add_referrer_reward
 end
