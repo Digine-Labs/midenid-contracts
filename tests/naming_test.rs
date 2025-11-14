@@ -13,7 +13,6 @@ pub struct InitializedNamingAndPricing {
     pub domain_registrar_account: Account,
     pub domain_registrar_account_2: Account,
     pub domain_registrar_account_3: Account,
-    pub treasury_account: Account,
     pub pricing_tx_sender_account: Account,
     pub pricing_setter_account: Account,
     pub naming_account: Account,
@@ -35,7 +34,6 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     let domain_registrar_account_2 = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_2.into()])?;
     let domain_registrar_account_3 = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_3.into()])?;
 
-    let treasury_account = builder.add_existing_wallet(Auth::BasicAuth)?;
     let pricing_tx_sender_account = builder.add_existing_wallet(Auth::BasicAuth)?;
     let pricing_setter_account= builder.add_existing_wallet(Auth::BasicAuth)?;
 
@@ -45,7 +43,6 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
     let initialize_naming_note = create_naming_initialize_note(
         owner_account.id(),
         owner_account.id(),
-        treasury_account.id(),
         naming_account.clone()
     ).await.unwrap();
 
@@ -180,7 +177,6 @@ async fn initiate_pricing_and_naming() -> anyhow::Result<InitializedNamingAndPri
         domain_registrar_account,
         domain_registrar_account_2,
         domain_registrar_account_3,
-        treasury_account,
         pricing_tx_sender_account,
         pricing_setter_account,
         naming_account: updated_naming_account,
@@ -194,11 +190,10 @@ async fn test_naming_init() -> anyhow::Result<()> {
     let mut builder = MockChain::builder();
 
     let owner_account = builder.add_existing_wallet(Auth::BasicAuth)?;
-    let treasury_account= builder.add_existing_wallet(Auth::BasicAuth)?;
 
     let naming_account = create_naming_account();
 
-    let initialize_input_note = create_naming_initialize_note(owner_account.id(), owner_account.id(), treasury_account.id(), naming_account.clone()).await.unwrap();
+    let initialize_input_note = create_naming_initialize_note(owner_account.id(), owner_account.id(), naming_account.clone()).await.unwrap();
 
     builder.add_note(OutputNote::Full(initialize_input_note.clone()));
 
@@ -216,13 +211,10 @@ async fn test_naming_init() -> anyhow::Result<()> {
     
     let init_flag = updated_naming_account.storage().get_item(0)?.get(0).unwrap().as_int();
     let owner_slot = updated_naming_account.storage().get_item(1)?;
-    let trasury_slot = updated_naming_account.storage().get_item(2)?;
 
     assert_eq!(init_flag, 1);
     assert_eq!(owner_account.id().prefix().as_u64(), owner_slot.get(1).unwrap().as_int());
     assert_eq!(owner_account.id().suffix().as_int(), owner_slot.get(0).unwrap().as_int());
-    assert_eq!(treasury_account.id().prefix().as_u64(), trasury_slot.get(1).unwrap().as_int());
-    assert_eq!(treasury_account.id().suffix().as_int(), trasury_slot.get(0).unwrap().as_int());
     Ok(())
 }
 

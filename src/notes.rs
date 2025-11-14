@@ -10,7 +10,7 @@ pub fn get_note_code(note_name: String) -> String {
     fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", note_name))).unwrap()
 }
 
-pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountId, treasury: AccountId, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountId, naming: Account) -> Result<Note, Error> {
     let note_code = get_note_code("initialize_naming".to_string());
     let account_code= get_naming_account_code();
 
@@ -24,8 +24,6 @@ pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountI
         .unwrap();
 
     let note_inputs =NoteInputs::new([
-        Felt::new(treasury.suffix().into()),
-        Felt::new(treasury.prefix().into()),
         Felt::new(owner.suffix().into()),
         Felt::new(owner.prefix().into())
     ].to_vec()).unwrap();
