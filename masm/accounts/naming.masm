@@ -1,6 +1,7 @@
 use.miden::account
 use.miden::account_id
 use.miden::note
+use.miden::tx
 
 ## Storage Slots
 const.INIT_FLAG_SLOT=0
@@ -15,6 +16,7 @@ const.REF_CLAIMED_REVENUE_SLOT=8
 const.DOMAIN_COUNT_SLOT=9
 const.TOTAL_REVENUE_SLOT=10 # protocol total revenue map([0, 0, token_prefix, token_suffix] -> amount)
 const.CLAIMED_REVENUE_SLOT=11
+const.DOMAIN_LENGTHS=12 # domain expiry dates map(DOMAIN -> expiry timestamp)
 
 ## Errors
 const.ERR_ONLY_OWNER="Only owner"
@@ -23,7 +25,7 @@ const.ERR_ALREADY_INITIALIZED="Contract already initialized"
 const.ERR_PAYMENT_TOKEN_NOT_ALLOWED="This payment token not allowed"
 const.ERR_PRICE_ZERO="Price zero for this length"
 const.ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
-const.ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less that price"
+const.ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less than price"
 const.ERR_DOMAIN_NOT_AVAILABLE="Domain is already taken"
 const.ERR_DOMAIN_LENGTH_TOO_HIGH="21 characters allowed"
 const.ERR_REF_RATE_OVERLIMIT="Ref rate higher or equal to 10000"
@@ -33,6 +35,10 @@ const.ERR_REF_NOT_EXIST="Referrer rate is zero"
 const.DOMAIN_LENGTH_TOO_HIGH="Maximum 21 characters allowed"
 const.ERR_INVALID_DOMAIN_LENGTH="Domain length field does not match actual character count"
 const.ERR_EMPTY_DOMAIN="Domain length zero"
+const.ERR_CALCULATE_DISCOUNT_OVERFLOW="Overflow at discount calc"
+const.ERR_CALCULATE_DISCOUNT_UNDERFLOW="Underflow at discount calc"
+const.ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH="Max 10 years"
+const.ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH="Timestamp len overflow"
 
 ## Memory Pointers
 
@@ -40,9 +46,14 @@ const.MEM_DOMAIN=0x0020 # WORD
 const.MEM_PAYMENT_TOKEN=0x0024 # WORD
 const.MEM_REFERRER=0x0028 # WORD
 const.MEM_DOMAIN_NEW_OWNER=0x002C # WORD
+const.MEM_REG_LEN=0x0030 # WORD
 
 ## Constants
+const.YEAR=31536000 # In seconds
+const.MAX_REG_LEN=10 # Years
 const.MAX_NAME_LENGTH=21
+const.FIVE_YR_DISCOUNT=5000 # 50%
+const.THREE_YR_DISCOUNT=3000 # 30%
 const.MAX_REF_RATE=10000 # Basis point
 const.REF_RATE_LIMIT=2500 # %25
 const.DOMAIN_LETTER_PRICE_BREAKPOINT=5 # After 5 letters constant price
@@ -54,11 +65,12 @@ const.PAD_3RD_CHAR=65536
 const.PAD_2ND_CHAR=256
 const.PAD_1ST_CHAR=1
 
-# Input: [PAYMENT_TOKEN, DOMAIN]
+# Input: [PAYMENT_TOKEN, DOMAIN, REG_LEN]
 # Output: []
 export.register
     mem_storew.MEM_PAYMENT_TOKEN dropw
     mem_storew.MEM_DOMAIN dropw
+    mem_storew.MEM_REG_LEN dropw
     # []
     exec._assert_domain_available
     exec._assert_domain_rules
@@ -76,6 +88,9 @@ export.register
     exec.note::get_sender
     exec._update_domain_map
 
+    # Set domain len
+    exec._extend_domain_length
+
     exec._calculate_domain_price
     # [price]
     exec._increase_total_revenue
@@ -84,11 +99,12 @@ export.register
     exec._after_domain_register
 end
 
-# Input: [REFERRER, PAYMENT_TOKEN, DOMAIN]
+# Input: [REFERRER, PAYMENT_TOKEN, DOMAIN, REG_LEN]
 export.register_with_referrer
     mem_storew.MEM_REFERRER dropw
     mem_storew.MEM_PAYMENT_TOKEN dropw
     mem_storew.MEM_DOMAIN dropw
+    mem_storew.MEM_REG_LEN dropw
     # []
     exec._assert_domain_available
     exec._assert_domain_rules
@@ -105,6 +121,9 @@ export.register_with_referrer
     # Update domain map
     exec.note::get_sender
     exec._update_domain_map
+
+    # Set domain len
+    exec._extend_domain_length
 
     exec._calculate_domain_price
     # [price]
@@ -272,6 +291,25 @@ proc._update_domain_owner
     # []
 end
 
+# Input: [] Memory [DOMAIN, REG_LEN]
+proc._extend_domain_length
+    padw mem_loadw.MEM_REG_LEN drop drop drop
+    # [reg_len]
+    dup lte.MAX_REG_LEN assert.err=ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH
+    # [reg_len]
+    push.YEAR u32overflowing_mul assertz.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
+    # [len * year]
+    exec.tx::get_block_timestamp
+    # [timestamp, len * yr]
+    u32overflowing_add assertz.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
+    push.0.0.0
+    # [END_TIME]
+    padw mem_loadw.MEM_DOMAIN
+    # [DOMAIN, END_TIME]
+    push.DOMAIN_LENGTHS exec.account::set_map_item dropw dropw
+    # []
+end
+
 # Input: []
 # Output: []
 proc._after_domain_register
@@ -289,7 +327,7 @@ proc._increase_domain_count
     push.DOMAIN_COUNT_SLOT exec.account::set_item dropw
 end
 
-# Input: [] Memory [DOMAIN, PAYMENT_TOKEN]
+# Input: [] Memory [DOMAIN, PAYMENT_TOKEN, REG_LEN]
 # Output: [price]
 # Call it after validate domain
 proc._calculate_domain_price
@@ -300,6 +338,46 @@ proc._calculate_domain_price
     push.0
     push.PRICES_SLOT exec.account::get_map_item drop drop drop
     # [price]
+    exec._calculate_discount
+    # [discounted_price]
+    padw mem_loadw.MEM_REG_LEN drop drop drop
+    # [reg_len, discounted_price]
+    u32assert2 u32overflowing_mul assertz.err=ERR_CALCULATE_DISCOUNT_OVERFLOW
+
+end
+
+# Input: [price] Memory [REG_LEN]
+# Output: [discounted_price]
+proc._calculate_discount
+    padw mem_loadw.MEM_REG_LEN drop drop drop
+    # [reg_len, price]
+    dup gte.5
+    if.true
+        # [reg_len, price]
+        drop dup 
+        # [price, price]
+        push.FIVE_YR_DISCOUNT u32assert2 u32overflowing_mul
+        assertz.err=ERR_CALCULATE_DISCOUNT_OVERFLOW
+        u32assert2 u32div.10000
+        u32assert2 u32overflowing_sub assertz.err=ERR_CALCULATE_DISCOUNT_UNDERFLOW
+        # [discounted_price]
+        
+    else
+        # [reg_len, price]
+        gte.3
+        if.true
+            # [price]
+            dup
+            push.THREE_YR_DISCOUNT u32assert2 u32overflowing_mul
+            assertz.err=ERR_CALCULATE_DISCOUNT_OVERFLOW
+            u32assert2 u32div.10000
+            u32assert2 u32overflowing_sub assertz.err=ERR_CALCULATE_DISCOUNT_UNDERFLOW
+            # [discounted price]
+        else
+            # [price]
+            nop
+        end
+    end
 end
 
 # Input: [] Memory [PAYMENT_TOKEN]
@@ -371,11 +449,21 @@ end
 # Output: []
 proc._assert_domain_available
     padw mem_loadw.MEM_DOMAIN
-    push.DOMAIN_TO_OWNER_SLOT
-    exec.account::get_map_item drop drop
-    push.0.0 exec.account_id::is_equal
+    # First check is domain expired
+    push.DOMAIN_LENGTHS
+    exec.account::get_map_item drop drop drop
+    # [expiry_time]
+    exec.tx::get_block_timestamp
+    # [current_time, expiry_time]
+    u32assert2 u32lt 
+    if.false
+        padw mem_loadw.MEM_DOMAIN
+        push.DOMAIN_TO_OWNER_SLOT
+        exec.account::get_map_item drop drop
+        push.0.0 exec.account_id::is_equal
 
-    assert.err=ERR_DOMAIN_NOT_AVAILABLE
+        assert.err=ERR_DOMAIN_NOT_AVAILABLE
+    end
 end
 
 # Input: [] Memory [DOMAIN]

@@ -171,7 +171,7 @@ async fn test_naming_register() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -216,6 +216,116 @@ async fn test_naming_register() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+async fn test_naming_register_discount() -> anyhow::Result<()> {
+    let mut setup = init_contract().await?;
+
+    let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 278 * 5)?;
+    let domain = encode_domain("test".to_string());
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account.id(), 
+        setup.fungible_asset.faucet_id(), 
+        domain, 
+        asset,
+        5
+        
+    ).await?;
+
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    // Register name
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await?;
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+
+    let domain_to_id_map = updated_naming_account.storage().get_map_item(4, domain).unwrap();
+    let id_to_domain_map = updated_naming_account.storage().get_map_item(3, Word::new([Felt::new(setup.domain_registrar_account.id().suffix().as_int()), Felt::new(setup.domain_registrar_account.id().prefix().as_felt().as_int()), Felt::new(0), Felt::new(0)])).unwrap();
+    let domain_to_owner_map = updated_naming_account.storage().get_map_item(5, domain).unwrap();
+
+    assert_eq!(domain_to_id_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_id_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    assert_eq!(id_to_domain_map, domain);
+
+    assert_eq!(domain_to_owner_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_owner_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    let total_revenue = updated_naming_account.storage().get_map_item(10, Word::new([Felt::new(asset.faucet_id().suffix().as_int()), Felt::new(asset.faucet_id().prefix().as_u64()), Felt::new(0),Felt::new(0)]))?;
+
+    assert_eq!(total_revenue.get(0).unwrap().as_int(),1390);
+    
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_naming_register_discount_3_yr() -> anyhow::Result<()> {
+    let mut setup = init_contract().await?;
+
+    let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 1167)?;
+    let domain = encode_domain("test".to_string());
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account.id(), 
+        setup.fungible_asset.faucet_id(), 
+        domain, 
+        asset,
+        3
+        
+    ).await?;
+
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    // Register name
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await?;
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+
+    let domain_to_id_map = updated_naming_account.storage().get_map_item(4, domain).unwrap();
+    let id_to_domain_map = updated_naming_account.storage().get_map_item(3, Word::new([Felt::new(setup.domain_registrar_account.id().suffix().as_int()), Felt::new(setup.domain_registrar_account.id().prefix().as_felt().as_int()), Felt::new(0), Felt::new(0)])).unwrap();
+    let domain_to_owner_map = updated_naming_account.storage().get_map_item(5, domain).unwrap();
+
+    assert_eq!(domain_to_id_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_id_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    assert_eq!(id_to_domain_map, domain);
+
+    assert_eq!(domain_to_owner_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_owner_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    let total_revenue = updated_naming_account.storage().get_map_item(10, Word::new([Felt::new(asset.faucet_id().suffix().as_int()), Felt::new(asset.faucet_id().prefix().as_u64()), Felt::new(0),Felt::new(0)]))?;
+
+    assert_eq!(total_revenue.get(0).unwrap().as_int(), 1167);
+    
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_naming_register_exist_name() -> anyhow::Result<()> {
     let mut setup = init_contract().await?;
 
@@ -226,7 +336,7 @@ async fn test_naming_register_exist_name() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -260,7 +370,7 @@ async fn test_naming_register_exist_name() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        updated_naming_account.clone()
+        1
         
     ).await?;
 
@@ -297,7 +407,7 @@ async fn test_naming_register_wrong_payment() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -335,7 +445,7 @@ async fn test_naming_transfer_domain() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -408,7 +518,7 @@ async fn test_naming_transfer_domain_not_from_owner() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -478,7 +588,7 @@ async fn test_naming_register_empty_domain() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -518,7 +628,7 @@ async fn test_naming_register_two_felts_domain() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -569,7 +679,7 @@ async fn test_naming_register_three_felts_domain() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -620,7 +730,7 @@ async fn test_naming_register_max_length_domain() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 
@@ -671,7 +781,7 @@ async fn test_naming_register_domain_length_too_high() -> anyhow::Result<()> {
         setup.fungible_asset.faucet_id(), 
         domain, 
         asset,
-        setup.naming_account.clone()
+        1
         
     ).await?;
 

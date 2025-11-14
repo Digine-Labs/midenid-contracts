@@ -24,6 +24,7 @@ pub fn naming_storage() -> Vec<StorageSlot> {
         empty_storage_value(),
         empty_storage_map(),
         empty_storage_map(),
+        empty_storage_map(),
         ];
     return storage_slots;
 }

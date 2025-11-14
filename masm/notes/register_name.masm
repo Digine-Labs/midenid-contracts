@@ -1,16 +1,18 @@
 use.miden_name::naming
 use.miden::note
+use.miden::tx
 use.std::sys
 
 const.TOKEN_PTR=0
 const.DOMAIN_PTR=4
-# Input (arguments): [TOKEN, DOMAIN]
+const.REG_LEN_PTR=8
+# Input (arguments): [TOKEN, DOMAIN, REG_LEN]
 begin
     push.0
     exec.note::get_inputs
     drop drop
-    padw mem_loadw.DOMAIN_PTR padw mem_loadw.TOKEN_PTR
-    # [prefix, suffix, DOMAIN]
+    padw mem_loadw.REG_LEN_PTR padw mem_loadw.DOMAIN_PTR padw mem_loadw.TOKEN_PTR
+    # [TOKEN, DOMAIN, REG_LEN]
     call.naming::register
     exec.sys::truncate_stack
 end

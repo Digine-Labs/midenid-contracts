@@ -220,7 +220,7 @@ pub async fn create_pricing_initialize_note(tx_sender: AccountId, token: Account
     Ok(note)
 }
 
-pub async fn create_naming_register_name_note(tx_sender: AccountId, payment_token: AccountId, domain: Word, asset: FungibleAsset, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_register_name_note(tx_sender: AccountId, payment_token: AccountId, domain: Word, asset: FungibleAsset, duration: u64) -> Result<Note, Error> {
        let note_code = get_note_code("register_name".to_string());
     let account_code= get_naming_account_code();
 
@@ -241,7 +241,11 @@ pub async fn create_naming_register_name_note(tx_sender: AccountId, payment_toke
         Felt::new(domain.get(0).unwrap().as_int()),
         Felt::new(domain.get(1).unwrap().as_int()),
         Felt::new(domain.get(2).unwrap().as_int()),
-        Felt::new(domain.get(3).unwrap().as_int())
+        Felt::new(domain.get(3).unwrap().as_int()),
+        Felt::new(duration),
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0)
     ].to_vec()).unwrap();
 
     let mut client = instantiate_client(Endpoint::testnet())
