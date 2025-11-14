@@ -8,22 +8,28 @@ const.ERR_ONLY_OWNER="Only owner"
 const.ERR_ONLY_DOMAIN_OWNER="Only domain owner"
 const.ERR_ALREADY_INITIALIZED="Contract already initialized"
 const.ERR_PAYMENT_TOKEN_NOT_ALLOWED="This payment token not allowed"
+const.ERR_PRICE_ZERO="Price zero for this length"
 const.ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
 const.ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less that price"
 const.ERR_DOMAIN_NOT_AVAILABLE="Domain is already taken"
 const.ERR_DOMAIN_LENGTH_TOO_HIGH="21 characters allowed"
+const.ERR_REF_RATE_OVERLIMIT="Ref rate higher or equal to 10000"
 const.ERR_REF_RATE_TOO_HIGH="Max 2500 ref rate"
+const.ERR_REF_RATE_ZERO="Ref rate zero"
 const.ERR_REF_NOT_EXIST="Referrer rate is zero"
+const.DOMAIN_LENGTH_TOO_HIGH="Maximum 21 characters allowed"
+const.ERR_INVALID_DOMAIN_LENGTH="Domain length field does not match actual character count"
+const.ERR_EMPTY_DOMAIN="Domain length zero"
 
 ## Constants
 const.INIT_FLAG_SLOT=0
 const.OWNER_SLOT=1
 const.TREASURY_SLOT=2
-const.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT=3
+const.PRICES_SLOT=3
+#const.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT=3
 const.ACCOUNT_ID_TO_DOMAIN_SLOT=4
 const.DOMAIN_TO_ACCOUNT_ID_SLOT=5
 const.DOMAIN_TO_OWNER_SLOT=6
-const.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT=7
 const.REF_RATE_SLOT=8
 const.REF_TOTAL_REVENUE_SLOT=9
 const.REF_CLAIMED_REVENUE_SLOT=10
@@ -31,21 +37,33 @@ const.DOMAIN_COUNT_SLOT=11
 const.TOTAL_REVENUE_SLOT=12
 const.CLAIMED_REVENUE_SLOT=13
 
+
 const.MAX_NAME_LENGTH=21
 const.MAX_REF_RATE=10000 # Basis point
 const.REF_RATE_LIMIT=2500 # %25
+const.DOMAIN_LETTER_PRICE_BREAKPOINT=5 # After 5 letters constant price
+
+const.MAX_FELT_PART=0xFFFFFFFFFFFFFF # 8*7 bits
+
+const.PAD_4TH_CHAR=16777216
+const.PAD_3RD_CHAR=65536
+const.PAD_2ND_CHAR=256
+const.PAD_1ST_CHAR=1
 
 ## Memory Addresses
 const.MEM_REFERRER_RATE=0x0040
 const.MEM_REFERRER=0x0020
 const.MEM_PAYMENT_TOKEN=0x0024
 const.MEM_DOMAIN=0x0028
+const.MEM_SET_PRICE_KEY=0x0060
+const.MEM_DOMAIN_TOTAL_PRICE=0x0030
+
 
 ## Storage
 # 0: init flag [0, 0, 0, flag]
 # 1: owner [0, 0, prefix, suffix]
 # 2: treasury [0, 0, prefix, suffix]
-# 3: map(payment_token -> pricing contract ID)
+# 3: domain prices map([0, letter_count, payment_token_prefix, payment_token_suffix] -> [PRICE])
 # 4: Account to domain map([0, 0, account_prefix, account_suffix] -> DOMAIN)
 # 5: Domain to account map(DOMAIN -> [0, 0, account_prefix, account_suffix])
 # 6: Domain to owner map(DOMAIN -> [0, 0, owner_prefix, owner_suffix])
@@ -56,6 +74,7 @@ const.MEM_DOMAIN=0x0028
 # 11: total registered domains [0, 0, 0, total_supply]
 # 12: protocol total revenue map([0, 0, token_prefix, token_suffix] -> amount)
 # 13: claimed protocol revenue map([0, 0, token_prefix, token_suffix] -> amount)
+
 
 
 # Input: [owner_prefix, owner_suffix, treasury_prefix, treasury_suffix]
@@ -80,6 +99,7 @@ export.init
 end
 
 # Input: [referrer_prefix, referrer_suffix, token_prefix, token_suffix, DOMAIN]
+# Output: []
 export.register_with_referrer
     push.0.0
     mem_storew.MEM_REFERRER dropw
@@ -93,25 +113,32 @@ export.register_with_referrer
     # [REFERRER]
     exec._assert_referrer_exist
     # []
-    padw mem_loadw.MEM_DOMAIN dupw dupw dupw
-    # [DOMAIN, DOMAIN, DOMAIN]
+    padw mem_loadw.MEM_DOMAIN dupw 
+    # [DOMAIN, DOMAIN]
     exec._assert_domain_available
     exec._assert_domain_rules
-    # [DOMAIN, DOMAIN]
-    exec.note::get_sender
-    # [caller_prefix, caller_suffix, DOMAIN, DOMAIN]
-    exec._update_domain_map
-    # [DOMAIN]
-    exec.note::get_sender
-    exec._update_domain_owner
+    # Now we can trust length is correct
+    padw mem_loadw.MEM_PAYMENT_TOKEN drop drop
+    # [token_prefix, token_suffix]
+    exec._assert_payment_token
     # []
-    padw mem_loadw.MEM_DOMAIN
-    padw mem_loadw.MEM_PAYMENT_TOKEN
-    push.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT exec.account::get_map_item
-    # [PRICING_CONTRACT]
-    padw eqw assertz.err=ERR_PAYMENT_TOKEN_NOT_ALLOWED dropw
-    # []
-    # TODO: Remove pricing contract
+    # receive payment
+    padw mem_loadw.MEM_PAYMENT_TOKEN drop drop
+    # [token_prefix, token_suffix]
+    padw mem_loadw.MEM_DOMAIN exec._get_domain_length
+    # [length, token_prefix, token_suffix]
+    push.0 push.PRICE_SLOT exec.account::get_map_item drop drop drop
+    # [price]
+    dup gt.0 assert.err=ERR_PRICE_ZERO
+    # [price]
+    dup 
+    # [price, price]
+    padw mem_loadw.MEM_PAYMENT_TOKEN drop drop
+    exec._receive_payment
+    # [price]
+    exec._add_referrer_reward
+    # [ref_deducted_amt]
+
 end
 
 # Input: [payment_token_prefix, payment_token_suffix, DOMAIN]
@@ -229,6 +256,21 @@ export.receive_asset
 end
 
 ## Only Owner
+# Input: [letter_count, token_prefix, token_suffix, price]
+# []
+export.set_price
+    exec._assert_only_owner
+    push.0
+    mem_storew.MEM_SET_PRICE_KEY dropw
+    push.0.0.0
+    # [PRICE]
+    padw mem_loadw.MEM_SET_PRICE_KEY
+    # [KEY, PRICE]
+    push.PRICES_SLOT
+    exec.account::set_map_item dropw dropw
+    # []
+end
+
 # Input: [new_owner_prefix, new_owner_suffix]
 # Output: []
 export.update_registry_owner
@@ -259,40 +301,6 @@ export.update_treasury
     dropw
 end
 
-# Input: [token_prefix, token_suffix, contract_prefix, contract_suffix]
-# Output: []
-export.set_payment_token_contract
-    exec._assert_only_owner
-    # [token_prefix, token_suffix, contract_prefix, contract_suffix]
-    push.0.0
-    # [0, 0, token_prefix, token_suffix, contract_prefix, contract_suffix]
-    movup.5 movup.5
-    # [contract_prefix, contract_suffix, 0, 0, token_prefix, token_suffix]
-    movdn.3 movdn.3
-    # [0, 0, contract_prefix, contract_suffix, token_prefix, token_suffix]
-    push.0.0
-    # [0, 0, 0, 0, contract_prefix, contract_suffix, token_prefix, token_suffix]
-    movup.7 movup.7
-    # [token_prefix, token_suffix, 0, 0, 0, 0, contract_prefix, contract_suffix]
-    movdn.3 movdn.3
-    # [0, 0, token_prefix, token_suffix, 0, 0, contract_prefix, contract_suffix]
-    push.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT
-    # [10, 0, 0, token_prefix, token_suffix, 0, 0, contract_prefix, contract_suffix]
-    exec.account::set_map_item
-    # [OLD_VALUE, OLD_KEY]
-    dropw dropw
-    # []
-end
-
-# Input: [PRICING_CONTRACT, PROC_ROOT]
-# Output: []
-export.set_calculate_price_root
-    exec._assert_only_owner
-    push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT
-    exec.account::set_map_item dropw dropw
-    # []
-end
-
 # Input: [ref_prefix, ref_suffix, rate]
 # Output: []
 export.set_referral_rate
@@ -314,16 +322,6 @@ export.set_referral_rate
     push.REF_RATE_SLOT
     exec.account::set_map_item dropw dropw
     # []
-end
-
-## Internal procedures
-# Input: [pricing_contract_prefix, pricing_contract_suffix]
-# Output: [ROOT]
-proc._get_calculate_price_root
-    push.0.0
-    push.PRICING_CONTRACT_TO_CALCULATE_PROC_ROOT_SLOT
-    exec.account::get_map_item
-    # [ROOT]
 end
 
 ### Clears domain to account and account to domain mapping if this domain set as default domain.
@@ -394,16 +392,17 @@ proc._update_domain_owner
 end
 
 # Input: [token_prefix, token_suffix]
-# Output: [1 or 0]
-proc._is_token_available_for_payment
-    push.PAYMENT_TOKEN_TO_CONTRACT_ID_SLOT
-    exec.account::get_map_item drop drop
-    # [contract_prefix, contract_suffix]
-    push.0.0
-    exec.account_id::is_equal
-    # [1 if token contract zero]
-    not
-    # [1 or 0]
+# Output: []
+proc._assert_payment_token
+    push.1
+    # [letter, prefix, suffix]
+    push.0
+    # [PRICES_KEY]
+    push.PRICES
+    exec.account::get_map_item drop drop drop
+    # [price]
+    gt.0 assert.err=ERR_PAYMENT_TOKEN_NOT_ALLOWED
+    # []
 end
 
 # Input: [DOMAIN]
@@ -434,6 +433,10 @@ end
 # Input: [DOMAIN]
 # Output: []
 proc._assert_domain_rules
+    dupw
+    # [DOMAIN, DOMAIN]
+    exec._validate_domain_length
+    # [DOMAIN]
     lte.MAX_NAME_LENGTH
     # [len_check, f1, f2, f3]
     assert.err=ERR_DOMAIN_LENGTH_TOO_HIGH
@@ -515,7 +518,106 @@ proc._assert_referrer_exist
     # []
 end
 
-# Input: [REFERRER, TOKEN, amount]
-# Output: []
+# Input: Stack [total_amt] Memory [REFERRER, TOKEN, price]
+# Output: [ref_deducted_amount]
 proc._add_referrer_reward
+    # [total_amt]
+    padw mem_loadw.MEM_REFERRER
+    # [REFERRER, total_amt]
+    push.REF_RATE_SLOT exec.account::get_map_item drop drop drop
+    # [ref_rate, total_amt]
+    dup gt.0 assert.err=ERR_REF_RATE_ZERO
+    dup lt.MAX_REF_RATE assert.err=ERR_REF_RATE_OVERLIMIT
+    # [ref_rate, total_amt]
+    swap dup swap.2
+    # [total_amt, ref_rate, total_amt]
+    mul div.10000
+    # [(rate * total) / 10000, total_amt]
+    sub 
+    # [total - ((rate * total) / 10000)]
+
+end
+
+## DOMAIN LENGTH VALIDATIONS
+
+# Input: [DOMAIN]
+# Output: [length]
+proc._get_domain_length
+    swap.3 drop drop drop
+    # [length]
+end
+
+# Input: [length, felt1, felt2, felt3] -> DOMAIN
+# Output: []
+proc._validate_domain_length
+    # Stack: [length, felt1, felt2, felt3]
+    dup eq.0 assertz.err=ERR_EMPTY_DOMAIN
+    movdn.3
+    # [f1, f2, f3, length]
+    exec._count_chars_in_felt
+    # [f1_count, f2, f3, length]
+    movdn.2
+    # [f2, f3, f1_count, length]
+    exec._count_chars_in_felt swap
+    # [f3, f2_count, f1_count, length]
+    exec._count_chars_in_felt
+    # [f3_count, f2_count, f1_count, length]
+    add add 
+    # [f3+f2+f1, length]
+    eq
+    # [1 or 0]
+    assert.err=ERR_INVALID_DOMAIN_LENGTH
+end
+
+# Input: [felt]
+# Output: [count]
+proc._count_chars_in_felt
+    u32split
+    # [u32_high, u32_low]
+    exec._count_chars_in_u32
+    # [count_high, u32_low]
+    swap
+    exec._count_chars_in_u32
+    # [count_low, count_high]
+    add
+    # [count]
+end
+
+# Input: [u32]
+# Output: [count]
+proc._count_chars_in_u32
+    push.0 swap # push count
+    # [u32, count]
+    u32divmod.PAD_4TH_CHAR swap
+    # [bolum, kalan, count]
+    gt.0
+    if.true
+        # [kalan, count]
+        swap 
+        # [count, kalan]
+        add.1 swap
+        # [kalan, count + 1]
+    end
+
+    u32divmod.PAD_3RD_CHAR swap
+    gt.0
+    if.true
+        # [kalan, count]
+        swap 
+        # [count, kalan]
+        add.1 swap
+        # [kalan, count + 1]
+    end
+    u32divmod.PAD_2ND_CHAR swap
+    gt.0
+    if.true
+        swap add.1 swap
+    end
+
+    u32divmod.PAD_1ST_CHAR swap
+    gt.0
+    if.true
+        swap add.1 swap
+    end
+    drop
 end

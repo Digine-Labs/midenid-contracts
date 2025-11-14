@@ -7,7 +7,6 @@ use.std::sys
 ## Errors
 const.ERR_ALREADY_INITIALIZED="Contract already initialized"
 const.ERR_ONLY_PRICE_SETTER="Only price setter"
-const.DOMAIN_PART_HIGH="Only 7 bits per felt"
 const.DOMAIN_LENGTH_TOO_HIGH="Maximum 21 characters allowed"
 const.ERR_INVALID_DOMAIN_LENGTH="Domain length field does not match actual character count"
 const.ERR_EMPTY_DOMAIN="Domain length zero"
