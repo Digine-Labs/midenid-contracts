@@ -9,7 +9,7 @@ begin
     push.0
     exec.note::get_inputs
     drop drop
-    mem_loadw.DOMAIN_PTR padw mem_loadw.TOKEN_PTR drop drop
+    padw mem_loadw.DOMAIN_PTR padw mem_loadw.TOKEN_PTR
     # [prefix, suffix, DOMAIN]
     call.naming::register
     exec.sys::truncate_stack

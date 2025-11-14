@@ -129,9 +129,14 @@ export.transfer
     # []
 end
 
+# Inputs: [TOKEN]
+export.claim_referral_earnings
+    nop
+    # TODO
+end
+
 # Input: [OWNER]
 export.init
-    debug.stack
     push.INIT_FLAG_SLOT exec.account::get_item drop drop drop
     assertz.err=ERR_ALREADY_INITIALIZED
     # [OWNER]
@@ -169,6 +174,19 @@ end
 export.set_price
     exec._assert_only_owner
     push.PRICES_SLOT exec.account::set_map_item dropw dropw
+end
+
+# Input: [TOKEN]
+export.claim_protocol_revenue
+    exec._assert_only_owner
+    # TODO
+end
+
+# Input: [TOKEN]
+export.withdraw_assets
+    exec._assert_only_owner
+    nop
+    # TODO
 end
 
 ## Internal Methods
@@ -343,6 +361,7 @@ proc._assert_only_domain_owner
     exec.account::get_map_item drop drop
     # [owner_prefix, owner_suffix]
     exec.note::get_sender
+    nop
     # [caller_prefix, caller_suffix, owner_prefix, owner_suffix]
     exec.account_id::is_equal assert.err=ERR_ONLY_DOMAIN_OWNER
     # []

@@ -1,0 +1,16 @@
+use.miden_name::naming
+use.miden::note
+use.std::sys
+
+## Input (arguments): [0, letter_count, token_prefix, token_suffix, PRICE]
+begin
+    push.0
+    exec.note::get_inputs
+    # [num_inputs, init_ptr]
+    drop drop
+    mem_loadw.0
+    padw mem_loadw.4
+    # [letter_count, price]
+    call.naming::set_price
+    exec.sys::truncate_stack
+end

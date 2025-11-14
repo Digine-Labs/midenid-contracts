@@ -4,13 +4,13 @@ use.std::sys
 
 const.NEW_OWNER_PTR=0
 
-# Input (arguments): [new_owner_prefix, new_owner_suffix]
+# Input (arguments): [NEW_OWNER]
 begin
     push.0
     exec.note::get_inputs
     drop drop
-    mem_loadw.NEW_OWNER_PTR drop drop
-    # [prefix, suffix]
+    mem_loadw.NEW_OWNER_PTR
+    # [NEW_OWNER]
     call.naming::update_registry_owner
     exec.sys::truncate_stack
 end

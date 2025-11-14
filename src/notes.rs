@@ -78,6 +78,44 @@ pub async fn create_naming_set_payment_token_contract(tx_sender: AccountId, toke
     Ok(note)  
 }
 
+pub async fn create_naming_set_price(tx_sender: AccountId, token: AccountId, price: u64, letter_count: u64) -> Result<Note, Error> {
+    let note_code = get_note_code("set_price".to_string());
+    let account_code= get_naming_account_code();
+
+    let library_path = "miden_name::naming";
+    let library = create_library(account_code, library_path).unwrap();
+
+    let note_script = ScriptBuilder::new(true)
+        .with_dynamically_linked_library(&library)
+        .unwrap()
+        .compile_note_script(note_code)
+        .unwrap();
+
+    let note_inputs =NoteInputs::new([
+        Felt::new(price),
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(token.suffix().as_int()),
+        Felt::new(token.prefix().as_u64()),
+        Felt::new(letter_count),
+        Felt::new(0),
+    ].to_vec()).unwrap();
+
+    let mut client = instantiate_client(Endpoint::testnet())
+    .await?;
+    let serial_number = client.rng().draw_word();
+    let note_recipient = NoteRecipient::new(serial_number, note_script, note_inputs.clone());
+
+    let note_tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local)?; //NoteTag::from_account_id(naming);
+
+    let note_metadata = NoteMetadata::new(tx_sender, NoteType::Public, note_tag, NoteExecutionHint::Always, Felt::new(0)).unwrap();
+
+    let note_assets = NoteAssets::new(vec![]).unwrap();
+    let note = Note::new(note_assets, note_metadata, note_recipient);
+    Ok(note)  
+}
+
 pub async fn create_naming_set_pricing_root(tx_sender: AccountId, root: Word, pricing_contract: AccountId, naming: AccountId) -> Result<Note, Error> {
     let note_code = get_note_code("set_pricing_root".to_string());
     let account_code= get_naming_account_code();
@@ -220,7 +258,7 @@ pub async fn create_naming_register_name_note(tx_sender: AccountId, payment_toke
     Ok(note)   
 }
 
-pub async fn create_naming_transfer_note(tx_sender: Account, receiver: AccountId, domain: Word, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_transfer_note(tx_sender: Account, receiver: AccountId, domain: Word) -> Result<Note, Error> {
     let note_code = get_note_code("transfer_domain".to_string());
     let account_code= get_naming_account_code();
 

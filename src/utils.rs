@@ -14,12 +14,16 @@ pub fn naming_storage() -> Vec<StorageSlot> {
     let storage_slots: Vec<StorageSlot> = vec![
         empty_storage_value(), // Init flag
         empty_storage_value(), // owner
-        empty_storage_value(), // treasury
         empty_storage_map(), // payment token -> price contract
         empty_storage_map(), // account to domain
         empty_storage_map(), // domain to account
         empty_storage_map(), // domain to owner
         empty_storage_map(), // calculate price root
+        empty_storage_map(),
+        empty_storage_map(),
+        empty_storage_value(),
+        empty_storage_map(),
+        empty_storage_map(),
         ];
     return storage_slots;
 }

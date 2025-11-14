@@ -10,8 +10,8 @@ begin
     push.0
     exec.note::get_inputs
     drop drop
-    mem_loadw.DOMAIN_PTR padw mem_loadw.NEW_OWNER_PTR drop drop
-    # [prefix, suffix, DOMAIN]
+    mem_loadw.DOMAIN_PTR padw mem_loadw.NEW_OWNER_PTR
+    # [NEW_OWNER, DOMAIN]
     call.naming::transfer
     exec.sys::truncate_stack
 end
