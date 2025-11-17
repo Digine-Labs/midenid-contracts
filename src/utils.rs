@@ -25,6 +25,7 @@ pub fn naming_storage() -> Vec<StorageSlot> {
         empty_storage_map(),
         empty_storage_map(),
         empty_storage_map(),
+        empty_storage_value(), // ONE YEAR TIMESTAMP
         ];
     return storage_slots;
 }

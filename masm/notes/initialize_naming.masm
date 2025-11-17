@@ -3,14 +3,15 @@ use.miden::note
 use.std::sys
 
 const.INITIALIZE_NOTE_INPUT_PTR=0
+const.TIMESTAMP_INPUT_PTR=4
 
-# Input (arguments): [owner_prefix, owner_suffix, 0, 0]
+# Input (arguments): [OWNER, TS]
 begin
     push.INITIALIZE_NOTE_INPUT_PTR
     exec.note::get_inputs
     # [num_inputs, init_ptr]
-    drop drop push.INITIALIZE_NOTE_INPUT_PTR
-    mem_loadw
+    drop drop padw mem_loadw.TIMESTAMP_INPUT_PTR
+    padw mem_loadw.INITIALIZE_NOTE_INPUT_PTR
     # [INPUTS]
     call.naming::init
     exec.sys::truncate_stack

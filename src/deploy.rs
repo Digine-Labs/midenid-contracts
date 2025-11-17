@@ -136,7 +136,7 @@ pub async fn initialize_pricing_contract(client: &mut Client<FilesystemKeyStore<
 }
 
 pub async fn initialize_naming_contract(client: &mut Client<FilesystemKeyStore<StdRng>>,initializer_account: AccountId, owner: AccountId, treasury: AccountId, contract: Account) -> anyhow::Result<()> {
-    let initialize_note = create_naming_initialize_note(initializer_account, owner, contract.clone()).await?;
+    let initialize_note = create_naming_initialize_note(initializer_account, owner, 1231231231).await?;
 
     let tx_request = TransactionRequestBuilder::new()
         .own_output_notes(vec![OutputNote::Full(initialize_note)])
@@ -190,7 +190,7 @@ pub async fn initialize_all(
     pricing_contract: Account,
     prices: Vec<Felt>
 ) -> anyhow::Result<()> {
-    let init_naming_note = create_naming_initialize_note(initializer_account, initializer_account, naming_contract.clone()).await?;
+    let init_naming_note = create_naming_initialize_note(initializer_account, initializer_account, 123123123).await?;
     // Initially set setter as initializer_account
     let init_pricing_note = create_pricing_initialize_note(initializer_account, token, initializer_account, pricing_contract.clone()).await?;
 

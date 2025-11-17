@@ -10,7 +10,7 @@ pub fn get_note_code(note_name: String) -> String {
     fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", note_name))).unwrap()
 }
 
-pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountId, naming: Account) -> Result<Note, Error> {
+pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountId, one_year_time: u32) -> Result<Note, Error> {
     let note_code = get_note_code("initialize_naming".to_string());
     let account_code= get_naming_account_code();
 
@@ -25,7 +25,13 @@ pub async fn create_naming_initialize_note(tx_sender: AccountId, owner: AccountI
 
     let note_inputs =NoteInputs::new([
         Felt::new(owner.suffix().into()),
-        Felt::new(owner.prefix().into())
+        Felt::new(owner.prefix().into()),
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(one_year_time.into()),
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
     ].to_vec()).unwrap();
 
     let mut client = instantiate_client(Endpoint::testnet())

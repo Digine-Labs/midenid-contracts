@@ -19,6 +19,7 @@ pub struct InitializedNamingAndPricing {
     //pub pricing_account: Account,
     //pub faucet: Account,
     pub fungible_asset: FungibleAsset,
+    pub one_year_time: u32
 }
 
 async fn init_contract() -> anyhow::Result<InitializedNamingAndPricing>{
@@ -39,7 +40,7 @@ async fn init_contract() -> anyhow::Result<InitializedNamingAndPricing>{
     let initialize_naming_note = create_naming_initialize_note(
         owner_account.id(),
         owner_account.id(),
-        naming_account.clone()
+        500
     ).await.unwrap();
     
     let test_prices = get_test_prices();
@@ -124,6 +125,7 @@ async fn init_contract() -> anyhow::Result<InitializedNamingAndPricing>{
         domain_registrar_account_3,
         naming_account: updated_naming_account,
         fungible_asset: fungible_asset_1,
+        one_year_time: 500
     })
 }
 
@@ -135,7 +137,7 @@ async fn test_naming_init() -> anyhow::Result<()> {
 
     let naming_account = create_naming_account();
 
-    let initialize_input_note = create_naming_initialize_note(owner_account.id(), owner_account.id(), naming_account.clone()).await.unwrap();
+    let initialize_input_note = create_naming_initialize_note(owner_account.id(), owner_account.id(), 500).await.unwrap();
 
     builder.add_note(OutputNote::Full(initialize_input_note.clone()));
 
@@ -153,10 +155,12 @@ async fn test_naming_init() -> anyhow::Result<()> {
     
     let init_flag = updated_naming_account.storage().get_item(0)?.get(0).unwrap().as_int();
     let owner_slot = updated_naming_account.storage().get_item(1)?;
-
+    let timestamp_slot = updated_naming_account.storage().get_item(13)?.get(0).unwrap().as_int();
+    
     assert_eq!(init_flag, 1);
     assert_eq!(owner_account.id().prefix().as_u64(), owner_slot.get(1).unwrap().as_int());
     assert_eq!(owner_account.id().suffix().as_int(), owner_slot.get(0).unwrap().as_int());
+    assert_eq!(timestamp_slot, 500);
     Ok(())
 }
 
@@ -174,7 +178,8 @@ async fn test_naming_register() -> anyhow::Result<()> {
         1
         
     ).await?;
-
+    let current_timestamp = setup.mock_chain.latest_block_header().timestamp();
+    
     setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
     setup.mock_chain.prove_next_block()?;
 
@@ -211,7 +216,208 @@ async fn test_naming_register() -> anyhow::Result<()> {
     let total_revenue = updated_naming_account.storage().get_map_item(10, Word::new([Felt::new(asset.faucet_id().suffix().as_int()), Felt::new(asset.faucet_id().prefix().as_u64()), Felt::new(0),Felt::new(0)]))?;
 
     assert_eq!(total_revenue.get(0).unwrap().as_int(), 555);
+
+    let domain_to_expiry_date_map = updated_naming_account.storage().get_map_item(12, domain).unwrap();
+
+    assert!(domain_to_expiry_date_map.get(0).unwrap().as_int() >= (current_timestamp * setup.one_year_time).into());
     
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_naming_register_expired() -> anyhow::Result<()> {
+    let mut setup = init_contract().await?;
+
+    let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
+    let domain = encode_domain("test".to_string());
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account.id(), 
+        setup.fungible_asset.faucet_id(), 
+        domain, 
+        asset,
+        1
+        
+    ).await?;
+    let current_timestamp = setup.mock_chain.latest_block_header().timestamp();
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+    
+    // Register name
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await?;
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+
+    let domain_to_id_map = updated_naming_account.storage().get_map_item(4, domain).unwrap();
+    let id_to_domain_map = updated_naming_account.storage().get_map_item(3, Word::new([Felt::new(setup.domain_registrar_account.id().suffix().as_int()), Felt::new(setup.domain_registrar_account.id().prefix().as_felt().as_int()), Felt::new(0), Felt::new(0)])).unwrap();
+    let domain_to_owner_map = updated_naming_account.storage().get_map_item(5, domain).unwrap();
+
+    assert_eq!(domain_to_id_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_id_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    assert_eq!(id_to_domain_map, domain);
+
+    assert_eq!(domain_to_owner_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_owner_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    let total_revenue = updated_naming_account.storage().get_map_item(10, Word::new([Felt::new(asset.faucet_id().suffix().as_int()), Felt::new(asset.faucet_id().prefix().as_u64()), Felt::new(0),Felt::new(0)]))?;
+
+    assert_eq!(total_revenue.get(0).unwrap().as_int(), 555);
+
+    let domain_to_expiry_date_map = updated_naming_account.storage().get_map_item(12, domain).unwrap();
+    assert!(domain_to_expiry_date_map.get(0).unwrap().as_int() >= (current_timestamp + setup.one_year_time).into());
+
+    // Manipulate storage
+    let current_timestamp = domain_to_expiry_date_map.get(0).unwrap().as_int();
+    println!("current ts on storage: {}", current_timestamp);
+    
+    //setup.mock_chain.prove_until_block(80)?;
+    let current_timestamp = setup.mock_chain.latest_block_header().timestamp();
+    println!("Current ts: {}", current_timestamp);
+
+    // Try to register again from different account
+
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account_2.id(), 
+        setup.fungible_asset.faucet_id(), 
+        domain, 
+        asset,
+        1
+    ).await?;
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await?;
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+    setup.mock_chain.prove_next_block()?;
+    let domain_to_owner_map = updated_naming_account.storage().get_map_item(5, domain).unwrap();
+
+    assert_eq!(domain_to_owner_map.get(0).unwrap().as_int(), setup.domain_registrar_account_2.id().suffix().as_int());
+    assert_eq!(domain_to_owner_map.get(1).unwrap().as_int(), setup.domain_registrar_account_2.id().prefix().as_felt().as_int());
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_naming_register_not_expired() -> anyhow::Result<()> {
+    let mut setup = init_contract().await?;
+
+    let asset = FungibleAsset::new(setup.fungible_asset.faucet_id(), 555)?;
+    let domain = encode_domain("test".to_string());
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account.id(), 
+        setup.fungible_asset.faucet_id(), 
+        domain, 
+        asset,
+        1
+        
+    ).await?;
+    let current_timestamp = setup.mock_chain.latest_block_header().timestamp();
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+    
+    // Register name
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await?;
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+
+    let domain_to_id_map = updated_naming_account.storage().get_map_item(4, domain).unwrap();
+    let id_to_domain_map = updated_naming_account.storage().get_map_item(3, Word::new([Felt::new(setup.domain_registrar_account.id().suffix().as_int()), Felt::new(setup.domain_registrar_account.id().prefix().as_felt().as_int()), Felt::new(0), Felt::new(0)])).unwrap();
+    let domain_to_owner_map = updated_naming_account.storage().get_map_item(5, domain).unwrap();
+
+    assert_eq!(domain_to_id_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_id_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    assert_eq!(id_to_domain_map, domain);
+
+    assert_eq!(domain_to_owner_map.get(0).unwrap().as_int(), setup.domain_registrar_account.id().suffix().as_int());
+    assert_eq!(domain_to_owner_map.get(1).unwrap().as_int(), setup.domain_registrar_account.id().prefix().as_felt().as_int());
+
+    let total_revenue = updated_naming_account.storage().get_map_item(10, Word::new([Felt::new(asset.faucet_id().suffix().as_int()), Felt::new(asset.faucet_id().prefix().as_u64()), Felt::new(0),Felt::new(0)]))?;
+
+    assert_eq!(total_revenue.get(0).unwrap().as_int(), 555);
+
+    let domain_to_expiry_date_map = updated_naming_account.storage().get_map_item(12, domain).unwrap();
+    assert!(domain_to_expiry_date_map.get(0).unwrap().as_int() >= (current_timestamp + setup.one_year_time).into());
+
+    // Manipulate storage
+    let current_timestamp = domain_to_expiry_date_map.get(0).unwrap().as_int();
+    println!("current ts on storage: {}", current_timestamp);
+    
+    setup.mock_chain.prove_until_block(6)?;
+    let current_timestamp = setup.mock_chain.latest_block_header().timestamp();
+    println!("Current ts: {}", current_timestamp);
+
+    // Try to register again from different account
+
+    let register_name_note = create_naming_register_name_note(
+        setup.domain_registrar_account_2.id(), 
+        setup.fungible_asset.faucet_id(), 
+        domain, 
+        asset,
+        1
+    ).await?;
+    setup.mock_chain.add_pending_note(OutputNote::Full(register_name_note.clone()));
+    setup.mock_chain.prove_next_block()?;
+
+    let register_name_inputs = setup.mock_chain.get_transaction_inputs(
+        setup.naming_account.clone(),
+        None,
+        &[register_name_note.id()],
+        &[]
+    )?;
+
+    let register_name_tx_context = TransactionContextBuilder::new(setup.naming_account.clone())
+        .account_seed(None)
+        .tx_inputs(register_name_inputs)
+        .build()?;
+
+    let executed_tx = register_name_tx_context.execute().await?;
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+    //setup.mock_chain.prove_next_block()?;
+
+    let domain_to_owner_map = updated_naming_account.storage().get_map_item(5, domain).unwrap();
+
+    assert_eq!(domain_to_owner_map.get(0).unwrap().as_int(), setup.domain_registrar_account_2.id().suffix().as_int());
+    assert_eq!(domain_to_owner_map.get(1).unwrap().as_int(), setup.domain_registrar_account_2.id().prefix().as_felt().as_int());
     Ok(())
 }
 
@@ -495,9 +701,11 @@ async fn test_naming_transfer_domain() -> anyhow::Result<()> {
         .tx_inputs(transfer_domain_inputs)
         .build()?;
 
-    let executed_tx = transfer_domain_tx_context.execute().await?;
+    let executed_tx = transfer_domain_tx_context.execute().await;
 
-    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx)?;
+    assert!(executed_tx.is_ok());
+
+    let updated_naming_account = setup.mock_chain.add_pending_executed_transaction(&executed_tx?)?;
 
     let updated_domain_to_owner_map = updated_naming_account.storage().get_map_item(5, domain).unwrap();
 
