@@ -3,15 +3,15 @@ use.miden::note
 use.std::sys
 
 const.TOKEN=0
-const.RECIPIENT=4
+const.NOTE_DETAILS=4
+const.RECIPIENT=8
 
-# Input (arguments): [TOKEN, RECIPIENT]
 begin
     push.0
-    exec.note::get_inputs
-    drop drop
-    mem_loadw.RECIPIENT padw mem_loadw.TOKEN
-    # [TOKEN, RECIPIENT]
+    exec.note::get_inputs drop drop
+
+    mem_loadw.RECIPIENT padw mem_loadw.NOTE_DETAILS padw mem_loadw.TOKEN
+    # [TOKEN, DETAILS, RECIPIENT]
     call.naming::claim_protocol_revenue
     exec.sys::truncate_stack
 end

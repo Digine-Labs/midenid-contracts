@@ -1,5 +1,7 @@
 mod test_utils;
 
+use std::any::Any;
+
 use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteInputs, NoteType}, transaction::OutputNote};
 use miden_crypto::{Felt, Word, rand::RpoRandomCoin};
 use miden_lib::note::create_p2id_note;
@@ -45,13 +47,26 @@ async fn test_claim_protocol_revenue() -> anyhow::Result<()> {
     assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
     
     // Withdraw
-
-
+    // 1,2,3,4 => 4,3,2,1
+    let p2id_note = ctx.chain.add_pending_p2id_note(ctx.naming.id(), ctx.owner.id(), &[], NoteType::Public)?;
+    ctx.chain.prove_next_block()?;
+    let recipient_hash = p2id_note.recipient().digest();
     let claim_inputs = NoteInputs::new([
+        // TOKEN
         Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
         Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()),
         Felt::new(0),
         Felt::new(0),
+        // NOTE_DETAILS
+        Felt::new(p2id_note.metadata().execution_hint().into()), //exec_hint
+        Felt::new(1), //note_type
+        p2id_note.header().metadata().aux(), // aux
+        Felt::new(p2id_note.header().metadata().tag().as_u32().into()), //tag
+        // RECIPIENT
+        Felt::new(recipient_hash.get(0).unwrap().as_int()),
+        Felt::new(recipient_hash.get(1).unwrap().as_int()),
+        Felt::new(recipient_hash.get(2).unwrap().as_int()),
+        Felt::new(recipient_hash.get(3).unwrap().as_int()),
     ].to_vec())?;
     let claim_note = create_note_for_naming("claim_protocol_revenue".to_string(), claim_inputs, ctx.owner.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
     let updated_naming_account = execute_note(&mut ctx.chain, claim_note, updated_account).await?;

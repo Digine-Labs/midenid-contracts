@@ -51,6 +51,7 @@ const.MEM_REFERRER=0x0028 # WORD
 const.MEM_DOMAIN_NEW_OWNER=0x002C # WORD
 const.MEM_REG_LEN=0x0030 # WORD
 const.MEM_RECIPIENT=0x0034 # WORD
+const.MEM_NOTE_DETAILS=0x0038 # Word
 
 ## Constants
 #const.YEAR=31536000 # In seconds
@@ -244,17 +245,21 @@ export.set_price
     push.PRICES_SLOT exec.account::set_map_item dropw dropw
 end
 
-# Input: [TOKEN, RECIPIENT]
+# Input: [TOKEN, NOTE_DETAILS, RECIPIENT]
 export.claim_protocol_revenue
     mem_storew.MEM_PAYMENT_TOKEN dropw
+    mem_storew.MEM_NOTE_DETAILS dropw
     mem_storew.MEM_RECIPIENT dropw
     exec._assert_only_owner
     # Create note
-    mem_loadw.MEM_RECIPIENT
-    push.1 # hint
-    push.1 # note_type
-    push.0 # aux
-    push.0 # tag
+
+
+    padw mem_loadw.MEM_RECIPIENT
+    padw mem_loadw.MEM_NOTE_DETAILS
+    #padw mem_loadw.MEM_PAYMENT_TOKEN
+    debug.stack.8
+    # Stack must be
+    # [tag, aux, note_type, exec_hint, RECIPIENT]
     exec.tx::create_note # TODO
     debug.stack.8
     # Create ASSET word
