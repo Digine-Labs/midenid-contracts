@@ -1,0 +1,17 @@
+use.miden_name::naming
+use.miden::note
+use.std::sys
+
+const.TOKEN=0
+const.RECIPIENT=4
+
+# Input (arguments): [TOKEN, RECIPIENT]
+begin
+    push.0
+    exec.note::get_inputs
+    drop drop
+    mem_loadw.RECIPIENT padw mem_loadw.TOKEN
+    # [TOKEN, RECIPIENT]
+    call.naming::claim_protocol_revenue
+    exec.sys::truncate_stack
+end

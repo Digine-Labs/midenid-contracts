@@ -41,6 +41,7 @@ const.ERR_CALCULATE_DISCOUNT_UNDERFLOW="Underflow at discount calc"
 const.ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH="Max 10 years"
 const.ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH="Timestamp len overflow"
 const.ERR_DOMAIN_NOT_EXPIRED="Domain not expired"
+const.ERR_U32_OVERFLOW="U32 Overflow"
 
 ## Memory Pointers
 
@@ -49,6 +50,7 @@ const.MEM_PAYMENT_TOKEN=0x0024 # WORD
 const.MEM_REFERRER=0x0028 # WORD
 const.MEM_DOMAIN_NEW_OWNER=0x002C # WORD
 const.MEM_REG_LEN=0x0030 # WORD
+const.MEM_RECIPIENT=0x0034 # WORD
 
 ## Constants
 #const.YEAR=31536000 # In seconds
@@ -242,17 +244,32 @@ export.set_price
     push.PRICES_SLOT exec.account::set_map_item dropw dropw
 end
 
-# Input: [TOKEN]
+# Input: [TOKEN, RECIPIENT]
 export.claim_protocol_revenue
+    mem_storew.MEM_PAYMENT_TOKEN dropw
+    mem_storew.MEM_RECIPIENT dropw
     exec._assert_only_owner
-    # TODO
+    # Create note
+    mem_loadw.MEM_RECIPIENT
+    push.1 # hint
+    push.1 # note_type
+    push.0 # aux
+    push.0 # tag
+    exec.tx::create_note
+    debug.stack.8
+    # Create ASSET word
+    # []
+    exec._get_remaining_revenue
+    # [claimable_revenue]
+    exec._get_asset
+    # [ASSET]
 end
 
 # Input: [TOKEN]
 export.withdraw_assets
+    mem_storew.MEM_PAYMENT_TOKEN dropw
     exec._assert_only_owner
     nop
-    # TODO
 end
 
 ## Internal Methods
@@ -309,6 +326,27 @@ proc._increase_total_revenue
     # []
 end
 
+# Input: [] Memory [PAYMENT_TOKEN]
+# Output: [claimable_revenue]
+proc._get_remaining_revenue
+    padw mem_loadw.MEM_PAYMENT_TOKEN
+    push.TOTAL_REVENUE_SLOT exec.account::get_map_item drop drop drop
+    # [total_revenue]
+    padw mem_loadw.MEM_PAYMENT_TOKEN
+    push.CLAIMED_REVENUE_SLOT exec.account::get_map_item drop drop drop
+    # [claimed_revenue, total_revenue]
+    u32assert2 u32overflowing_sub assertz.err=ERR_U32_OVERFLOW
+    # [claimable_revenue]
+end
+
+# Input: [amt] Memory [PAYMENT_TOKEN]
+# Output: [ASSET]
+proc._get_asset
+    push.0 swap
+    padw mem_loadw.MEM_PAYMENT_TOKEN drop drop
+    # [prefix, suffix, amt, 0]
+end
+
 # Input: [account_prefix, account_suffix] Memory [DOMAIN]
 # Output: []
 proc._update_domain_map
@@ -335,7 +373,6 @@ proc._update_domain_owner
     # [DOMAIN, 0, 0, prefix, suffix]
     push.DOMAIN_TO_OWNER_SLOT
     # [slot, DOMAIN, 0, 0, prefix, suffix]
-    debug.stack.12
     exec.account::set_map_item dropw dropw
     # []
 end
@@ -346,7 +383,6 @@ proc._assert_only_domain_owner
     padw mem_loadw.MEM_DOMAIN
     push.DOMAIN_TO_OWNER_SLOT
     # [slot, DOMAIN]
-    debug.stack.12
     exec.account::get_map_item drop drop
     # [owner_prefix, owner_suffix]
     exec.note::get_sender
@@ -558,6 +594,7 @@ end
 proc._validate_domain_length
     # Stack: [length, felt1, felt2, felt3]
     dup eq.0 assertz.err=ERR_EMPTY_DOMAIN
+    dup lte.21 assert.err=ERR_DOMAIN_LENGTH_TOO_HIGH
     movdn.3
     # [f1, f2, f3, length]
     exec._count_chars_in_felt

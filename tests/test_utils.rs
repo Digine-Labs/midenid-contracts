@@ -60,10 +60,6 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     let mut mockchain = builder.build()?;
     let one_year_time: u32 = 500;
 
-    println!("\nNaming Account: {}", naming_account.id().to_hex());
-    println!("Fungible Asset: {}", fungible_asset_1.faucet_id().to_hex());
-    println!("Owner Account: {}", owner_account.id().to_hex());
-
     let initialize_inputs = NoteInputs::new([
         Felt::new(owner_account.id().suffix().into()),
         Felt::new(owner_account.id().prefix().into()),
