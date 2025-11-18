@@ -2,7 +2,6 @@
 name = "midenname-contracts"
 version = "0.1.0"
 edition = "2024"
-default-run = "midenname-contracts"
 
 [dependencies]
 miden-client = { version = "0.11.4", features = ["testing", "tonic", "sqlite"] }

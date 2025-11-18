@@ -10,7 +10,7 @@ begin
     drop drop
     mem_loadw.0
     padw mem_loadw.4
-    # [letter_count, price]
+    # [0, letter_count, token_prefix, token_suffix, PRICE]
     call.naming::set_price
     exec.sys::truncate_stack
 end

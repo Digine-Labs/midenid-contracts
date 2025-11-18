@@ -150,7 +150,7 @@ export.transfer
     # []
 end
 
-# Inputs: [DOMAIN]
+# Input: [DOMAIN]
 # Permissionless function that clears domain mapping for expired domains
 export.clear_expired_domain
     mem_storew.MEM_DOMAIN
@@ -172,6 +172,12 @@ export.clear_expired_domain
     push.DOMAIN_EXPIRY_DATES
     exec.account::set_map_item dropw dropw
     # []
+end
+
+# Input: [DOMAIN]
+export.extend_domain
+    mem_storew.MEM_DOMAIN dropw
+    exec._assert_only_domain_owner
 end
 
 # Inputs: [TOKEN]
