@@ -255,7 +255,7 @@ export.claim_protocol_revenue
     push.1 # note_type
     push.0 # aux
     push.0 # tag
-    exec.tx::create_note
+    exec.tx::create_note # TODO
     debug.stack.8
     # Create ASSET word
     # []
