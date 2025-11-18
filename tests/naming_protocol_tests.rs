@@ -63,10 +63,10 @@ async fn test_claim_protocol_revenue() -> anyhow::Result<()> {
         p2id_note.header().metadata().aux(), // aux
         Felt::new(p2id_note.header().metadata().tag().as_u32().into()), //tag
         // RECIPIENT
-        Felt::new(recipient_hash.get(0).unwrap().as_int()),
-        Felt::new(recipient_hash.get(1).unwrap().as_int()),
-        Felt::new(recipient_hash.get(2).unwrap().as_int()),
-        Felt::new(recipient_hash.get(3).unwrap().as_int()),
+        recipient_hash[0],
+        recipient_hash[1],
+        recipient_hash[2],
+        recipient_hash[3],
     ].to_vec())?;
     let claim_note = create_note_for_naming("claim_protocol_revenue".to_string(), claim_inputs, ctx.owner.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
     let updated_naming_account = execute_note(&mut ctx.chain, claim_note, updated_account).await?;
