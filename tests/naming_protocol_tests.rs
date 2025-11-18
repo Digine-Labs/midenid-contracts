@@ -46,20 +46,12 @@ async fn test_claim_protocol_revenue() -> anyhow::Result<()> {
     
     // Withdraw
 
-    let p2id_note = ctx.chain.add_pending_p2id_note(updated_account.id(), ctx.owner.id(), &[], NoteType::Public)?;
-    ctx.chain.prove_next_block()?;
-    let p2id_recipient = p2id_note.recipient().digest();
-    //ctx.chain.add_pending_p2id_note(sender_account_id, target_account_id, asset, note_type)
-    println!("refcipient digest: {}", p2id_recipient.to_string());
+
     let claim_inputs = NoteInputs::new([
         Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
         Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()),
         Felt::new(0),
         Felt::new(0),
-        p2id_recipient[0],
-        p2id_recipient[1],
-        p2id_recipient[2],
-        p2id_recipient[3],
     ].to_vec())?;
     let claim_note = create_note_for_naming("claim_protocol_revenue".to_string(), claim_inputs, ctx.owner.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
     let updated_naming_account = execute_note(&mut ctx.chain, claim_note, updated_account).await?;
