@@ -1,0 +1,16 @@
+use.miden_name::naming
+use.miden::note
+use.std::sys
+
+const.DOMAIN=0
+
+# Input (arguments): [DOMAIN]
+begin
+    push.0
+    exec.note::get_inputs
+    drop drop
+    mem_loadw.DOMAIN
+    # [DOMAIN]
+    call.naming::activate_domain
+    exec.sys::truncate_stack
+end

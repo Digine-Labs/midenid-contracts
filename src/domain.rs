@@ -85,6 +85,12 @@ pub fn encode_domain(domain: String) -> Word {
     ])
 }
 
+pub fn encode_domain_as_felts(domain: String) -> [Felt;4] {
+    let encoded_domain = encode_domain(domain).to_vec();
+
+    [encoded_domain[0], encoded_domain[1], encoded_domain[2], encoded_domain[3]]
+}
+
 pub fn unsafe_encode_domain(domain: String) -> Word {
     // Validate length: must be > 0 and <= 20
     let len = domain.len();

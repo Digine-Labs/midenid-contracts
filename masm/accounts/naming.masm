@@ -87,8 +87,10 @@ export.register
     exec._update_domain_owner
     # []
     # Update domain map
-    exec.note::get_sender
-    exec._update_domain_map
+    # This feature removed. Domain must be activated after
+    #exec.note::get_sender
+    #exec._update_domain_map
+    exec._clear_domain_mapping
 
     # Set domain len
     exec._extend_domain_length
@@ -121,8 +123,10 @@ export.register_with_referrer
     exec._update_domain_owner
     # []
     # Update domain map
-    exec.note::get_sender
-    exec._update_domain_map
+    # This feature removed. Domain must be activated after
+    #exec.note::get_sender
+    #exec._update_domain_map
+    exec._clear_domain_mapping
 
     # Set domain len
     exec._extend_domain_length
@@ -134,6 +138,16 @@ export.register_with_referrer
     exec._increase_total_revenue
 
     exec._after_domain_register
+end
+
+# Input: [DOMAIN]
+# This function must be called to activate and match domain with account id
+export.activate_domain
+    mem_storew.MEM_DOMAIN dropw
+    exec._assert_only_domain_owner
+
+    exec.note::get_sender
+    exec._update_domain_map
 end
 
 # Inputs: [NEW_OWNER, DOMAIN]
@@ -317,10 +331,28 @@ proc._update_domain_owner
     push.0.0
     # [0,0, prefix, suffix]
     padw mem_loadw.MEM_DOMAIN
+    
     # [DOMAIN, 0, 0, prefix, suffix]
     push.DOMAIN_TO_OWNER_SLOT
     # [slot, DOMAIN, 0, 0, prefix, suffix]
+    debug.stack.12
     exec.account::set_map_item dropw dropw
+    # []
+end
+
+# Input: [] Memory [DOMAIN]
+# Output: []
+proc._assert_only_domain_owner
+    padw mem_loadw.MEM_DOMAIN
+    push.DOMAIN_TO_OWNER_SLOT
+    # [slot, DOMAIN]
+    debug.stack.12
+    exec.account::get_map_item drop drop
+    # [owner_prefix, owner_suffix]
+    exec.note::get_sender
+    nop
+    # [caller_prefix, caller_suffix, owner_prefix, owner_suffix]
+    exec.account_id::is_equal assert.err=ERR_ONLY_DOMAIN_OWNER
     # []
 end
 
@@ -468,21 +500,6 @@ proc._assert_only_owner
     drop drop
     # [owner_prefix, owner_suffix, caller_prefix, caller_suffix]
     exec.account_id::is_equal assert.err=ERR_ONLY_OWNER
-    # []
-end
-
-# Input: [] Memory [DOMAIN]
-# Output: []
-proc._assert_only_domain_owner
-    padw mem_loadw.MEM_DOMAIN
-    push.DOMAIN_TO_OWNER_SLOT
-    # [slot, DOMAIN]
-    exec.account::get_map_item drop drop
-    # [owner_prefix, owner_suffix]
-    exec.note::get_sender
-    nop
-    # [caller_prefix, caller_suffix, owner_prefix, owner_suffix]
-    exec.account_id::is_equal assert.err=ERR_ONLY_DOMAIN_OWNER
     # []
 end
 

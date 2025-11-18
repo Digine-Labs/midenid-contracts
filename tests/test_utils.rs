@@ -64,7 +64,7 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     println!("Fungible Asset: {}", fungible_asset_1.faucet_id().to_hex());
     println!("Owner Account: {}", owner_account.id().to_hex());
 
-    let initialize_inputs =NoteInputs::new([
+    let initialize_inputs = NoteInputs::new([
         Felt::new(owner_account.id().suffix().into()),
         Felt::new(owner_account.id().prefix().into()),
         Felt::new(0),
@@ -77,7 +77,6 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     let init_note = create_note_for_naming("initialize_naming".to_string(), initialize_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
     
     let updated_naming_account = execute_note(&mut mockchain, init_note, naming_account.clone()).await?;
-    println!("Naming initialized");
     // Set prices
 
     let updated_naming_account = set_test_prices(&mut mockchain, owner_account.id(), updated_naming_account, fungible_asset_1.faucet_id()).await?;
@@ -87,7 +86,8 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
         fungible_asset: fungible_asset_1, one_year: one_year_time })
 }
 
-async fn execute_note(chain: &mut MockChain, note: Note, target: Account) -> anyhow::Result<Account> {
+// Target must be updated account always which is returned from this function. do not use ctx.naming all the time
+pub async fn execute_note(chain: &mut MockChain, note: Note, target: Account) -> anyhow::Result<Account> {
     chain.add_pending_note(OutputNote::Full(note.clone()));
     chain.prove_next_block()?;
 
@@ -102,7 +102,7 @@ async fn execute_note(chain: &mut MockChain, note: Note, target: Account) -> any
     Ok(updated_account)
 }
 
-async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets) -> anyhow::Result<Note> {
+pub async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets) -> anyhow::Result<Note> {
     let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
     let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
     let library = create_library(naming_code, "miden_name::naming")?;
@@ -137,7 +137,6 @@ async fn set_test_prices(chain: &mut MockChain, tx_sender: AccountId, naming: Ac
     let prices = get_test_prices();
     let mut updated_naming_account = naming.clone();
     for i in 1..=5 {
-        println!("\nSetting price for letter {}", i);
         let one_letter_inputs = NoteInputs::new([
             prices[i as usize],
             Felt::new(0),
