@@ -17,11 +17,12 @@ name = "export_account"
 path = "src/deploy/export_account.rs"
 
 [dependencies]
-miden-client = { version = "0.11.4", features = ["testing", "tonic", "sqlite"] }
-miden-lib = { version = "0.11.2", default-features = false }
-miden-objects = { version = "0.11.2", default-features = false, features = ["testing"] }
-miden-crypto = { version = "0.15.9", features = ["executable"] }
-miden-assembly = "0.17.0"
+miden-client = { version = "0.12.3", features = ["testing", "tonic"] }
+miden-lib = { version = "0.12.3", default-features = false }
+miden-objects = { version = "0.12.3", default-features = false, features = ["testing"] }
+miden-crypto = { version = "0.18.2", features = ["executable"] }
+miden-assembly = "0.19.1"
+miden-testing = "0.12.3"
 rand = { version = "0.9" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
@@ -29,3 +30,4 @@ tokio = { version = "1.46", features = ["rt-multi-thread", "net", "macros", "fs"
 rand_chacha = "0.9.0"
 miden-client-tools = "0.2.4"
 chrono = "0.4"
+miden-client-sqlite-store = "0.12.3"

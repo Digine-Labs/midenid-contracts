@@ -7,11 +7,9 @@ use midenid_contracts::common::{
 
 use miden_client::{
     Word,
-    account::{AccountIdAddress, Address, AddressInterface},
     rpc::Endpoint,
     transaction::TransactionRequestBuilder,
 };
-use miden_objects::account::NetworkId;
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
@@ -32,20 +30,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -------------------------------------------------------------------------
     let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
 
-    let (counter_contract, counter_seed) =
+    let counter_contract =
         create_public_immutable_contract(&mut client, &counter_code).await?;
 
     client
-        .add_account(&counter_contract, Some(counter_seed), false)
+        .add_account(&counter_contract, false)
         .await
         .unwrap();
-    let addr = AccountIdAddress::new(counter_contract.id(), AddressInterface::Unspecified);
 
-    // build address of faucet
-    let address = Address::AccountId(addr);
     println!(
         "📄 Counter contract ID: {}",
-        address.to_bech32(NetworkId::Testnet)
+        counter_contract.id()
     );
 
     // -------------------------------------------------------------------------
@@ -69,12 +64,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .unwrap();
 
-    let tx_result = client
-        .new_transaction(counter_contract.id(), tx_increment_request)
+    let tx_id = client
+        .submit_new_transaction(counter_contract.id(), tx_increment_request)
         .await
         .unwrap();
-
-    let _ = client.submit_transaction(tx_result.clone()).await;
 
     println!("🚀 Increment transaction submitted – waiting for finality …");
     sleep(Duration::from_secs(7)).await;
@@ -104,7 +97,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔢 Counter value after tx: {}", counter_val);
     println!("✅ Success! The counter was incremented.");
 
-    let tx_id = tx_result.executed_transaction().id();
     println!(
         "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
         tx_id
