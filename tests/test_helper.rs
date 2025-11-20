@@ -346,11 +346,11 @@ impl RegistryTestHelper {
     /// - **Immutable**: Contract code cannot be changed after deployment
     pub async fn deploy_registry_contract(&mut self) -> Result<Account, ClientError> {
         let registry_code = fs::read_to_string(Path::new(paths::REGISTRY_CONTRACT)).unwrap();
-        let (registry_contract, registry_seed) =
+        let registry_contract =
             create_public_immutable_contract(&mut self.client, &registry_code).await?;
 
         self.client
-            .add_account(&registry_contract, Some(registry_seed), false)
+            .add_account(&registry_contract, false)
             .await?;
 
         self.registry_contract = Some(registry_contract.clone());
