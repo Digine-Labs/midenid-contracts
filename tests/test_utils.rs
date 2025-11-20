@@ -55,7 +55,7 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     let domain_registrar_account = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_1.into()])?;
     let domain_registrar_account_2 = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_2.into()])?;
     let domain_registrar_account_3 = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_3.into()])?;
-    let naming_account = create_test_naming_account();
+    let mut naming_account = create_test_naming_account();
     builder.add_account(naming_account.clone())?;
     let mut mockchain = builder.build()?;
     let one_year_time: u32 = 500;
@@ -72,30 +72,32 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     ].to_vec())?;
     let init_note = create_note_for_naming("initialize_naming".to_string(), initialize_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
     
-    let updated_naming_account = execute_note(&mut mockchain, init_note, naming_account.clone()).await?;
+    execute_note(&mut mockchain, init_note, &mut naming_account).await?;
     // Set prices
 
-    let updated_naming_account = set_test_prices(&mut mockchain, owner_account.id(), updated_naming_account, fungible_asset_1.faucet_id()).await?;
+    set_test_prices(&mut mockchain, owner_account.id(), &mut naming_account, fungible_asset_1.faucet_id()).await?;
 
     Ok(TestingContext { chain: mockchain, owner: owner_account, registrar_1: domain_registrar_account, 
-        registrar_2: domain_registrar_account_2, registrar_3: domain_registrar_account_3, naming: updated_naming_account, 
+        registrar_2: domain_registrar_account_2, registrar_3: domain_registrar_account_3, naming: naming_account, 
         fungible_asset: fungible_asset_1, one_year: one_year_time })
 }
 
 // Target must be updated account always which is returned from this function. do not use ctx.naming all the time
-pub async fn execute_note(chain: &mut MockChain, note: Note, target: Account) -> anyhow::Result<Account> {
-    chain.add_pending_note(OutputNote::Full(note.clone()));
+pub async fn execute_note(chain: &mut MockChain, note: Note, target: &mut Account) -> anyhow::Result<()> {
+    let tx_ctx = chain.build_tx_context(target.id(), &[note.id()], &[])?.build()?;
+    //chain.add_pending_note(OutputNote::Full(note.clone()));
+    //chain.prove_next_block()?;
+    let executed_tx = tx_ctx.execute().await?;
+    //let note_inputs = chain.get_transaction_inputs(target.clone(), None, &[note.id()], &[])?;
+    //let tx_context = TransactionContextBuilder::new(target.clone())
+    //      .account_seed(None).tx_inputs(note_inputs).build()?;
+
+    //let executed_tx = tx_context.execute().await?;;
+    target.apply_delta(&executed_tx.account_delta())?;
+    chain.add_pending_executed_transaction(&executed_tx)?;
     chain.prove_next_block()?;
 
-    let note_inputs = chain.get_transaction_inputs(target.clone(), None, &[note.id()], &[])?;
-    let tx_context = TransactionContextBuilder::new(target.clone())
-        .account_seed(None).tx_inputs(note_inputs).build()?;
-
-    let executed_tx = tx_context.execute().await?;;
-    let updated_account = chain.add_pending_executed_transaction(&executed_tx)?;
-    chain.prove_next_block()?;
-
-    Ok(updated_account)
+    Ok(())
 }
 
 pub async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets) -> anyhow::Result<Note> {
@@ -129,9 +131,8 @@ fn create_library(account_code: String, library_path: &str) -> anyhow::Result<Li
     Ok(library)
 }
 
-async fn set_test_prices(chain: &mut MockChain, tx_sender: AccountId, naming: Account, asset: AccountId) -> anyhow::Result<Account> {
+async fn set_test_prices(chain: &mut MockChain, tx_sender: AccountId, naming: &mut Account, asset: AccountId) -> anyhow::Result<()> {
     let prices = get_test_prices();
-    let mut updated_naming_account = naming.clone();
     for i in 1..=5 {
         let one_letter_inputs = NoteInputs::new([
             prices[i as usize],
@@ -146,8 +147,8 @@ async fn set_test_prices(chain: &mut MockChain, tx_sender: AccountId, naming: Ac
 
         let one_letter_note = create_note_for_naming("set_price".to_string(), one_letter_inputs, tx_sender, naming.id(), NoteAssets::new(vec![]).unwrap()).await?;
 
-        updated_naming_account = execute_note(chain, one_letter_note, updated_naming_account.clone()).await?;
+        execute_note(chain, one_letter_note, naming).await?;
     }
 
-    Ok(updated_naming_account)
+    Ok(())
 }

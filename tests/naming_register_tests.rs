@@ -62,12 +62,12 @@ async fn test_naming_register_activate() -> anyhow::Result<()> {
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let updated_account = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await?;
+    execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
 
-    let domain_owner_slot = updated_account.storage().get_map_item(5, domain_word)?;
-    let domain_expiry_slot = updated_account.storage().get_map_item(12, domain_word)?;
-    let domain_to_id = updated_account.storage().get_map_item(4, domain_word)?;
-    let id_to_domain = updated_account.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let domain_owner_slot = ctx.naming.storage().get_map_item(5, domain_word)?;
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
+    let domain_to_id = ctx.naming.storage().get_map_item(4, domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
 
 
     assert_eq!(domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
@@ -82,19 +82,19 @@ async fn test_naming_register_activate() -> anyhow::Result<()> {
     
     // Protocol values
 
-    let total_revenue_slot = updated_account.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555);
 
-    let total_domain_count = updated_account.storage().get_item(9)?;
+    let total_domain_count = ctx.naming.storage().get_item(9)?;
     assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
     
     // Activate domain
 
     let activate_note = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(domain_word.to_vec())?, ctx.registrar_1.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
-    let updated_account = execute_note(&mut ctx.chain, activate_note, updated_account.clone()).await?; // Use always updated account as target
+    execute_note(&mut ctx.chain, activate_note, &mut ctx.naming).await?; // Use always updated account as target
 
-    let domain_to_id = updated_account.storage().get_map_item(4, domain_word)?;
-    let id_to_domain = updated_account.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let domain_to_id = ctx.naming.storage().get_map_item(4, domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
 
     assert_eq!(domain_to_id.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int()); // Now domain mapping must be matched
     assert_eq!(domain_to_id.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().as_u64());
@@ -126,12 +126,12 @@ async fn test_naming_register_activate_by_not_owner() -> anyhow::Result<()> {
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let updated_account = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await?;
+    execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
 
-    let domain_owner_slot = updated_account.storage().get_map_item(5, domain_word)?;
-    let domain_expiry_slot = updated_account.storage().get_map_item(12, domain_word)?;
-    let domain_to_id = updated_account.storage().get_map_item(4, domain_word)?;
-    let id_to_domain = updated_account.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let domain_owner_slot = ctx.naming.storage().get_map_item(5, domain_word)?;
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
+    let domain_to_id = ctx.naming.storage().get_map_item(4, domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
 
 
     assert_eq!(domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
@@ -146,16 +146,16 @@ async fn test_naming_register_activate_by_not_owner() -> anyhow::Result<()> {
     
     // Protocol values
 
-    let total_revenue_slot = updated_account.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555);
 
-    let total_domain_count = updated_account.storage().get_item(9)?;
+    let total_domain_count = ctx.naming.storage().get_item(9)?;
     assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
     
     // Activate domain - should fail because registrar_2 is not the owner
 
     let activate_note = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(domain_word.to_vec())?, ctx.registrar_2.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
-    let result = execute_note(&mut ctx.chain, activate_note, updated_account.clone()).await;
+    let result = execute_note(&mut ctx.chain, activate_note, &mut ctx.naming).await;
 
     // This should fail because registrar_2 is not the domain owner
     assert!(result.is_err(), "Expected activation by non-owner to fail, but it succeeded");
@@ -185,13 +185,13 @@ async fn test_naming_register_already_exist_domain() -> anyhow::Result<()> {
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let updated_account = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await?;
+    execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
 
     // Try to register again with different owner
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_2.id(), ctx.naming.id(), register_asset).await?;
-    let result = execute_note(&mut ctx.chain, note, updated_account).await;
+    let result = execute_note(&mut ctx.chain, note, &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected domain register fails. But it succeeded");
     Ok(())
@@ -220,13 +220,13 @@ async fn test_naming_register_already_exist_domain_from_same_owner() -> anyhow::
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let updated_account = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await?;
+    execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
 
     // Try to register again with different owner
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let result = execute_note(&mut ctx.chain, note, updated_account).await;
+    let result = execute_note(&mut ctx.chain, note, &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected domain register fails. But it succeeded");
     Ok(())
@@ -256,12 +256,12 @@ async fn test_naming_register_two_domains_activate_after() -> anyhow::Result<()>
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let updated_account = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await?;
+    execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
 
-    let domain_owner_slot = updated_account.storage().get_map_item(5, domain_word)?;
-    let domain_expiry_slot = updated_account.storage().get_map_item(12, domain_word)?;
-    let domain_to_id = updated_account.storage().get_map_item(4, domain_word)?;
-    let id_to_domain = updated_account.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let domain_owner_slot = ctx.naming.storage().get_map_item(5, domain_word)?;
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
+    let domain_to_id = ctx.naming.storage().get_map_item(4, domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
 
 
     assert_eq!(domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
@@ -276,19 +276,19 @@ async fn test_naming_register_two_domains_activate_after() -> anyhow::Result<()>
     
     // Protocol values
 
-    let total_revenue_slot = updated_account.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555);
 
-    let total_domain_count = updated_account.storage().get_item(9)?;
+    let total_domain_count = ctx.naming.storage().get_item(9)?;
     assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
     
     // Activate domain
 
     let activate_note = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(domain_word.to_vec())?, ctx.registrar_1.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
-    let updated_account = execute_note(&mut ctx.chain, activate_note, updated_account.clone()).await?; // Use always updated account as target
+    execute_note(&mut ctx.chain, activate_note, &mut ctx.naming).await?; // Use always updated account as target
 
-    let domain_to_id = updated_account.storage().get_map_item(4, domain_word)?;
-    let id_to_domain = updated_account.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let domain_to_id = ctx.naming.storage().get_map_item(4, domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
 
     assert_eq!(domain_to_id.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int()); // Now domain mapping must be matched
     assert_eq!(domain_to_id.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().as_u64());
@@ -316,10 +316,10 @@ async fn test_naming_register_two_domains_activate_after() -> anyhow::Result<()>
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 123)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let updated_account = execute_note(&mut ctx.chain, note, updated_account.clone()).await?;
+    execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
 
-    let second_domain_owner_slot = updated_account.storage().get_map_item(5, second_domain_word)?;
-    let second_domain_expiry_slot = updated_account.storage().get_map_item(12, second_domain_word)?;
+    let second_domain_owner_slot = ctx.naming.storage().get_map_item(5, second_domain_word)?;
+    let second_domain_expiry_slot = ctx.naming.storage().get_map_item(12, second_domain_word)?;
 
     assert_eq!(second_domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
     assert_eq!(second_domain_owner_slot.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().as_u64());
@@ -329,10 +329,10 @@ async fn test_naming_register_two_domains_activate_after() -> anyhow::Result<()>
     // Now activate second domain
 
     let activate_note = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(second_domain_word.to_vec())?, ctx.registrar_1.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
-    let updated_account = execute_note(&mut ctx.chain, activate_note, updated_account.clone()).await?; // Use always updated account as target
+    execute_note(&mut ctx.chain, activate_note, &mut ctx.naming).await?; // Use always updated account as target
 
-    let domain_to_id = updated_account.storage().get_map_item(4, second_domain_word)?;
-    let id_to_domain = updated_account.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let domain_to_id = ctx.naming.storage().get_map_item(4, second_domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
 
     assert_eq!(domain_to_id.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int()); // Now domain mapping must be matched
     assert_eq!(domain_to_id.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().as_u64());
@@ -340,16 +340,16 @@ async fn test_naming_register_two_domains_activate_after() -> anyhow::Result<()>
 
     // Check first domain mapping
 
-    let first_domain_to_id = updated_account.storage().get_map_item(4, domain_word)?;
+    let first_domain_to_id = ctx.naming.storage().get_map_item(4, domain_word)?;
     assert_eq!(first_domain_to_id.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int()); // First domain must remain mapping to old address
     assert_eq!(first_domain_to_id.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().as_u64());
 
     // Ensure protocol values
 
-    let total_revenue_slot = updated_account.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555 + 123);
 
-    let total_domain_count = updated_account.storage().get_item(9)?;
+    let total_domain_count = ctx.naming.storage().get_item(9)?;
     assert_eq!(total_domain_count.get(0).unwrap().as_int(), 2);
     Ok(())
 }
@@ -377,7 +377,7 @@ async fn test_naming_register_less_amount() -> anyhow::Result<()> {
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 554)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let result = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await;
+    let result = execute_note(&mut ctx.chain, note, &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected revert but succeeded.");
     Ok(())
@@ -406,12 +406,12 @@ async fn test_naming_register_higher_amount() -> anyhow::Result<()> {
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 1200)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let updated_account = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await?;
+    execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
 
-    let total_revenue_slot = updated_account.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555); // Protocol only saves actual cost as revenue
 
-    let total_domain_count = updated_account.storage().get_item(9)?;
+    let total_domain_count = ctx.naming.storage().get_item(9)?;
     assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
 
     Ok(())
@@ -440,7 +440,7 @@ async fn test_naming_register_wrong_letter_length() -> anyhow::Result<()> {
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 554)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let result = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await;
+    let result = execute_note(&mut ctx.chain, note, &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected revert but succeeded.");
     Ok(())
@@ -469,7 +469,7 @@ async fn test_naming_register_too_much_letters() -> anyhow::Result<()> {
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 554)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let result = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await;
+    let result = execute_note(&mut ctx.chain, note, &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected revert but succeeded.");
     Ok(())
@@ -498,7 +498,7 @@ async fn test_naming_register_empty_domain() -> anyhow::Result<()> {
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 554)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
     let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let result = execute_note(&mut ctx.chain, note, ctx.naming.clone()).await;
+    let result = execute_note(&mut ctx.chain, note, &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected revert but succeeded.");
     Ok(())

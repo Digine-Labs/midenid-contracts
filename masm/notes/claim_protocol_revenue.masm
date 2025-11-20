@@ -1,5 +1,5 @@
 use.miden_name::naming
-use.miden::note
+use.miden::active_note
 use.std::sys
 
 const.TOKEN=0
@@ -8,9 +8,9 @@ const.RECIPIENT=8
 
 begin
     push.0
-    exec.note::get_inputs drop drop
+    exec.active_note::get_inputs drop drop
 
-    mem_loadw.RECIPIENT padw mem_loadw.NOTE_DETAILS padw mem_loadw.TOKEN
+    mem_loadw_be.RECIPIENT padw mem_loadw_be.NOTE_DETAILS padw mem_loadw_be.TOKEN
     # [TOKEN, DETAILS, RECIPIENT]
     call.naming::claim_protocol_revenue
     exec.sys::truncate_stack

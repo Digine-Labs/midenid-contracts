@@ -9,7 +9,7 @@ begin
     push.0
     exec.note::get_inputs
     drop drop
-    mem_loadw.DOMAIN
+    mem_loadw_be.DOMAIN
     # [DOMAIN]
     call.naming::activate_domain
     exec.sys::truncate_stack
