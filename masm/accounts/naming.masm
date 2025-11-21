@@ -89,7 +89,7 @@ export.register
     exec._receive_payment
     # []
     # Update domain owner
-    exec.input_note::get_sender
+    push.0 exec.input_note::get_sender
     exec._update_domain_owner
     # []
     # Update domain map
@@ -125,7 +125,7 @@ export.register_with_referrer
     exec._receive_payment
     # []
     # Update domain owner
-    exec.input_note::get_sender
+    push.0 exec.input_note::get_sender
     exec._update_domain_owner
     # []
     # Update domain map
@@ -152,7 +152,7 @@ export.activate_domain
     mem_storew_be.MEM_DOMAIN dropw
     exec._assert_only_domain_owner
 
-    exec.input_note::get_sender
+    push.0 exec.input_note::get_sender
     exec._update_domain_map
 end
 
@@ -245,7 +245,8 @@ end
 # Output: []
 export.set_price
     exec._assert_only_owner
-    push.PRICES_SLOT exec.native_account::set_map_item dropw dropw
+    push.PRICES_SLOT 
+    exec.native_account::set_map_item dropw dropw
 end
 
 # Input: [TOKEN, NOTE_DETAILS, RECIPIENT]
@@ -393,7 +394,7 @@ proc._assert_only_domain_owner
     # [slot, DOMAIN]
     exec.active_account::get_map_item drop drop
     # [owner_prefix, owner_suffix]
-    exec.input_note::get_sender
+    push.0 exec.input_note::get_sender
     nop
     # [caller_prefix, caller_suffix, owner_prefix, owner_suffix]
     exec.account_id::is_equal assert.err=ERR_ONLY_DOMAIN_OWNER
@@ -536,7 +537,7 @@ end
 # Input: []
 # Output: []
 proc._assert_only_owner
-    exec.input_note::get_sender
+    push.0 exec.input_note::get_sender
     # [caller_prefix, caller_suffix]
     push.OWNER_SLOT
     exec.active_account::get_item

@@ -2,7 +2,7 @@ use std::{fs, ops::Not, path::Path, sync::Arc};
 
 use anyhow::Ok;
 use miden_assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, ast::{Module, ModuleKind}};
-use miden_client::{ScriptBuilder, account::{Account, AccountBuilder, AccountId, AccountStorageMode}, asset::FungibleAsset, note::{Note, NoteAssets, NoteExecutionHint, NoteId, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::{ExecutedTransaction, OutputNote}};
+use miden_client::{ScriptBuilder, account::{Account, AccountBuilder, AccountId, AccountStorageMode}, asset::FungibleAsset, note::{Note, NoteAssets, NoteExecutionHint, NoteId, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::OutputNote};
 use miden_crypto::{Felt, Word};
 use miden_lib::{account::auth, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
@@ -11,7 +11,7 @@ use midenname_contracts::storage::naming_storage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
-pub fn create_test_naming_account() -> Account {
+fn create_test_naming_account() -> Account {
     let storage_slots = naming_storage();
     let code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
 
@@ -100,16 +100,26 @@ pub fn add_note_to_builder(builder: &mut MockChainBuilder, note: Note) -> anyhow
     Ok(())
 }
 
+pub async fn execute_notes_and_build_chain(builder: MockChainBuilder, note_ids: &[NoteId], target: &mut Account) -> anyhow::Result<MockChain> {
+    let mut chain = builder.build()?;
+
+    for note_id in note_ids {
+        execute_note(&mut chain, *note_id, target).await?;
+    }
+    Ok(chain)
+}
+
 // Target must be updated account always which is returned from this function. do not use ctx.naming all the time
-pub async fn execute_note(chain: &mut MockChain, note_id: NoteId, target: &mut Account) -> anyhow::Result<ExecutedTransaction> {
+pub async fn execute_note(chain: &mut MockChain, note_id: NoteId, target: &mut Account) -> anyhow::Result<()> {
     let tx_ctx = chain.build_tx_context(target.id(), &[note_id], &[])?.build()?;
 
     let executed_tx = tx_ctx.execute().await?;
-    Ok(executed_tx)
-    //target.apply_delta(&executed_tx.account_delta())?;
-    //chain.add_pending_executed_transaction(&executed_tx)?;
-    //chain.prove_next_block()?;
 
+    target.apply_delta(&executed_tx.account_delta())?;
+    chain.add_pending_executed_transaction(&executed_tx)?;
+    chain.prove_next_block()?;
+
+    Ok(())
 }
 
 pub async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets) -> anyhow::Result<Note> {

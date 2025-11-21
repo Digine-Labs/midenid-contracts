@@ -1,124 +1,34 @@
 mod test_utils;
 
-use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteInputs}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::OutputNote};
+use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteInputs}};
 use miden_crypto::{Felt, Word};
-use miden_testing::{Auth, MockChain};
 use midenname_contracts::domain::{encode_domain, encode_domain_as_felts, unsafe_encode_domain};
 use test_utils::init_naming;
 
-use crate::test_utils::{create_note_for_naming, create_test_naming_account, execute_note, get_test_prices};
+use crate::test_utils::{add_note_to_builder, create_note_for_naming, execute_note, execute_notes_and_build_chain, get_test_prices};
 
 #[tokio::test]
 async fn test_naming_initialize() -> anyhow::Result<()> {
-    let mut builder = MockChain::builder();
-
-    let fungible_asset_1 = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 100000).unwrap();
-    let mut naming_account = create_test_naming_account();
-    builder.add_account(naming_account.clone())?;
-
-    let owner_account = builder.add_existing_wallet(Auth::BasicAuth)?;
-    let one_year_time: u32 = 500;
-
-    let initialize_inputs = NoteInputs::new([
-        Felt::new(owner_account.id().suffix().into()),
-        Felt::new(owner_account.id().prefix().into()),
-        Felt::new(0),
-        Felt::new(0),
-        Felt::new(one_year_time.into()),
-        Felt::new(0),
-        Felt::new(0),
-        Felt::new(0),
-    ].to_vec())?;
-    let init_note = create_note_for_naming("initialize_naming".to_string(), initialize_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
-    builder.add_output_note(OutputNote::Full(init_note.clone()));
-
-    let note_inputs = NoteInputs::new([
-            Felt::new(fungible_asset_1.faucet_id().suffix().into()),
-            Felt::new(fungible_asset_1.faucet_id().prefix().into()),
-        ].to_vec())?;
-    let set_prices_note = create_note_for_naming("set_all_prices".to_string(), note_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
-    builder.add_output_note(OutputNote::Full(set_prices_note.clone()));
-
-    let mut chain = builder.build()?;
-
-    let tx_ctx = chain.build_tx_context(naming_account.id(), &[init_note.id()], &[])?.build()?;
-    let executed_tx = tx_ctx.execute().await?;
-
-    chain.add_pending_executed_transaction(&executed_tx)?;
-    chain.prove_next_block()?;
-    naming_account.apply_delta(executed_tx.account_delta())?;
-
-    let init_slot = naming_account.storage().get_item(0)?;
-    let owner_slot = naming_account.storage().get_item(1)?;
-    let one_year_slot = naming_account.storage().get_item(13)?;
-
-    assert_eq!(init_slot.get(0).unwrap().as_int(), 1);
-    assert_eq!(owner_slot.get(1).unwrap().as_int(), owner_account.id().prefix().as_u64());
-    assert_eq!(owner_slot.get(0).unwrap().as_int(), owner_account.id().suffix().as_int());
-    assert_eq!(one_year_slot.get(0).unwrap().as_int(), 500);
-
-    let tx_ctx = chain.build_tx_context(naming_account.id(), &[set_prices_note.id()], &[])?.build()?;
-    let executed_tx = tx_ctx.execute().await?;
-
-    chain.add_pending_executed_transaction(&executed_tx)?;
-    chain.prove_next_block()?;
-    naming_account.apply_delta(executed_tx.account_delta())?;
-
-    let mock_prices = get_test_prices();
-    for i in 1..=5 { 
-        let price_slot = naming_account.storage()
-            .get_map_item(2, 
-                Word::new([
-                        Felt::new(fungible_asset_1.faucet_id().suffix().as_int()),
-                        fungible_asset_1.faucet_id().prefix().as_felt(),
-                        Felt::new(i as u64),
-                        Felt::new(0)
-                    ]))?;
-        println!("w :{}", price_slot.to_string());
-        assert_eq!(price_slot.get(0).unwrap().as_int(), mock_prices[i as usize].as_int());
-    }
-    Ok(())
-}
-
-#[tokio::test]
-#[ignore = "sdsd"]
-async fn test_naming_initializex() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
-
-    let mut naming_account = ctx.naming;
 
     let mut chain = ctx.builder.build()?;
 
-    let init_tx = execute_note(&mut chain, ctx.initialize_note.id(), &mut naming_account).await?;
-    //ctx.naming.apply_delta(executed_tx.account_delta())?;
-    let set_price_tx = execute_note(&mut chain, ctx.set_prices_note.id(), &mut naming_account).await?;
-
-    //let mut chain = ctx.builder.build();
-    naming_account.apply_delta(init_tx.account_delta())?;
-    chain.add_pending_executed_transaction(&init_tx)?;
-    chain.prove_next_block()?;
-
+    execute_note(&mut chain, ctx.initialize_note.id(), &mut ctx.naming).await?;
+    execute_note(&mut chain, ctx.set_prices_note.id(), &mut ctx.naming).await?;
     
-    
-    let init_slot = naming_account.storage().get_item(0)?;
-    let owner_slot = naming_account.storage().get_item(1)?;
-    let one_year_slot = naming_account.storage().get_item(13)?;
+    let init_slot = ctx.naming.storage().get_item(0)?;
+    let owner_slot = ctx.naming.storage().get_item(1)?;
+    let one_year_slot = ctx.naming.storage().get_item(13)?;
 
     assert_eq!(init_slot.get(0).unwrap().as_int(), 1);
     assert_eq!(owner_slot.get(1).unwrap().as_int(), ctx.owner.id().prefix().as_u64());
     assert_eq!(owner_slot.get(0).unwrap().as_int(), ctx.owner.id().suffix().as_int());
     assert_eq!(one_year_slot.get(0).unwrap().as_int(), 500);
 
-    naming_account.apply_delta(set_price_tx.account_delta())?;
-    chain.add_pending_executed_transaction(&set_price_tx)?;
-    chain.prove_next_block()?;
-
-    
-
     // Assert prices
     let mock_prices = get_test_prices();
     for i in 1..=5 { 
-        let price_slot = naming_account.storage()
+        let price_slot = ctx.naming.storage()
             .get_map_item(2, 
                 Word::new([
                         Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
@@ -126,14 +36,13 @@ async fn test_naming_initializex() -> anyhow::Result<()> {
                         Felt::new(i as u64),
                         Felt::new(0)
                     ]))?;
-        println!("w :{}", price_slot.to_string());
         assert_eq!(price_slot.get(0).unwrap().as_int(), mock_prices[i as usize].as_int());
     }
 
     
     Ok(())
 }
-/* 
+ 
 #[tokio::test]
 async fn test_naming_register_activate() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
@@ -157,8 +66,14 @@ async fn test_naming_register_activate() -> anyhow::Result<()> {
     
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
+    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
+    let activate_note = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(domain_word.to_vec())?, ctx.registrar_1.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
+    add_note_to_builder(&mut ctx.builder, register_note.clone())?;
+    add_note_to_builder(&mut ctx.builder, activate_note.clone())?;
+    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id(), register_note.id()], &mut ctx.naming).await?;
+    //execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
+
+    
 
     let domain_owner_slot = ctx.naming.storage().get_map_item(5, domain_word)?;
     let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
@@ -186,8 +101,8 @@ async fn test_naming_register_activate() -> anyhow::Result<()> {
     
     // Activate domain
 
-    let activate_note = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(domain_word.to_vec())?, ctx.registrar_1.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
-    execute_note(&mut ctx.chain, activate_note, &mut ctx.naming).await?; // Use always updated account as target
+    
+    execute_note(&mut chain, activate_note.id(), &mut ctx.naming).await?; // Use always updated account as target
 
     let domain_to_id = ctx.naming.storage().get_map_item(4, domain_word)?;
     let id_to_domain = ctx.naming.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
@@ -197,7 +112,7 @@ async fn test_naming_register_activate() -> anyhow::Result<()> {
     assert_eq!(id_to_domain, domain_word);
     Ok(())
 }
-
+/*
 #[tokio::test]
 async fn test_naming_register_activate_by_not_owner() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
