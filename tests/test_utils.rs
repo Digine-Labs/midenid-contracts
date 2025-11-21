@@ -11,7 +11,7 @@ use midenname_contracts::storage::naming_storage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
-fn create_test_naming_account() -> Account {
+pub fn create_test_naming_account() -> Account {
     let storage_slots = naming_storage();
     let code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
 

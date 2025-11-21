@@ -1,14 +1,88 @@
 mod test_utils;
 
-use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteInputs}};
+use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteInputs}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::OutputNote};
 use miden_crypto::{Felt, Word};
+use miden_testing::{Auth, MockChain};
 use midenname_contracts::domain::{encode_domain, encode_domain_as_felts, unsafe_encode_domain};
 use test_utils::init_naming;
 
-use crate::test_utils::{create_note_for_naming, execute_note, get_test_prices};
+use crate::test_utils::{create_note_for_naming, create_test_naming_account, execute_note, get_test_prices};
 
 #[tokio::test]
 async fn test_naming_initialize() -> anyhow::Result<()> {
+    let mut builder = MockChain::builder();
+
+    let fungible_asset_1 = FungibleAsset::new(ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(), 100000).unwrap();
+    let mut naming_account = create_test_naming_account();
+    builder.add_account(naming_account.clone())?;
+
+    let owner_account = builder.add_existing_wallet(Auth::BasicAuth)?;
+    let one_year_time: u32 = 500;
+
+    let initialize_inputs = NoteInputs::new([
+        Felt::new(owner_account.id().suffix().into()),
+        Felt::new(owner_account.id().prefix().into()),
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(one_year_time.into()),
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+    ].to_vec())?;
+    let init_note = create_note_for_naming("initialize_naming".to_string(), initialize_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
+    builder.add_output_note(OutputNote::Full(init_note.clone()));
+
+    let note_inputs = NoteInputs::new([
+            Felt::new(fungible_asset_1.faucet_id().suffix().into()),
+            Felt::new(fungible_asset_1.faucet_id().prefix().into()),
+        ].to_vec())?;
+    let set_prices_note = create_note_for_naming("set_all_prices".to_string(), note_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
+    builder.add_output_note(OutputNote::Full(set_prices_note.clone()));
+
+    let mut chain = builder.build()?;
+
+    let tx_ctx = chain.build_tx_context(naming_account.id(), &[init_note.id()], &[])?.build()?;
+    let executed_tx = tx_ctx.execute().await?;
+
+    chain.add_pending_executed_transaction(&executed_tx)?;
+    chain.prove_next_block()?;
+    naming_account.apply_delta(executed_tx.account_delta())?;
+
+    let init_slot = naming_account.storage().get_item(0)?;
+    let owner_slot = naming_account.storage().get_item(1)?;
+    let one_year_slot = naming_account.storage().get_item(13)?;
+
+    assert_eq!(init_slot.get(0).unwrap().as_int(), 1);
+    assert_eq!(owner_slot.get(1).unwrap().as_int(), owner_account.id().prefix().as_u64());
+    assert_eq!(owner_slot.get(0).unwrap().as_int(), owner_account.id().suffix().as_int());
+    assert_eq!(one_year_slot.get(0).unwrap().as_int(), 500);
+
+    let tx_ctx = chain.build_tx_context(naming_account.id(), &[set_prices_note.id()], &[])?.build()?;
+    let executed_tx = tx_ctx.execute().await?;
+
+    chain.add_pending_executed_transaction(&executed_tx)?;
+    chain.prove_next_block()?;
+    naming_account.apply_delta(executed_tx.account_delta())?;
+
+    let mock_prices = get_test_prices();
+    for i in 1..=5 { 
+        let price_slot = naming_account.storage()
+            .get_map_item(2, 
+                Word::new([
+                        Felt::new(fungible_asset_1.faucet_id().suffix().as_int()),
+                        fungible_asset_1.faucet_id().prefix().as_felt(),
+                        Felt::new(i as u64),
+                        Felt::new(0)
+                    ]))?;
+        println!("w :{}", price_slot.to_string());
+        assert_eq!(price_slot.get(0).unwrap().as_int(), mock_prices[i as usize].as_int());
+    }
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "sdsd"]
+async fn test_naming_initializex() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let mut naming_account = ctx.naming;
