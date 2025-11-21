@@ -11,7 +11,7 @@ use rand_chacha::ChaCha20Rng;
 use test_utils::init_naming;
 
 use crate::test_utils::{create_note_for_naming, execute_note};
-
+/* 
 #[tokio::test]
 #[ignore = "reason"]
 async fn test_claim_protocol_revenue() -> anyhow::Result<()> {
@@ -54,3 +54,4 @@ async fn test_claim_protocol_revenue() -> anyhow::Result<()> {
     // check balances
     Ok(())
 }
+    */

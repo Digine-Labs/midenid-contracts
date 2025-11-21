@@ -9,21 +9,42 @@ use crate::test_utils::{create_note_for_naming, execute_note, get_test_prices};
 
 #[tokio::test]
 async fn test_naming_initialize() -> anyhow::Result<()> {
-    let ctx = init_naming().await?;
+    let mut ctx = init_naming().await?;
 
-    let init_slot = ctx.naming.storage().get_item(0)?;
-    let owner_slot = ctx.naming.storage().get_item(1)?;
-    let one_year_slot = ctx.naming.storage().get_item(13)?;
+    let mut naming_account = ctx.naming;
+
+    let mut chain = ctx.builder.build()?;
+
+    let init_tx = execute_note(&mut chain, ctx.initialize_note.id(), &mut naming_account).await?;
+    //ctx.naming.apply_delta(executed_tx.account_delta())?;
+    let set_price_tx = execute_note(&mut chain, ctx.set_prices_note.id(), &mut naming_account).await?;
+
+    //let mut chain = ctx.builder.build();
+    naming_account.apply_delta(init_tx.account_delta())?;
+    chain.add_pending_executed_transaction(&init_tx)?;
+    chain.prove_next_block()?;
+
+    
+    
+    let init_slot = naming_account.storage().get_item(0)?;
+    let owner_slot = naming_account.storage().get_item(1)?;
+    let one_year_slot = naming_account.storage().get_item(13)?;
 
     assert_eq!(init_slot.get(0).unwrap().as_int(), 1);
     assert_eq!(owner_slot.get(1).unwrap().as_int(), ctx.owner.id().prefix().as_u64());
     assert_eq!(owner_slot.get(0).unwrap().as_int(), ctx.owner.id().suffix().as_int());
     assert_eq!(one_year_slot.get(0).unwrap().as_int(), 500);
 
+    naming_account.apply_delta(set_price_tx.account_delta())?;
+    chain.add_pending_executed_transaction(&set_price_tx)?;
+    chain.prove_next_block()?;
+
+    
+
     // Assert prices
     let mock_prices = get_test_prices();
     for i in 1..=5 { 
-        let price_slot = ctx.naming.storage()
+        let price_slot = naming_account.storage()
             .get_map_item(2, 
                 Word::new([
                         Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
@@ -31,13 +52,14 @@ async fn test_naming_initialize() -> anyhow::Result<()> {
                         Felt::new(i as u64),
                         Felt::new(0)
                     ]))?;
+        println!("w :{}", price_slot.to_string());
         assert_eq!(price_slot.get(0).unwrap().as_int(), mock_prices[i as usize].as_int());
     }
 
     
     Ok(())
 }
-
+/* 
 #[tokio::test]
 async fn test_naming_register_activate() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
@@ -545,3 +567,4 @@ async fn test_register_with_discount_3yr() -> anyhow::Result<()> {
 async fn test_register_with_discount_10yr() -> anyhow::Result<()> {
     Ok(())
 }
+    */

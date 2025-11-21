@@ -1,12 +1,12 @@
-use std::{fs, path::Path, sync::Arc};
+use std::{fs, ops::Not, path::Path, sync::Arc};
 
 use anyhow::Ok;
 use miden_assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, ast::{Module, ModuleKind}};
-use miden_client::{ScriptBuilder, account::{Account, AccountBuilder, AccountId, AccountStorageMode}, asset::FungibleAsset, note::{Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::OutputNote};
+use miden_client::{ScriptBuilder, account::{Account, AccountBuilder, AccountId, AccountStorageMode}, asset::FungibleAsset, note::{Note, NoteAssets, NoteExecutionHint, NoteId, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::{ExecutedTransaction, OutputNote}};
 use miden_crypto::{Felt, Word};
 use miden_lib::{account::auth, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
-use miden_testing::{Auth, MockChain, TransactionContextBuilder};
+use miden_testing::{Auth, MockChain, MockChainBuilder, TransactionContextBuilder};
 use midenname_contracts::storage::naming_storage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -35,14 +35,17 @@ pub fn get_test_prices() -> Vec<Felt> {
 }
 
 pub struct TestingContext {
-    pub chain: MockChain,
+    pub builder: MockChainBuilder,
+    //pub chain: MockChain,
     pub owner: Account,
     pub registrar_1: Account,
     pub registrar_2: Account,
     pub registrar_3: Account,
     pub naming: Account,
     pub fungible_asset: FungibleAsset,
-    pub one_year: u32
+    pub one_year: u32,
+    pub initialize_note: Note,
+    pub set_prices_note: Note
 }
 
 pub async fn init_naming() -> anyhow::Result<TestingContext> {
@@ -57,7 +60,7 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     let domain_registrar_account_3 = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_3.into()])?;
     let mut naming_account = create_test_naming_account();
     builder.add_account(naming_account.clone())?;
-    let mut mockchain = builder.build()?;
+    //let mut mockchain = builder.build()?;
     let one_year_time: u32 = 500;
 
     let initialize_inputs = NoteInputs::new([
@@ -72,32 +75,41 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     ].to_vec())?;
     let init_note = create_note_for_naming("initialize_naming".to_string(), initialize_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
     
-    execute_note(&mut mockchain, init_note, &mut naming_account).await?;
+    //execute_note(&mut mockchain, init_note, &mut naming_account).await?;
+    add_note_to_builder(&mut builder, init_note.clone())?;
     // Set prices
 
-    set_test_prices(&mut mockchain, owner_account.id(), &mut naming_account, fungible_asset_1.faucet_id()).await?;
+    let note_inputs = NoteInputs::new([
+            Felt::new(fungible_asset_1.faucet_id().suffix().into()),
+            Felt::new(fungible_asset_1.faucet_id().prefix().into()),
+        ].to_vec())?;
+    let set_prices_note = create_note_for_naming("set_all_prices".to_string(), note_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
 
-    Ok(TestingContext { chain: mockchain, owner: owner_account, registrar_1: domain_registrar_account, 
+    add_note_to_builder(&mut builder, set_prices_note.clone())?;
+    //set_test_prices(&mut mockchain, owner_account.id(), &mut naming_account, fungible_asset_1.faucet_id()).await?;
+    //add_set_prices_notes(&mut builder,owner_account.id(), &mut naming_account, fungible_asset_1.faucet_id()).await?;
+
+    Ok(TestingContext { builder: builder, owner: owner_account, registrar_1: domain_registrar_account, 
         registrar_2: domain_registrar_account_2, registrar_3: domain_registrar_account_3, naming: naming_account, 
-        fungible_asset: fungible_asset_1, one_year: one_year_time })
+        fungible_asset: fungible_asset_1, one_year: one_year_time, initialize_note: init_note, set_prices_note: set_prices_note })
+}
+
+pub fn add_note_to_builder(builder: &mut MockChainBuilder, note: Note) -> anyhow::Result<()> {
+    builder.add_output_note(OutputNote::Full(note.clone()));
+
+    Ok(())
 }
 
 // Target must be updated account always which is returned from this function. do not use ctx.naming all the time
-pub async fn execute_note(chain: &mut MockChain, note: Note, target: &mut Account) -> anyhow::Result<()> {
-    let tx_ctx = chain.build_tx_context(target.id(), &[note.id()], &[])?.build()?;
-    //chain.add_pending_note(OutputNote::Full(note.clone()));
-    //chain.prove_next_block()?;
+pub async fn execute_note(chain: &mut MockChain, note_id: NoteId, target: &mut Account) -> anyhow::Result<ExecutedTransaction> {
+    let tx_ctx = chain.build_tx_context(target.id(), &[note_id], &[])?.build()?;
+
     let executed_tx = tx_ctx.execute().await?;
-    //let note_inputs = chain.get_transaction_inputs(target.clone(), None, &[note.id()], &[])?;
-    //let tx_context = TransactionContextBuilder::new(target.clone())
-    //      .account_seed(None).tx_inputs(note_inputs).build()?;
+    Ok(executed_tx)
+    //target.apply_delta(&executed_tx.account_delta())?;
+    //chain.add_pending_executed_transaction(&executed_tx)?;
+    //chain.prove_next_block()?;
 
-    //let executed_tx = tx_context.execute().await?;;
-    target.apply_delta(&executed_tx.account_delta())?;
-    chain.add_pending_executed_transaction(&executed_tx)?;
-    chain.prove_next_block()?;
-
-    Ok(())
 }
 
 pub async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets) -> anyhow::Result<Note> {
@@ -129,26 +141,4 @@ fn create_library(account_code: String, library_path: &str) -> anyhow::Result<Li
     let library = assembler.clone().assemble_library([module]).unwrap();
 
     Ok(library)
-}
-
-async fn set_test_prices(chain: &mut MockChain, tx_sender: AccountId, naming: &mut Account, asset: AccountId) -> anyhow::Result<()> {
-    let prices = get_test_prices();
-    for i in 1..=5 {
-        let one_letter_inputs = NoteInputs::new([
-            prices[i as usize],
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(0),
-            Felt::new(asset.suffix().into()),
-            Felt::new(asset.prefix().into()),
-            Felt::new(i as u64), // letter_count
-            Felt::new(0),
-        ].to_vec())?;
-
-        let one_letter_note = create_note_for_naming("set_price".to_string(), one_letter_inputs, tx_sender, naming.id(), NoteAssets::new(vec![]).unwrap()).await?;
-
-        execute_note(chain, one_letter_note, naming).await?;
-    }
-
-    Ok(())
 }
