@@ -11,7 +11,7 @@ use midenname_contracts::storage::naming_storage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
-fn create_test_naming_account() -> Account {
+pub fn create_test_naming_account() -> Account {
     let storage_slots = naming_storage();
     let code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
 
@@ -28,6 +28,42 @@ fn create_test_naming_account() -> Account {
         .build_existing().unwrap();
 
     account
+}
+
+pub async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets) -> anyhow::Result<Note> {
+    let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
+    let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
+    let library = create_library(naming_code, "miden_name::naming")?;
+
+    let note_script = ScriptBuilder::new(true)
+        .with_dynamically_linked_library(&library)
+        .unwrap()
+        .compile_note_script(note_code)
+        .unwrap();
+
+    let recipient = NoteRecipient::new(Word::default(), note_script, inputs.clone());
+    let tag = NoteTag::from_account_id(target_id);
+    let metadata = NoteMetadata::new(sender, NoteType::Public, tag, NoteExecutionHint::Always, Felt::new(0))?;
+    let note = Note::new(assets, metadata, recipient);
+    Ok(note)
+}
+
+pub async fn create_note_for_naming_with_custom_serial_num(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets, serial_num: Word) -> anyhow::Result<Note> {
+    let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
+    let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
+    let library = create_library(naming_code, "miden_name::naming")?;
+
+    let note_script = ScriptBuilder::new(true)
+        .with_dynamically_linked_library(&library)
+        .unwrap()
+        .compile_note_script(note_code)
+        .unwrap();
+
+    let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
+    let tag = NoteTag::from_account_id(target_id);
+    let metadata = NoteMetadata::new(sender, NoteType::Public, tag, NoteExecutionHint::Always, Felt::new(0))?;
+    let note = Note::new(assets, metadata, recipient);
+    Ok(note)
 }
 
 pub fn get_test_prices() -> Vec<Felt> {
@@ -122,23 +158,7 @@ pub async fn execute_note(chain: &mut MockChain, note_id: NoteId, target: &mut A
     Ok(())
 }
 
-pub async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets) -> anyhow::Result<Note> {
-    let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
-    let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
-    let library = create_library(naming_code, "miden_name::naming")?;
 
-    let note_script = ScriptBuilder::new(true)
-        .with_dynamically_linked_library(&library)
-        .unwrap()
-        .compile_note_script(note_code)
-        .unwrap();
-
-    let recipient = NoteRecipient::new(Word::default(), note_script, inputs.clone());
-    let tag = NoteTag::from_account_id(target_id);
-    let metadata = NoteMetadata::new(sender, NoteType::Public, tag, NoteExecutionHint::Always, Felt::new(0))?;
-    let note = Note::new(assets, metadata, recipient);
-    Ok(note)
-}
 
 fn create_library(account_code: String, library_path: &str) -> anyhow::Result<Library> {
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
