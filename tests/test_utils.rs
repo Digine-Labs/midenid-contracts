@@ -2,9 +2,9 @@ use std::{fs, ops::Not, path::Path, sync::Arc};
 
 use anyhow::Ok;
 use miden_assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, ast::{Module, ModuleKind}};
-use miden_client::{ScriptBuilder, account::{Account, AccountBuilder, AccountId, AccountStorageMode}, asset::FungibleAsset, note::{Note, NoteAssets, NoteExecutionHint, NoteId, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::OutputNote};
+use miden_client::{ScriptBuilder, account::{Account, AccountBuilder, AccountId, AccountStorageMode}, asset::{Asset, FungibleAsset}, note::{Note, NoteAssets, NoteExecutionHint, NoteId, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::OutputNote};
 use miden_crypto::{Felt, Word};
-use miden_lib::{account::auth, transaction::TransactionKernel};
+use miden_lib::{account::auth, note::WellKnownNote, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
 use miden_testing::{Auth, MockChain, MockChainBuilder, TransactionContextBuilder};
 use midenname_contracts::storage::naming_storage;
@@ -64,6 +64,34 @@ pub async fn create_note_for_naming_with_custom_serial_num(name: String, inputs:
     let metadata = NoteMetadata::new(sender, NoteType::Public, tag, NoteExecutionHint::Always, Felt::new(0))?;
     let note = Note::new(assets, metadata, recipient);
     Ok(note)
+}
+
+pub fn create_p2id_note_exact(
+    sender: AccountId,
+    target: AccountId,
+    assets: Vec<Asset>,
+    note_type: NoteType,
+    aux: Felt,
+    serial_num: Word,
+) -> anyhow::Result<Note> {
+    let recipient = build_p2id_recipient(target, serial_num)?;
+
+    let tag = NoteTag::from_account_id(target);
+
+    let metadata = NoteMetadata::new(sender, note_type, tag, NoteExecutionHint::always(), aux)?;
+    let vault = NoteAssets::new(assets)?;
+
+    Ok(Note::new(vault, metadata, recipient))
+}
+
+pub fn build_p2id_recipient(
+    target: AccountId,
+    serial_num: Word,
+) -> anyhow::Result<NoteRecipient> {
+    let note_script = WellKnownNote::P2ID.script();
+    let note_inputs = NoteInputs::new(vec![target.suffix(), target.prefix().as_felt()])?;
+
+    Ok(NoteRecipient::new(serial_num, note_script, note_inputs))
 }
 
 pub fn get_test_prices() -> Vec<Felt> {

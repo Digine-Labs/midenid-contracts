@@ -300,7 +300,7 @@ export.claim_protocol_revenue
     padw mem_loadw_be.MEM_RECIPIENT
     padw mem_loadw_be.MEM_NOTE_DETAILS
     #padw mem_loadw_be.MEM_PAYMENT_TOKEN
-    debug.stack.8
+    debug.stack.12
     # Stack must be
     # [tag, aux, note_type, exec_hint, RECIPIENT]
     exec.output_note::create # TODO
