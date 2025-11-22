@@ -45,6 +45,7 @@ const.ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH="Max 10 years"
 const.ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH="Timestamp len overflow"
 const.ERR_DOMAIN_NOT_EXPIRED="Domain not expired"
 const.ERR_U32_OVERFLOW="U32 Overflow"
+const.ERR_DOMAIN_EXPIRED="Domain expired"
 
 ## Memory Pointers
 
@@ -99,9 +100,10 @@ export.register
     exec._clear_domain_mapping
 
     # Set domain len
-    exec._extend_domain_length
+    exec._update_domain_length
 
     exec._calculate_domain_price
+    
     # [price]
     exec._increase_total_revenue
 
@@ -135,7 +137,7 @@ export.register_with_referrer
     exec._clear_domain_mapping
 
     # Set domain len
-    exec._extend_domain_length
+    exec._update_domain_length
 
     exec._calculate_domain_price
     # [price]
@@ -194,10 +196,22 @@ export.clear_expired_domain
     # []
 end
 
-# Input: [DOMAIN]
+# Input: [PAYMENT_TOKEN, DOMAIN, REG_LEN]
 export.extend_domain
+    mem_storew_be.MEM_PAYMENT_TOKEN dropw
     mem_storew_be.MEM_DOMAIN dropw
+    mem_storew_be.MEM_REG_LEN dropw
+
     exec._assert_only_domain_owner
+    exec._assert_payment_token
+    exec._assert_domain_rules
+    exec._assert_domain_not_expired
+
+    exec._calculate_domain_price
+    # [price]
+    exec._receive_payment
+    # []
+    exec._extend_existing_domain_length
 end
 
 # Inputs: [TOKEN]
@@ -282,6 +296,24 @@ export.withdraw_assets
 end
 
 ## Internal Methods
+
+# Input: [] Memory: [REG_LEN, DOMAIN]
+proc._extend_existing_domain_length
+    padw mem_loadw_be.MEM_DOMAIN
+    push.DOMAIN_EXPIRY_DATES exec.active_account::get_map_item drop drop drop
+    # [current_len]
+    padw mem_loadw_be.MEM_REG_LEN drop drop drop
+    # [extend_len_as_year, current_len]
+    exec._get_one_year
+    u32assert2 u32overflowing_mul assertz.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
+    # [len * yr, current_len]
+    u32assert2 u32overflowing_add assertz.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
+    # [new_len]
+    push.0.0.0
+    padw mem_loadw_be.MEM_DOMAIN
+    push.DOMAIN_EXPIRY_DATES exec.native_account::set_map_item dropw dropw
+    # []
+end
 
 # Input: [] Memory [DOMAIN]
 # Output: []
@@ -401,8 +433,20 @@ proc._assert_only_domain_owner
     # []
 end
 
+# Input: [] Memory [DOMAIN]
+# Output: []
+proc._assert_domain_not_expired
+    padw mem_loadw_be.MEM_DOMAIN
+    push.DOMAIN_EXPIRY_DATES exec.active_account::get_map_item drop drop drop
+    # [current_len]
+    exec.tx::get_block_timestamp
+    # [ts, current_len]
+    gt assert.err=ERR_DOMAIN_EXPIRED
+    # []
+end
+
 # Input: [] Memory [DOMAIN, REG_LEN]
-proc._extend_domain_length
+proc._update_domain_length
     padw mem_loadw_be.MEM_REG_LEN drop drop drop
     # [reg_len]
     dup lte.MAX_REG_LEN assert.err=ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH
@@ -486,7 +530,8 @@ proc._calculate_discount
         if.true
             # [price]
             dup
-            push.THREE_YR_DISCOUNT u32assert2 u32overflowing_mul
+            push.THREE_YR_DISCOUNT 
+            u32assert2 u32overflowing_mul
             assertz.err=ERR_CALCULATE_DISCOUNT_OVERFLOW
             u32assert2 u32div.10000
             u32assert2 u32overflowing_sub assertz.err=ERR_CALCULATE_DISCOUNT_UNDERFLOW

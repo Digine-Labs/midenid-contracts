@@ -739,31 +739,255 @@ async fn test_expired_domain_rebuy() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "not implemented"]
 async fn test_extend_domain_by_owner() -> anyhow::Result<()> {
+    let mut ctx = init_naming().await?;
+
+    let domain = encode_domain_as_felts("test".to_string());
+    let domain_word = encode_domain("test".to_string());
+    let register_note_inputs = NoteInputs::new([
+        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
+        ctx.fungible_asset.faucet_id().prefix().as_felt(),
+        Felt::new(0),
+        Felt::new(0),
+        domain[0],
+        domain[1],
+        domain[2],
+        domain[3],
+        Felt::new(1), // register length
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+    ].to_vec())?;
+
+    let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
+    let register_asset = NoteAssets::new(vec![cost.into()])?;
+    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, register_note.clone())?;
+
+    let extend_note = create_note_for_naming("extend_domain".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, extend_note.clone())?;
+
+    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+
+    execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
+    
+    let current_expiry = domain_expiry_slot.get(0).unwrap().as_int();
+    execute_note(&mut chain, extend_note.id(), &mut ctx.naming).await?;
+
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
+    let updated_expiry = domain_expiry_slot.get(0).unwrap().as_int();
+
+    assert_eq!(updated_expiry, current_expiry + ctx.one_year as u64);
     Ok(())
 }
 
 #[tokio::test]
-#[ignore = "not implemented"]
+async fn test_extend_expired_domain() -> anyhow::Result<()> {
+    let mut ctx = init_naming().await?;
+
+    let domain = encode_domain_as_felts("test".to_string());
+    let register_note_inputs = NoteInputs::new([
+        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
+        ctx.fungible_asset.faucet_id().prefix().as_felt(),
+        Felt::new(0),
+        Felt::new(0),
+        domain[0],
+        domain[1],
+        domain[2],
+        domain[3],
+        Felt::new(1), // register length
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+    ].to_vec())?;
+
+    let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
+    let register_asset = NoteAssets::new(vec![cost.into()])?;
+    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, register_note.clone())?;
+
+    let extend_note = create_note_for_naming("extend_domain".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, extend_note.clone())?;
+    
+    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+
+    execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
+
+    chain.prove_until_block(100)?;
+    
+    let result = execute_note(&mut chain, extend_note.id(), &mut ctx.naming).await;
+
+    assert!(result.is_err(), "Expected fail");
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_extend_domain_by_not_owner() -> anyhow::Result<()> {
+        let mut ctx = init_naming().await?;
+
+    let domain = encode_domain_as_felts("test".to_string());
+    let register_note_inputs = NoteInputs::new([
+        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
+        ctx.fungible_asset.faucet_id().prefix().as_felt(),
+        Felt::new(0),
+        Felt::new(0),
+        domain[0],
+        domain[1],
+        domain[2],
+        domain[3],
+        Felt::new(1), // register length
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+    ].to_vec())?;
+
+    let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
+    let register_asset = NoteAssets::new(vec![cost.into()])?;
+    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, register_note.clone())?;
+
+    let extend_note = create_note_for_naming("extend_domain".to_string(), register_note_inputs.clone(), ctx.registrar_2.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, extend_note.clone())?;
+
+    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+
+    execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
+
+    let result = execute_note(&mut chain, extend_note.id(), &mut ctx.naming).await;
+
+    assert!(result.is_err(), "Expected fail");
     Ok(())
 }
 
 #[tokio::test]
-#[ignore = "not implemented"]
 async fn test_register_with_discount_5yr() -> anyhow::Result<()> {
+    let mut ctx = init_naming().await?;
+
+    let domain = encode_domain_as_felts("test".to_string());
+    let domain_word = encode_domain("test".to_string());
+    let register_note_inputs = NoteInputs::new([
+        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
+        ctx.fungible_asset.faucet_id().prefix().as_felt(),
+        Felt::new(0),
+        Felt::new(0),
+        domain[0],
+        domain[1],
+        domain[2],
+        domain[3],
+        Felt::new(5), // register length
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+    ].to_vec())?;
+
+    let discounted_cost = 1390; // some rounding
+
+    let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), discounted_cost)?;
+    let register_asset = NoteAssets::new(vec![cost.into()])?;
+    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, register_note.clone())?;
+
+    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let current_time = chain.latest_block_header().timestamp();
+    execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
+    
+    let expiry = domain_expiry_slot.get(0).unwrap().as_int();
+    
+    let expected_expiry = current_time + (ctx.one_year * 5);
+    assert_eq!(expiry, expected_expiry as u64);
+
+    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), discounted_cost);
+
     Ok(())
 }
 
 #[tokio::test]
-#[ignore = "not implemented"]
 async fn test_register_with_discount_3yr() -> anyhow::Result<()> {
+    let mut ctx = init_naming().await?;
+
+    let domain = encode_domain_as_felts("test".to_string());
+    let domain_word = encode_domain("test".to_string());
+    let register_note_inputs = NoteInputs::new([
+        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
+        ctx.fungible_asset.faucet_id().prefix().as_felt(),
+        Felt::new(0),
+        Felt::new(0),
+        domain[0],
+        domain[1],
+        domain[2],
+        domain[3],
+        Felt::new(3), // register length
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+    ].to_vec())?;
+
+    let discounted_cost = 1167; // some rounding
+    let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), discounted_cost)?;
+    let register_asset = NoteAssets::new(vec![cost.into()])?;
+    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, register_note.clone())?;
+
+    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let current_time = chain.latest_block_header().timestamp();
+    execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
+    
+    let expiry = domain_expiry_slot.get(0).unwrap().as_int();
+    
+    let expected_expiry = current_time + (ctx.one_year * 3);
+    assert_eq!(expiry, expected_expiry as u64);
+
+    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), discounted_cost);
+
     Ok(())
 }
 
 #[tokio::test]
-#[ignore = "not implemented"]
 async fn test_register_with_discount_10yr() -> anyhow::Result<()> {
+let mut ctx = init_naming().await?;
+
+    let domain = encode_domain_as_felts("test".to_string());
+    let domain_word = encode_domain("test".to_string());
+    let register_note_inputs = NoteInputs::new([
+        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
+        ctx.fungible_asset.faucet_id().prefix().as_felt(),
+        Felt::new(0),
+        Felt::new(0),
+        domain[0],
+        domain[1],
+        domain[2],
+        domain[3],
+        Felt::new(10), // register length
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(0),
+    ].to_vec())?;
+
+    let discounted_cost = 2780; // some rounding
+
+    let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), discounted_cost)?;
+    let register_asset = NoteAssets::new(vec![cost.into()])?;
+    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset.clone()).await?;
+    add_note_to_builder(&mut ctx.builder, register_note.clone())?;
+
+    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let current_time = chain.latest_block_header().timestamp();
+    execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
+    
+    let expiry = domain_expiry_slot.get(0).unwrap().as_int();
+    
+    let expected_expiry = current_time + (ctx.one_year * 10);
+    assert_eq!(expiry, expected_expiry as u64);
+
+    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), discounted_cost);
+
     Ok(())
 }
