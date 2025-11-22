@@ -1,0 +1,18 @@
+use.miden_name::naming
+use.miden::active_note
+use.std::sys
+
+const.RATE_PTR=0
+const.REFERRER_PTR=4
+
+# Input (arguments): [RATE, REFERRER]
+begin
+    push.0
+    exec.active_note::get_inputs
+    # [num_inputs, init_ptr]
+    drop drop padw mem_loadw_be.RATE_PTR
+    padw mem_loadw_be.REFERRER_PTR
+    # [REFERRER, RATE]
+    call.naming::set_referrer_rate
+    exec.sys::truncate_stack
+end

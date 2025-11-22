@@ -46,6 +46,8 @@ const.ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH="Timestamp len overflow"
 const.ERR_DOMAIN_NOT_EXPIRED="Domain not expired"
 const.ERR_U32_OVERFLOW="U32 Overflow"
 const.ERR_DOMAIN_EXPIRED="Domain expired"
+const.ERR_UNDERFLOW_AT_FEE_CALC="Fee calculation underflow"
+const.ERR_OVERFLOW_AT_FEE_CALC="Fee calculation overflow"
 
 ## Memory Pointers
 
@@ -55,7 +57,11 @@ const.MEM_REFERRER=0x0028 # WORD
 const.MEM_DOMAIN_NEW_OWNER=0x002C # WORD
 const.MEM_REG_LEN=0x0030 # WORD
 const.MEM_RECIPIENT=0x0034 # WORD
-const.MEM_NOTE_DETAILS=0x0038 # Word
+const.MEM_NOTE_DETAILS=0x0038 # WORD
+const.MEM_REF_RATE=0x003C # WORD
+const.MEM_TOTAL_PAID_AMT=0x0050 # felt
+const.MEM_PROTOCOL_FEE_AMT=0x0051 # felt
+const.MEM_REFERRER_FEE_AMT=0x0052 # felt
 
 ## Constants
 #const.YEAR=31536000 # In seconds
@@ -263,6 +269,25 @@ export.set_price
     exec.native_account::set_map_item dropw dropw
 end
 
+# Input: [REFERRER, RATE]
+# Output: []
+export.set_referrer_rate
+    exec._assert_only_owner
+    mem_storew_be.MEM_REFERRER dropw
+    mem_storew_be.MEM_REF_RATE dropw
+
+    padw mem_loadw_be.MEM_REF_RATE drop drop drop
+    # [rate]
+    push.REF_RATE_LIMIT
+    # [limit, rate]
+    lte assert.err=ERR_REF_RATE_TOO_HIGH
+    # []
+    padw mem_loadw_be.MEM_REF_RATE
+    padw mem_loadw_be.MEM_REFERRER
+    push.REF_RATE_SLOT exec.native_account::set_map_item dropw dropw
+    # []
+end
+
 # Input: [TOKEN, NOTE_DETAILS, RECIPIENT]
 export.claim_protocol_revenue
     mem_storew_be.MEM_PAYMENT_TOKEN dropw
@@ -337,6 +362,9 @@ end
 # Input: [total_amt] Memory [PAYMENT_TOKEN, REFERRER]
 # Output: [protocol_revenue]
 proc._register_referrer_revenue
+    
+    mem_store.MEM_TOTAL_PAID_AMT
+    mem_load.MEM_TOTAL_PAID_AMT
     # [total_amt]
     padw mem_loadw_be.MEM_REFERRER
     # [REFERRER, total_amt]
@@ -345,12 +373,35 @@ proc._register_referrer_revenue
     dup gt.0 assert.err=ERR_REF_RATE_ZERO
     dup lt.MAX_REF_RATE assert.err=ERR_REF_RATE_OVERLIMIT
     # [ref_rate, total_amt]
-    swap dup swap.2
+    swap dup swap.2 swap
     # [total_amt, ref_rate, total_amt]
-    mul div.10000
+    u32assert2 u32overflowing_mul assertz.err=ERR_OVERFLOW_AT_FEE_CALC 
+    u32assert2 u32div.10000
     # [(rate * total) / 10000, total_amt]
     sub 
     # [total - ((rate * total) / 10000)]
+    # [protocol_revenue]
+    mem_store.MEM_PROTOCOL_FEE_AMT
+    mem_load.MEM_PROTOCOL_FEE_AMT
+    mem_load.MEM_TOTAL_PAID_AMT swap
+    # [protocol, total]
+    u32assert2 u32overflowing_sub assertz.err=ERR_UNDERFLOW_AT_FEE_CALC
+    mem_store.MEM_REFERRER_FEE_AMT
+    # []
+    ## Get current amt
+    padw mem_loadw_be.MEM_REFERRER
+    push.REF_TOTAL_REVENUE_SLOT exec.active_account::get_map_item drop drop drop
+    # [current_amt]
+    mem_load.MEM_REFERRER_FEE_AMT
+    # [ref_revenue, current_amt]
+    u32assert2 u32overflowing_add assertz.err=ERR_OVERFLOW_AT_FEE_CALC
+    # [new_total]
+    push.0.0.0
+    padw mem_loadw_be.MEM_REFERRER
+    push.REF_TOTAL_REVENUE_SLOT exec.native_account::set_map_item dropw dropw
+    # []
+    mem_load.MEM_PROTOCOL_FEE_AMT
+    # [protocol_revenue]
 end
 
 # Input: [amt] Memory [PAYMENT_TOKEN]
