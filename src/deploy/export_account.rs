@@ -1,6 +1,6 @@
+use miden_client::rpc::Endpoint;
 /// Export account details including seed phrase for backup
 use midenid_contracts::common::instantiate_client;
-use miden_client::rpc::Endpoint;
 use std::env;
 
 #[tokio::main]
@@ -24,8 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse account ID
     use miden_client::account::AccountId;
     let account_id = if account_id_str.starts_with("0x") {
-        AccountId::from_hex(account_id_str)
-            .map_err(|e| format!("Invalid hex account ID: {}", e))?
+        AccountId::from_hex(account_id_str).map_err(|e| format!("Invalid hex account ID: {}", e))?
     } else {
         return Err("Account ID must be in hex format (0x...)".into());
     };
@@ -52,8 +51,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("📋 Account Information:\n");
         println!("  Account ID (hex):     {}", record.account().id().to_hex());
         println!("  Account ID (decimal): {}", record.account().id());
-        println!("  Storage Mode:         {:?}", record.account().id().storage_mode());
-        println!("  Account Type:         {:?}\n", record.account().id().account_type());
+        println!(
+            "  Storage Mode:         {:?}",
+            record.account().id().storage_mode()
+        );
+        println!(
+            "  Account Type:         {:?}\n",
+            record.account().id().account_type()
+        );
 
         // Get the seed if available
         if let Some(seed) = record.seed() {
@@ -70,7 +75,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
     } else {
         eprintln!("❌ Account not found in local database!\n");
         eprintln!("Make sure the account exists locally. Run:");

@@ -45,14 +45,9 @@ async fn register_with_payment() -> Result<(), ClientError> {
             )
             .unwrap();
 
-        let tx_execution_result = helper
-            .client
-            .new_transaction(faucet_account.id(), transaction_request)
-            .await?;
-
         helper
             .client
-            .submit_transaction(tx_execution_result)
+            .submit_new_transaction(faucet_account.id(), transaction_request)
             .await?;
     }
     println!("✅ Minted 2 notes of {} tokens each", amount);
@@ -85,14 +80,9 @@ async fn register_with_payment() -> Result<(), ClientError> {
         .build_consume_notes(list_of_note_ids)
         .unwrap();
 
-    let tx_execution_result = helper
-        .client
-        .new_transaction(alice_account.id(), transaction_request)
-        .await?;
-
     helper
         .client
-        .submit_transaction(tx_execution_result)
+        .submit_new_transaction(alice_account.id(), transaction_request)
         .await?;
     println!("✅ All notes consumed successfully");
 
@@ -223,14 +213,9 @@ async fn register_with_payment_wrong_amount() -> Result<(), ClientError> {
             )
             .unwrap();
 
-        let tx_execution_result = helper
-            .client
-            .new_transaction(faucet_account.id(), transaction_request)
-            .await?;
-
         helper
             .client
-            .submit_transaction(tx_execution_result)
+            .submit_new_transaction(faucet_account.id(), transaction_request)
             .await?;
     }
     println!("✅ Minted 2 notes of {} tokens each", amount);
@@ -263,14 +248,9 @@ async fn register_with_payment_wrong_amount() -> Result<(), ClientError> {
         .build_consume_notes(list_of_note_ids)
         .unwrap();
 
-    let tx_execution_result = helper
-        .client
-        .new_transaction(alice_account.id(), transaction_request)
-        .await?;
-
     helper
         .client
-        .submit_transaction(tx_execution_result)
+        .submit_new_transaction(alice_account.id(), transaction_request)
         .await?;
     println!("✅ All notes consumed successfully");
 
@@ -407,14 +387,9 @@ async fn test_price_update_validation() -> Result<(), ClientError> {
         )
         .unwrap();
 
-    let tx_execution_result = helper
-        .client
-        .new_transaction(faucet_account.id(), transaction_request)
-        .await?;
-
     helper
         .client
-        .submit_transaction(tx_execution_result)
+        .submit_new_transaction(faucet_account.id(), transaction_request)
         .await?;
     println!("✅ Minted 100 tokens to Alice");
 
@@ -436,14 +411,9 @@ async fn test_price_update_validation() -> Result<(), ClientError> {
         .build_consume_notes(alice_note_ids)
         .unwrap();
 
-    let tx_execution_result = helper
-        .client
-        .new_transaction(alice_account.id(), transaction_request)
-        .await?;
-
     helper
         .client
-        .submit_transaction(tx_execution_result)
+        .submit_new_transaction(alice_account.id(), transaction_request)
         .await?;
     println!("✅ Alice consumed note");
 
@@ -468,14 +438,9 @@ async fn test_price_update_validation() -> Result<(), ClientError> {
         )
         .unwrap();
 
-    let tx_execution_result = helper
-        .client
-        .new_transaction(faucet_account.id(), transaction_request)
-        .await?;
-
     helper
         .client
-        .submit_transaction(tx_execution_result)
+        .submit_new_transaction(faucet_account.id(), transaction_request)
         .await?;
     println!("✅ Minted 100 tokens to Bob");
 
@@ -497,14 +462,9 @@ async fn test_price_update_validation() -> Result<(), ClientError> {
         .build_consume_notes(bob_note_ids)
         .unwrap();
 
-    let tx_execution_result = helper
-        .client
-        .new_transaction(bob_account.id(), transaction_request)
-        .await?;
-
     helper
         .client
-        .submit_transaction(tx_execution_result)
+        .submit_new_transaction(bob_account.id(), transaction_request)
         .await?;
     println!("✅ Bob consumed note");
 

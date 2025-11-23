@@ -6,16 +6,17 @@ use miden_client::{
     },
     auth::AuthSecretKey,
     builder::ClientBuilder,
-    crypto::SecretKey,
+    crypto::rpo_falcon512::SecretKey,
     keystore::FilesystemKeyStore,
     note::{
         Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata,
         NoteRecipient, NoteRelevance, NoteScript, NoteTag, NoteType,
     },
-    rpc::{Endpoint, TonicRpcClient},
+    rpc::{Endpoint, GrpcClient},
     store::{InputNoteRecord, NoteFilter},
     transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
 };
+use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_lib::account::{
     auth::{self, AuthRpoFalcon512},
     faucets::BasicFungibleFaucet,
@@ -65,11 +66,12 @@ pub async fn delete_keystore_and_store() {
 // Helper to instantiate Client
 pub async fn instantiate_client(endpoint: Endpoint) -> Result<Client, ClientError> {
     let timeout_ms = 10_000;
-    let rpc_api = Arc::new(TonicRpcClient::new(&endpoint, timeout_ms));
+    let rpc_api = Arc::new(GrpcClient::new(&endpoint, timeout_ms));
 
     let client = ClientBuilder::new()
         .rpc(rpc_api.clone())
         .filesystem_keystore("./keystore")
+        .sqlite_store("./store.sqlite3".into())
         .in_debug_mode(DebugMode::Enabled)
         .build()
         .await?;
@@ -99,7 +101,7 @@ pub async fn create_public_note_with_library_and_inputs(
     creator_account: Account,
     assets: NoteAssets,
     library: Library,
-    inputs: NoteInputs
+    inputs: NoteInputs,
 ) -> Result<Note, Error> {
     let assembler = TransactionKernel::assembler()
         .with_debug_mode(true)
@@ -127,12 +129,11 @@ pub async fn create_public_note_with_library_and_inputs(
         .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
-    let tx_result = client
-        .new_transaction(creator_account.id(), note_req)
+    let _ = client
+        .submit_new_transaction(creator_account.id(), note_req)
         .await
         .unwrap();
 
-    let _ = client.submit_transaction(tx_result).await;
     client.sync_state().await.unwrap();
 
     Ok(note)
@@ -172,12 +173,11 @@ pub async fn create_public_note_with_library(
         .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
-    let tx_result = client
-        .new_transaction(creator_account.id(), note_req)
+    let _ = client
+        .submit_new_transaction(creator_account.id(), note_req)
         .await
         .unwrap();
 
-    let _ = client.submit_transaction(tx_result).await;
     client.sync_state().await.unwrap();
 
     Ok(note)
@@ -213,12 +213,11 @@ pub async fn create_public_note(
         .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
-    let tx_result = client
-        .new_transaction(creator_account.id(), note_req)
+    let _ = client
+        .submit_new_transaction(creator_account.id(), note_req)
         .await
         .unwrap();
 
-    let _ = client.submit_transaction(tx_result).await;
     client.sync_state().await.unwrap();
 
     Ok(note)
@@ -236,10 +235,10 @@ pub async fn create_basic_account(
     let builder = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountUpdatableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone().into()))
         .with_component(BasicWallet);
-    let (account, seed) = builder.build().unwrap();
-    client.add_account(&account, Some(seed), false).await?;
+    let account = builder.build().unwrap();
+    client.add_account(&account, false).await?;
     keystore
         .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
         .unwrap();
@@ -274,7 +273,7 @@ fn empty_storage_map() -> StorageSlot {
 pub async fn create_public_immutable_contract(
     client: &mut Client,
     account_code: &String,
-) -> Result<(Account, Word), ClientError> {
+) -> Result<Account, ClientError> {
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
 
     let counter_component = AccountComponent::compile(
@@ -294,7 +293,7 @@ pub async fn create_public_immutable_contract(
 
     let mut init_seed = [0_u8; 32];
     client.rng().fill_bytes(&mut init_seed);
-    let (counter_contract, counter_seed) = AccountBuilder::new(init_seed)
+    let counter_contract = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
         .with_auth_component(auth::NoAuth)
@@ -302,7 +301,7 @@ pub async fn create_public_immutable_contract(
         .build()
         .unwrap();
 
-    Ok((counter_contract, counter_seed))
+    Ok(counter_contract)
 }
 
 pub fn create_tx_script(
@@ -381,14 +380,14 @@ pub async fn create_faucet_account(
     let builder = AccountBuilder::new(init_seed)
         .account_type(AccountType::FungibleFaucet)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone().into()))
         .with_component(faucet);
 
-    let (account, seed) = builder
+    let account = builder
         .build()
         .map_err(|e| ClientError::AccountError(e.into()))?;
 
-    client.add_account(&account, Some(seed), false).await?;
+    client.add_account(&account, false).await?;
     keystore
         .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
         .unwrap();

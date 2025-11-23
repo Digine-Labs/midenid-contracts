@@ -1,5 +1,11 @@
 use miden_client::{
-    account::Account, keystore::FilesystemKeyStore, note::{Note, NoteAssets, NoteInputs}, rpc::Endpoint, store::AccountRecord, transaction::TransactionRequestBuilder, ClientError, Word
+    ClientError, Word,
+    account::Account,
+    keystore::FilesystemKeyStore,
+    note::{Note, NoteAssets, NoteInputs},
+    rpc::Endpoint,
+    store::AccountRecord,
+    transaction::TransactionRequestBuilder,
 };
 use miden_objects::{Felt, FieldElement, account::AccountId, asset::FungibleAsset};
 use midenid_contracts::common::*;
@@ -268,9 +274,7 @@ impl RegistryTestHelper {
     ///
     /// Panics if the Word doesn't have 4 elements or NoteInputs creation fails
     fn word_to_note_inputs(word: &Word) -> NoteInputs {
-        let felts: Vec<Felt> = (0..4)
-            .map(|i| *word.get(i).unwrap())
-            .collect();
+        let felts: Vec<Felt> = (0..4).map(|i| *word.get(i).unwrap()).collect();
         NoteInputs::new(felts).unwrap()
     }
 
@@ -346,12 +350,10 @@ impl RegistryTestHelper {
     /// - **Immutable**: Contract code cannot be changed after deployment
     pub async fn deploy_registry_contract(&mut self) -> Result<Account, ClientError> {
         let registry_code = fs::read_to_string(Path::new(paths::REGISTRY_CONTRACT)).unwrap();
-        let (registry_contract, registry_seed) =
+        let registry_contract =
             create_public_immutable_contract(&mut self.client, &registry_code).await?;
 
-        self.client
-            .add_account(&registry_contract, Some(registry_seed), false)
-            .await?;
+        self.client.add_account(&registry_contract, false).await?;
 
         self.registry_contract = Some(registry_contract.clone());
         sleep(Duration::from_secs(5)).await;
@@ -427,7 +429,7 @@ impl RegistryTestHelper {
         let init_note_code = get_note_code("init".to_string());
         let contract_library = self.load_registry_library();
         let empty_assets = NoteAssets::new(vec![]).unwrap();
-        let inputs = NoteInputs::new(vec![ token_prefix, token_suffix, Felt::new(price)]).unwrap();
+        let inputs = NoteInputs::new(vec![token_prefix, token_suffix, Felt::new(price)]).unwrap();
 
         let init_note = create_public_note_with_library_and_inputs(
             &mut self.client,
@@ -435,7 +437,7 @@ impl RegistryTestHelper {
             owner_account.clone(),
             empty_assets,
             contract_library,
-            inputs
+            inputs,
         )
         .await
         .unwrap();
@@ -492,7 +494,13 @@ impl RegistryTestHelper {
         let update_price_note_code = get_note_code("update_price".to_string());
         let contract_library = self.load_registry_library();
         let empty_assets = NoteAssets::new(vec![]).unwrap();
-        let inputs = NoteInputs::new(vec![Felt::new(new_price), Felt::new(0), Felt::new(0), Felt::new(0)]).unwrap();
+        let inputs = NoteInputs::new(vec![
+            Felt::new(new_price),
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(0),
+        ])
+        .unwrap();
 
         let update_price_note = create_public_note_with_library_and_inputs(
             &mut self.client,
@@ -500,7 +508,7 @@ impl RegistryTestHelper {
             owner_account.clone(),
             empty_assets,
             contract_library,
-            inputs
+            inputs,
         )
         .await
         .unwrap();
@@ -543,7 +551,11 @@ impl RegistryTestHelper {
         let update_owner_note_code = get_note_code("update_owner".to_string());
         let contract_library = self.load_registry_library();
         let empty_assets = NoteAssets::new(vec![]).unwrap();
-        let inputs = NoteInputs::new(vec![new_owner.id().suffix(),new_owner.id().prefix().as_felt()]).unwrap();
+        let inputs = NoteInputs::new(vec![
+            new_owner.id().suffix(),
+            new_owner.id().prefix().as_felt(),
+        ])
+        .unwrap();
 
         let update_price_note = create_public_note_with_library_and_inputs(
             &mut self.client,
@@ -551,7 +563,7 @@ impl RegistryTestHelper {
             owner_account.clone(),
             empty_assets,
             contract_library,
-            inputs
+            inputs,
         )
         .await
         .unwrap();
@@ -681,7 +693,12 @@ impl RegistryTestHelper {
     ///
     /// A tuple `(owner_prefix, owner_suffix)` representing the owner's account ID components
     pub fn get_owner(&self, account_record: &AccountRecord) -> (u64, u64) {
-        let owner: Word = account_record.account().storage().get_item(1).unwrap().into();
+        let owner: Word = account_record
+            .account()
+            .storage()
+            .get_item(1)
+            .unwrap()
+            .into();
         let (owner_prefix, owner_suffix) = (
             owner.get(0).unwrap().as_int(), // prefix at index 0
             owner.get(1).unwrap().as_int(), // suffix at index 1
@@ -1280,8 +1297,9 @@ impl RegistryTestHelper {
             .unwrap();
 
         let registry_id = self.registry_contract.as_ref().unwrap().id();
-        let tx_result = self.client.new_transaction(registry_id, request).await?;
-        self.client.submit_transaction(tx_result).await?;
+        self.client
+            .submit_new_transaction(registry_id, request)
+            .await?;
 
         Ok(())
     }
@@ -1307,7 +1325,12 @@ impl RegistryTestHelper {
 pub fn get_script_code(script_name: String) -> String {
     // Construct the file path and read the MASM script content
     // Used to load transaction scripts like "nop.masm" for executing transactions
-    fs::read_to_string(Path::new(&format!("{}/{}.masm", paths::SCRIPTS_DIR, script_name))).unwrap()
+    fs::read_to_string(Path::new(&format!(
+        "{}/{}.masm",
+        paths::SCRIPTS_DIR,
+        script_name
+    )))
+    .unwrap()
 }
 
 /// Reads a MASM note file from the notes directory.
@@ -1326,5 +1349,10 @@ pub fn get_script_code(script_name: String) -> String {
 pub fn get_note_code(note_name: String) -> String {
     // Construct the file path and read the MASM note content
     // Used to load note templates like "init.masm", "register_name.masm", "update_price.masm", etc.
-    fs::read_to_string(Path::new(&format!("{}/{}.masm", paths::NOTES_DIR, note_name))).unwrap()
+    fs::read_to_string(Path::new(&format!(
+        "{}/{}.masm",
+        paths::NOTES_DIR,
+        note_name
+    )))
+    .unwrap()
 }

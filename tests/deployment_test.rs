@@ -1,7 +1,7 @@
 mod test_helper;
 
-use test_helper::RegistryTestHelper;
 use miden_client::ClientError;
+use test_helper::RegistryTestHelper;
 
 #[tokio::test]
 async fn test_deployment_flow() -> Result<(), ClientError> {
@@ -26,7 +26,9 @@ async fn test_deployment_flow() -> Result<(), ClientError> {
 
     println!("\nStep 4: Initialize Registry");
     let price = 100;
-    helper.initialize_registry_with_faucet(&owner_account, Some(&faucet_account)).await?;
+    helper
+        .initialize_registry_with_faucet(&owner_account, Some(&faucet_account))
+        .await?;
     println!("✅ Registry initialized with price: {}", price);
 
     println!("\nStep 5: Verify Deployment");
@@ -36,12 +38,28 @@ async fn test_deployment_flow() -> Result<(), ClientError> {
             helper.get_initialization_state(&contract_state);
 
         assert_eq!(initialized, 1, "Registry should be initialized");
-        assert_eq!(owner_prefix, owner_account.id().prefix().as_felt().as_int(), "Owner prefix mismatch");
-        assert_eq!(owner_suffix, owner_account.id().suffix().as_int(), "Owner suffix mismatch");
+        assert_eq!(
+            owner_prefix,
+            owner_account.id().prefix().as_felt().as_int(),
+            "Owner prefix mismatch"
+        );
+        assert_eq!(
+            owner_suffix,
+            owner_account.id().suffix().as_int(),
+            "Owner suffix mismatch"
+        );
 
         let (token_prefix, token_suffix) = helper.get_payment_token_state(&contract_state);
-        assert_eq!(token_prefix, faucet_account.id().prefix().as_felt().as_int(), "Payment token prefix mismatch");
-        assert_eq!(token_suffix, faucet_account.id().suffix().as_int(), "Payment token suffix mismatch");
+        assert_eq!(
+            token_prefix,
+            faucet_account.id().prefix().as_felt().as_int(),
+            "Payment token prefix mismatch"
+        );
+        assert_eq!(
+            token_suffix,
+            faucet_account.id().suffix().as_int(),
+            "Payment token suffix mismatch"
+        );
 
         let price_word = contract_state.account().storage().get_item(5).unwrap();
         let stored_price = price_word.get(0).unwrap().as_int();
@@ -79,7 +97,9 @@ async fn test_deployment_with_different_prices() -> Result<(), ClientError> {
         if price == 0 {
             helper.initialize_registry(&owner_account).await?;
         } else {
-            helper.initialize_registry_with_faucet(&owner_account, Some(&faucet_account)).await?;
+            helper
+                .initialize_registry_with_faucet(&owner_account, Some(&faucet_account))
+                .await?;
         }
 
         helper.sync_network().await?;
@@ -91,7 +111,11 @@ async fn test_deployment_with_different_prices() -> Result<(), ClientError> {
             let stored_price = price_word.get(0).unwrap().as_int();
 
             let expected_price = if price == 0 { 0 } else { 100 };
-            assert_eq!(stored_price, expected_price, "Price {} should be stored as {}", price, expected_price);
+            assert_eq!(
+                stored_price, expected_price,
+                "Price {} should be stored as {}",
+                price, expected_price
+            );
             println!("✅ Price {} verified", stored_price);
         }
     }
@@ -119,9 +143,21 @@ async fn test_deployment_verification_checks() -> Result<(), ClientError> {
     println!("   Faucet:   {}", faucet_account.id());
     println!("   Registry: {}", registry_contract.id());
 
-    let owner_exists = helper.client.get_account(owner_account.id()).await?.is_some();
-    let faucet_exists = helper.client.get_account(faucet_account.id()).await?.is_some();
-    let registry_exists = helper.client.get_account(registry_contract.id()).await?.is_some();
+    let owner_exists = helper
+        .client
+        .get_account(owner_account.id())
+        .await?
+        .is_some();
+    let faucet_exists = helper
+        .client
+        .get_account(faucet_account.id())
+        .await?
+        .is_some();
+    let registry_exists = helper
+        .client
+        .get_account(registry_contract.id())
+        .await?
+        .is_some();
 
     assert!(owner_exists, "Owner account should exist");
     assert!(faucet_exists, "Faucet account should exist");
@@ -129,11 +165,17 @@ async fn test_deployment_verification_checks() -> Result<(), ClientError> {
 
     println!("\n✅ All accounts verified in database");
 
-    helper.initialize_registry_with_faucet(&owner_account, Some(&faucet_account)).await?;
+    helper
+        .initialize_registry_with_faucet(&owner_account, Some(&faucet_account))
+        .await?;
     helper.sync_network().await?;
 
     let (initialized, owner_prefix, owner_suffix) = {
-        let record = helper.client.get_account(registry_contract.id()).await?.unwrap();
+        let record = helper
+            .client
+            .get_account(registry_contract.id())
+            .await?
+            .unwrap();
         helper.get_initialization_state(&record)
     };
 
@@ -161,13 +203,16 @@ async fn test_registry_ready_for_registration_after_deployment() -> Result<(), C
     helper.deploy_registry_contract().await?;
     helper.sync_network().await?;
 
-    helper.initialize_registry_with_faucet(&owner_account, Some(&faucet_account)).await?;
+    helper
+        .initialize_registry_with_faucet(&owner_account, Some(&faucet_account))
+        .await?;
     helper.sync_network().await?;
 
     println!("✅ Registry deployed and initialized");
 
     println!("\n💰 Minting tokens to user...");
-    let fungible_asset = miden_objects::asset::FungibleAsset::new(faucet_account.id(), 100).unwrap();
+    let fungible_asset =
+        miden_objects::asset::FungibleAsset::new(faucet_account.id(), 100).unwrap();
     let tx_req = miden_client::transaction::TransactionRequestBuilder::new()
         .build_mint_fungible_asset(
             fungible_asset,
@@ -177,22 +222,31 @@ async fn test_registry_ready_for_registration_after_deployment() -> Result<(), C
         )
         .unwrap();
 
-    let tx_result = helper.client.new_transaction(faucet_account.id(), tx_req).await?;
-    helper.client.submit_transaction(tx_result).await?;
+    helper
+        .client
+        .submit_new_transaction(faucet_account.id(), tx_req)
+        .await?;
 
     let list_of_note_ids = loop {
         helper.client.sync_state().await?;
-        let consumable_notes = helper.client.get_consumable_notes(Some(user_account.id())).await?;
+        let consumable_notes = helper
+            .client
+            .get_consumable_notes(Some(user_account.id()))
+            .await?;
         let note_ids: Vec<_> = consumable_notes.iter().map(|(note, _)| note.id()).collect();
-        if !note_ids.is_empty() { break note_ids; }
+        if !note_ids.is_empty() {
+            break note_ids;
+        }
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     };
 
     let tx_req = miden_client::transaction::TransactionRequestBuilder::new()
         .build_consume_notes(list_of_note_ids)
         .unwrap();
-    let tx_result = helper.client.new_transaction(user_account.id(), tx_req).await?;
-    helper.client.submit_transaction(tx_result).await?;
+    helper
+        .client
+        .submit_new_transaction(user_account.id(), tx_req)
+        .await?;
 
     helper.sync_network().await?;
     let user_record = helper.client.get_account(user_account.id()).await?.unwrap();
@@ -201,7 +255,9 @@ async fn test_registry_ready_for_registration_after_deployment() -> Result<(), C
     println!("✅ User has tokens");
 
     println!("\n📝 Registering name 'alice'...");
-    helper.register_name_for_account_with_payment(&user_account, "alice", Some(100)).await?;
+    helper
+        .register_name_for_account_with_payment(&user_account, "alice", Some(100))
+        .await?;
     helper.sync_network().await?;
 
     let is_registered = helper.is_name_registered("alice").await?;

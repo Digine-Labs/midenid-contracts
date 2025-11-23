@@ -1,5 +1,5 @@
 use.miden_id::registry
-use.miden::note
+use.miden::active_note
 use.std::sys
 
 const.NOTE_INPUT_PTR=0
@@ -8,9 +8,9 @@ const.NOTE_INPUT_PTR=0
 # Inputs: [PRICE] (argument)
 begin
     push.NOTE_INPUT_PTR
-    exec.note::get_inputs
+    exec.active_note::get_inputs
     push.0
-    mem_loadw
+    mem_loadw_be
     call.registry::update_price
     exec.sys::truncate_stack
 end

@@ -1,15 +1,16 @@
-use std::{env, fs, path::Path};
+use miden_client::{
+    account::AccountId, address::Address, rpc::Endpoint, transaction::TransactionRequestBuilder,
+};
+use miden_objects::{
+    Felt,
+    note::{NoteAssets, NoteInputs},
+};
 use midenid_contracts::common::{
     create_library, create_public_immutable_contract, create_public_note_with_library_and_inputs,
     create_tx_script, instantiate_client,
 };
-use miden_client::{
-    account::AccountId,
-    rpc::Endpoint,
-    transaction::TransactionRequestBuilder,
-};
-use miden_objects::{address::Address, note::{NoteAssets, NoteInputs}, Felt, FieldElement};
-use tokio::time::{sleep, Duration};
+use std::{env, fs, path::Path};
+use tokio::time::{Duration, sleep};
 
 /// Parses an account ID from either hexadecimal or Bech32 format.
 ///
@@ -37,13 +38,13 @@ fn parse_account_id(id_str: &str) -> Result<AccountId, String> {
     // Check if it's a bech32 address (starts with known prefixes)
     if id_str.starts_with("mm1") || id_str.starts_with("mtst1") || id_str.starts_with("mdev1") {
         // Parse bech32 and extract AccountId
-        let (_network_id, address) = Address::from_bech32(id_str)
+        use miden_client::address::AddressId;
+        let (_network_id, address) = Address::decode(id_str)
             .map_err(|e| format!("Failed to parse bech32 address '{}': {}", id_str, e))?;
 
-        match address {
-            Address::AccountId(account_id_address) => {
-                Ok(account_id_address.id())
-            }
+        // Get account ID from address
+        match address.id() {
+            AddressId::AccountId(account_id) => Ok(account_id),
             _ => Err(format!("Unsupported address type in: {}", id_str)),
         }
     } else if id_str.starts_with("0x") {
@@ -68,25 +69,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if args.len() < 3 {
         eprintln!("\n❌ Error: Missing required parameters\n");
-        eprintln!("Usage: {} <network> <payment_token_id> <price> [owner_account_id]\n", args[0]);
+        eprintln!(
+            "Usage: {} <network> <payment_token_id> <price> [owner_account_id]\n",
+            args[0]
+        );
         eprintln!("Examples:");
         eprintln!("  # Auto-create owner account:");
-        eprintln!("  {} testnet 0x97598f759deab5201e93e1aac55997 10\n", args[0]);
+        eprintln!(
+            "  {} testnet 0x97598f759deab5201e93e1aac55997 10\n",
+            args[0]
+        );
         eprintln!("  # Use existing owner account:");
-        eprintln!("  {} testnet 0x97598f759deab5201e93e1aac55997 10 0x1c89546e3b82cd1012a9fe4853bc68\n", args[0]);
+        eprintln!(
+            "  {} testnet 0x97598f759deab5201e93e1aac55997 10 0x1c89546e3b82cd1012a9fe4853bc68\n",
+            args[0]
+        );
         eprintln!("  # With bech32 addresses:");
-        eprintln!("  {} testnet mtst1... 10 mtst1qqwgj4rw8wpv6yqj48lys5audpcqqykld75\n", args[0]);
+        eprintln!(
+            "  {} testnet mtst1... 10 mtst1qqwgj4rw8wpv6yqj48lys5audpcqqykld75\n",
+            args[0]
+        );
         eprintln!("Parameters:");
         eprintln!("  network           - Network to deploy to: devnet, testnet, or mainnet");
-        eprintln!("  payment_token_id  - Faucet/token ID (hex: 0x... OR bech32: mm1.../mtst.../mdev...)");
+        eprintln!(
+            "  payment_token_id  - Faucet/token ID (hex: 0x... OR bech32: mm1.../mtst.../mdev...)"
+        );
         eprintln!("  price             - Registration price in tokens (e.g., 10, 100)");
-        eprintln!("  owner_account_id  - (Optional) Use existing account, or omit to auto-create\n");
+        eprintln!(
+            "  owner_account_id  - (Optional) Use existing account, or omit to auto-create\n"
+        );
         std::process::exit(1);
     }
 
     let network_str = &args[1];
     let payment_token_id_str = &args[2];
-    let price: u64 = args[3].parse()
+    let price: u64 = args[3]
+        .parse()
         .map_err(|_| format!("Invalid price: '{}'. Must be a number.", args[3]))?;
     let owner_id_str = args.get(4).map(|s| s.as_str());
 
@@ -98,12 +116,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Mainnet endpoint - using the expected mainnet RPC URL
             // Note: Update this URL when Miden mainnet is officially launched
             Endpoint::new("https".into(), "rpc.mainnet.miden.io".into(), None)
-        },
+        }
         _ => {
             return Err(format!(
                 "Invalid network: '{}'. Must be one of: devnet, testnet, mainnet",
                 network_str
-            ).into());
+            )
+            .into());
         }
     };
 
@@ -111,7 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Parse payment token ID (supports both hex and bech32)
     println!("🔍 Parsing payment token ID...");
-    if payment_token_id_str.starts_with("mm1") || payment_token_id_str.starts_with("mtst1") || payment_token_id_str.starts_with("mdev1") {
+    if payment_token_id_str.starts_with("mm1")
+        || payment_token_id_str.starts_with("mtst1")
+        || payment_token_id_str.starts_with("mdev1")
+    {
         println!("   Detected bech32 format, converting to AccountId...");
     }
     let payment_token_id = parse_account_id(payment_token_id_str)?;
@@ -129,7 +151,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Handle owner account - either use existing or create new
     let (owner_id, owner_account, owner_seed) = if let Some(existing_id) = owner_id_str {
         println!("🔍 Using existing owner account...");
-        if existing_id.starts_with("mm1") || existing_id.starts_with("mtst1") || existing_id.starts_with("mdev1") {
+        if existing_id.starts_with("mm1")
+            || existing_id.starts_with("mtst1")
+            || existing_id.starts_with("mdev1")
+        {
             println!("   Detected bech32 format, converting to AccountId...");
         }
         let owner_id = parse_account_id(existing_id)?;
@@ -144,15 +169,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "❌ Owner account {} not found in local database!\n\
                  The owner account must be imported locally to sign the initialization note.",
                 owner_id
-            ).into());
+            )
+            .into());
         };
 
         (owner_id, owner_account, None)
     } else {
         println!("🔑 Creating new owner account...\n");
 
-        use midenid_contracts::common::create_basic_account;
         use miden_client::keystore::FilesystemKeyStore;
+        use midenid_contracts::common::create_basic_account;
 
         let keystore = FilesystemKeyStore::new("./keystore".into())?;
         let (account, _key_pair) = create_basic_account(&mut client, keystore).await?;
@@ -163,12 +189,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("   Account ID (hex):     {}", account.id().to_hex());
         println!("   Account ID (decimal): {}", account.id());
         println!("   Storage Mode:         {:?}", account.id().storage_mode());
-        println!("   Account Type:         {:?}\n", account.id().account_type());
+        println!(
+            "   Account Type:         {:?}\n",
+            account.id().account_type()
+        );
 
         // Get the seed for backup
         let account_record = client.get_account(account.id()).await?;
         let seed = if let Some(record) = account_record {
-            record.seed().cloned()
+            record.seed().map(|s| *s)
         } else {
             None
         };
@@ -176,7 +205,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ref seed_value) = seed {
             println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             println!("🔐 ACCOUNT SEED (BACKUP THIS!):\n");
-            println!("   {}\n", seed_value);
+            println!("   {:?}\n", seed_value);
             println!("⚠️  WARNING: This seed gives full control of the account!");
             println!("   Store it securely - you'll need it to recover the account.\n");
         }
@@ -199,12 +228,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let registry_code = fs::read_to_string(Path::new("./masm/accounts/miden_id.masm"))?;
     println!("📄 Loading contract: ./masm/accounts/miden_id.masm");
 
-    let (registry_contract, registry_seed) =
-        create_public_immutable_contract(&mut client, &registry_code).await?;
+    let registry_contract = create_public_immutable_contract(&mut client, &registry_code).await?;
 
-    client
-        .add_account(&registry_contract, Some(registry_seed), false)
-        .await?;
+    client.add_account(&registry_contract, false).await?;
 
     println!("✅ Registry contract deployed!");
     println!("   ID: {}", registry_contract.id());
@@ -253,8 +279,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .custom_script(transaction_script)
         .build()?;
 
-    let tx_result = client.new_transaction(registry_contract.id(), request).await?;
-    client.submit_transaction(tx_result).await?;
+    client
+        .submit_new_transaction(registry_contract.id(), request)
+        .await?;
 
     println!("✅ Registry initialized!\n");
 
@@ -268,29 +295,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let contract_record = client.get_account(registry_contract.id()).await?;
     if let Some(record) = contract_record {
         let storage = record.account().storage();
-       
+
         let initialized = storage.get_item(0).unwrap().get(3).unwrap().as_int();
         let owner_word = storage.get_item(1).unwrap();
         let payment_token_word = storage.get_item(2).unwrap();
+        let name_to_addr_map_root = storage.get_item(3).unwrap();
+        let addr_to_name_map_root = storage.get_item(4).unwrap();
         let price_word = storage.get_item(5).unwrap();
 
         println!("✅ Registry State:");
-        println!("   Initialized: {} (raw value: {})", if initialized == 1 { "✓" } else { "✗" }, initialized);
-        println!("   Owner Prefix: {} (expected: {})",
+        println!(
+            "   Slot 0 - Initialized: {} (raw value: {})",
+            if initialized == 1 { "✓" } else { "✗" },
+            initialized
+        );
+        println!(
+            "   Slot 1 - Owner Prefix: {} (expected: {})",
             owner_word.get(0).unwrap().as_int(),
-            owner_id.prefix().as_felt().as_int());
-        println!("   Owner Suffix: {} (expected: {})",
+            owner_id.prefix().as_felt().as_int()
+        );
+        println!(
+            "   Slot 1 - Owner Suffix: {} (expected: {})",
             owner_word.get(1).unwrap().as_int(),
-            owner_id.suffix().as_int());
-        println!("   Payment Token Prefix: {} (expected: {})",
+            owner_id.suffix().as_int()
+        );
+        println!(
+            "   Slot 2 - Payment Token Prefix: {} (expected: {})",
             payment_token_word.get(1).unwrap().as_int(),
-            payment_token_id.prefix().as_felt().as_int());
-        println!("   Payment Token Suffix: {} (expected: {})",
+            payment_token_id.prefix().as_felt().as_int()
+        );
+        println!(
+            "   Slot 2 - Payment Token Suffix: {} (expected: {})",
             payment_token_word.get(0).unwrap().as_int(),
-            payment_token_id.suffix().as_int());
-        println!("   Price: {} tokens (expected: {})\n",
+            payment_token_id.suffix().as_int()
+        );
+        println!(
+            "   Slot 3 - Name→Addr Map (SMT root): {:?}",
+            name_to_addr_map_root
+        );
+        println!(
+            "   Slot 4 - Addr→Name Map (SMT root): {:?}",
+            addr_to_name_map_root
+        );
+        println!(
+            "   Slot 5 - Price: {} tokens (expected: {})\n",
             price_word.get(0).unwrap().as_int(),
-            price);
+            price
+        );
+
+        println!("   📝 Note: Slots 3 & 4 are StorageMaps. The values shown are SMT root hashes.");
+        println!("      Use get_map_item(slot, key) to query individual entries.\n");
     }
 
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -306,7 +360,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(ref seed_value) = owner_seed {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         println!("🔐 OWNER ACCOUNT SEED (BACKUP THIS!):\n");
-        println!("   {}\n", seed_value);
+        println!("   {:?}\n", seed_value);
         println!("⚠️  IMPORTANT: Store this seed securely!");
         println!("   You need it to recover the owner account.\n");
     }
@@ -323,44 +377,93 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut file = fs::File::create(&filepath)?;
 
-    writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")?;
+    writeln!(
+        file,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )?;
     writeln!(file, "MIDEN ID REGISTRY DEPLOYMENT RECORD")?;
-    writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")?;
+    writeln!(
+        file,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    )?;
 
-    writeln!(file, "Deployment Date: {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"))?;
+    writeln!(
+        file,
+        "Deployment Date: {}",
+        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+    )?;
     writeln!(file, "Network:         {}\n", network_str.to_uppercase())?;
 
-    writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")?;
+    writeln!(
+        file,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )?;
     writeln!(file, "REGISTRY CONTRACT")?;
-    writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")?;
+    writeln!(
+        file,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    )?;
 
-    writeln!(file, "Registry ID (hex):     {}", registry_contract.id().to_hex())?;
+    writeln!(
+        file,
+        "Registry ID (hex):     {}",
+        registry_contract.id().to_hex()
+    )?;
     writeln!(file, "Registry ID (decimal): {}\n", registry_contract.id())?;
 
-    writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")?;
+    writeln!(
+        file,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )?;
     writeln!(file, "CONFIGURATION")?;
-    writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")?;
+    writeln!(
+        file,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    )?;
 
     writeln!(file, "Owner Account (hex):     {}", owner_id.to_hex())?;
     writeln!(file, "Owner Account (decimal): {}", owner_id)?;
-    writeln!(file, "Payment Token (hex):     {}", payment_token_id.to_hex())?;
+    writeln!(
+        file,
+        "Payment Token (hex):     {}",
+        payment_token_id.to_hex()
+    )?;
     writeln!(file, "Payment Token (decimal): {}", payment_token_id)?;
     writeln!(file, "Registration Price:      {} tokens\n", price)?;
 
     if let Some(ref seed_value) = owner_seed {
-        writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")?;
+        writeln!(
+            file,
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        )?;
         writeln!(file, "OWNER ACCOUNT SEED (KEEP SECRET!)")?;
-        writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")?;
-        writeln!(file, "{}\n", seed_value)?;
-        writeln!(file, "⚠️  WARNING: This seed gives full control of the owner account!")?;
+        writeln!(
+            file,
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        )?;
+        writeln!(file, "{:?}\n", seed_value)?;
+        writeln!(
+            file,
+            "⚠️  WARNING: This seed gives full control of the owner account!"
+        )?;
         writeln!(file, "   Store it securely and never share it.\n")?;
     }
 
-    writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")?;
+    writeln!(
+        file,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )?;
     writeln!(file, "FRONTEND INTEGRATION")?;
-    writeln!(file, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")?;
+    writeln!(
+        file,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    )?;
     writeln!(file, "Use these values in your frontend configuration:\n")?;
-    writeln!(file, "REGISTRY_CONTRACT_ID=\"{}\"", registry_contract.id().to_hex())?;
+    writeln!(
+        file,
+        "REGISTRY_CONTRACT_ID=\"{}\"",
+        registry_contract.id().to_hex()
+    )?;
     writeln!(file, "PAYMENT_TOKEN_ID=\"{}\"", payment_token_id.to_hex())?;
     writeln!(file, "REGISTRATION_PRICE={}", price)?;
 

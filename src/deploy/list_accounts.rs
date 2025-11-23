@@ -1,5 +1,5 @@
-use midenid_contracts::common::instantiate_client;
 use miden_client::rpc::Endpoint;
+use midenid_contracts::common::instantiate_client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

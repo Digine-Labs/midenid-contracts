@@ -8,13 +8,15 @@ mod test_helper;
 use test_helper::RegistryTestHelper;
 
 #[tokio::test]
-async fn update_price_with_note()-> Result<(), ClientError> {
+async fn update_price_with_note() -> Result<(), ClientError> {
     // Setup: Deploy contract and initialize registry with price of 100
     let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
     let owner_account = helper.create_account("Owner").await?;
     let faucet_account = helper.create_faucet("REG", 8, 1_000_000).await?;
 
-    helper.initialize_registry_with_faucet(&owner_account, Some(&faucet_account)).await?;
+    helper
+        .initialize_registry_with_faucet(&owner_account, Some(&faucet_account))
+        .await?;
 
     // Verify initial price is 100
     let initial_state = helper.get_contract_state().await?.unwrap();
