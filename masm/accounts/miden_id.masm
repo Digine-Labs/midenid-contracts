@@ -50,7 +50,7 @@ export.init
     dropw drop
     # [token_prefix, token_suffix]
 
-    exec.active_note::get_sender
+    push.0 exec.active_note::get_sender
     # [owner_prefix, owner_suffix, token_prefix, token_suffix]
     exec._update_owner
     # [token_prefix, token_suffix]
@@ -124,7 +124,7 @@ export.register_name
     # [NAME]
 
     # Get the sender address
-    exec.active_note::get_sender
+    push.0 exec.active_note::get_sender
     # [prefix, suffix, NAME(4)] = 6 elements
 
     # Check if account already has a name (one name per account)
@@ -427,7 +427,7 @@ proc._update_owner
 end
 
 proc._assert_only_owner
-    exec.active_note::get_sender
+    push.0 exec.active_note::get_sender
     push.1
     exec.active_account::get_item
     drop drop

@@ -11,7 +11,7 @@ begin
     push.NOTE_INPUT_PTR
     exec.active_note::get_inputs
     push.0
-    mem_loadw
+    mem_loadw_be
 
     # Register the name
     call.registry::register_name

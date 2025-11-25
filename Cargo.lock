@@ -2394,6 +2394,7 @@ dependencies = [
 name = "midenid-contracts"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "miden-assembly 0.19.1",
  "miden-client 0.12.3",
