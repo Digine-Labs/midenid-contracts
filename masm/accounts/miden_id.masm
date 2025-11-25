@@ -434,6 +434,8 @@ proc._set_payment_token
     # account::set_item stores in REVERSE: [index, V1, V2, V3, V4] → Word[V4, V3, V2, V1]
     # So to get [token_prefix, token_suffix, 0, 0] we need stack: [2, 0, 0, token_suffix, token_prefix]
     # Current: [token_prefix, token_suffix]
+    # Remove the extra 0 at the top of the stack
+    drop  
     swap
     # [token_suffix, token_prefix]
     push.0.0

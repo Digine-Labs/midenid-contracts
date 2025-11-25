@@ -208,13 +208,15 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     let naming_account = create_test_naming_account();
     builder.add_account(naming_account.clone())?;
 
+    // SWAPPED PLACES OF INPUTS
+
     // Create initialization note
     // init function expects: [price, token_prefix, token_suffix]
     let initialize_inputs = NoteInputs::new(
         [
-            Felt::new(100), // price
-            fungible_asset.faucet_id().prefix().as_felt(),
             Felt::new(fungible_asset.faucet_id().suffix().into()),
+            fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(100), // price
         ]
         .to_vec(),
     )?;
