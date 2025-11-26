@@ -46,18 +46,18 @@ async fn test_register_name_with_payment() -> anyhow::Result<()> {
     let name_to_id_value = ctx.naming.storage().get_map_item(3, name_word)?;
     
     // Should contain the user's account ID
-    let stored_prefix = name_to_id_value.get(2).unwrap().as_int();
-    let stored_suffix = name_to_id_value.get(3).unwrap().as_int();
+    let stored_prefix = name_to_id_value.get(1).unwrap().as_int();
+    let stored_suffix = name_to_id_value.get(0).unwrap().as_int();
     
     assert_eq!(stored_prefix, ctx.user_1.id().prefix().as_u64());
     assert_eq!(stored_suffix, ctx.user_1.id().suffix().as_int());
 
     // Verify reverse mapping in ID->name map (slot 4)
     let user_key = miden_client::Word::new([
-        Felt::new(0),
-        Felt::new(0),
-        Felt::new(ctx.user_1.id().prefix().as_u64()),
         Felt::new(ctx.user_1.id().suffix().as_int()),
+        Felt::new(ctx.user_1.id().prefix().as_u64()),
+        Felt::new(0),
+        Felt::new(0),
     ]);
     let id_to_name_value = ctx.naming.storage().get_map_item(4, user_key)?;
     
@@ -74,7 +74,7 @@ async fn test_duplicate_name_rejected() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let name = encode_domain_as_felts("alice".to_string());
-    
+
     // First registration
     let register_inputs_1 = NoteInputs::new([name[0], name[1], name[2], name[3]].to_vec())?;
     let payment_1 = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 100)?;

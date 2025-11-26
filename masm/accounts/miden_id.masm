@@ -126,23 +126,23 @@ export.register_name
     # Get the sender address
     push.0 exec.active_note::get_sender
     # [prefix, suffix, NAME(4)] = 6 elements
-
     # Check if account already has a name (one name per account)
     # Duplicate prefix, suffix, NAME for the check
-    dup.5 dup.5 dup.5 dup.5 dup.5 dup.5
-    # [prefix, suffix, NAME, prefix, suffix, NAME]
+    dup.6 dup.6 dup.6 dup.6 dup.6 dup.6 dup.6
+    # [prefix, suffix, 0, NAME, prefix, suffix, 0, NAME]
     exec._assert_not_have_name
     # [NAME, prefix, suffix, NAME] (8 elements)
     # _assert_not_have_name consumes [prefix, suffix, NAME] and returns [NAME]
-
+    
     # Clean up the extra NAME that was returned
     dropw
+    # [prefix, suffix, 0, NAME] = 7 elements
+    movup.3
+    drop
     # [prefix, suffix, NAME] = 6 elements
-
     # Duplicate all for both mappings
     dup.5 dup.5 dup.5 dup.5 dup.5 dup.5
     # [prefix, suffix, NAME, prefix, suffix, NAME] = 12 elements
-
     # Store Name->ID mapping (slot 3)
     # Need: [NAME(KEY), ADDR(VALUE)] = [NAME, 0, 0, prefix, suffix]
     push.0.0
@@ -282,45 +282,40 @@ end
 # Input: [prefix, suffix, NAME]
 # Output: [NAME]
 proc._assert_not_have_name
-    # Stack: [prefix, suffix, n0, n1, n2, n3] (NAME is 4 felts)
+    # Stack: [prefix, suffix, 0, n0, n1, n2, n3] (NAME is 4 felts)
     # Need to check if [0, 0, prefix, suffix] exists in slot 4
-
     # Duplicate NAME to preserve it
-    dup.5 dup.5 dup.5 dup.5
-    # [n0, n1, n2, n3, prefix, suffix, n0, n1, n2, n3]
-
+    dup.6 dup.6 dup.6 dup.6
+    # [n0, n1, n2, n3, prefix, suffix, 0, n0, n1, n2, n3]
     # Move duplicated NAME below prefix/suffix
-    movdn.7 movdn.7 movdn.7 movdn.7
-    # [prefix, suffix, n0, n1, n2, n3, n0, n1, n2, n3]
-
+    movdn.6 movdn.6 movdn.6 movdn.6
+    # [prefix, suffix, 0, n0, n1, n2, n3, n0, n1, n2, n3]
     # Build the key: [0, 0, prefix, suffix]
     push.0.0
-    # [0, 0, prefix, suffix, n0, n1, n2, n3, n0, n1, n2, n3]
-
+    # [0, 0, prefix, suffix, 0, n0, n1, n2, n3, n0, n1, n2, n3]
     # Query slot 4 for existing name
     push.4
-    # [4, 0, 0, prefix, suffix, n0, n1, n2, n3, n0, n1, n2, n3]
+    # [4, 0, 0, prefix, suffix, 0, n0, n1, n2, n3, n0, n1, n2, n3]
     exec.active_account::get_map_item
-    # [VALUE(4), n0, n1, n2, n3, n0, n1, n2, n3]
-
+    # [VALUE(4), 0, n0, n1, n2, n3, n0, n1, n2, n3]
     # Check if VALUE is zero (no name registered - this is what we want)
     push.0.0.0.0
-    # [ZERO(4), VALUE(4), n0, n1, n2, n3, n0, n1, n2, n3]
+    # [ZERO(4), VALUE(4), 0, n0, n1, n2, n3, n0, n1, n2, n3]
     eqw
-    # [result, ZERO(4), VALUE(4), n0, n1, n2, n3, n0, n1, n2, n3]
+    # [result, ZERO(4), VALUE(4), 0, n0, n1, n2, n3, n0, n1, n2, n3]
     # eqw returns 1 if equal (account has no name), 0 if not equal (account already has name)
-
     # Clean up the 8 elements from eqw
     movdn.8
     # [ZERO(4), VALUE(4), result, n0, n1, n2, n3, n0, n1, n2, n3]
     dropw dropw
-    # [result, n0, n1, n2, n3, n0, n1, n2, n3]
+    # [result, 0, n0, n1, n2, n3, n0, n1, n2, n3]
 
     # Assert result is 1 (account should NOT have a name already)
     assert.err=ACCOUNT_ALREADY_HAS_NAME
-    # [n0, n1, n2, n3, n0, n1, n2, n3]
+    # [0, n0, n1, n2, n3, n0, n1, n2, n3]
 
-    # Drop the first copy of NAME (the one we looked up)
+    # Drop the first copy of NAME (the one we looked up) & first 0
+    drop
     dropw
     # [n0, n1, n2, n3] = NAME (the original input NAME)
 end
@@ -331,7 +326,6 @@ proc._assert_name_length
     # Stack when NAME=[5, 435459550305, 0, 0] is pushed:
     # push.5.435459550305.0.0 creates stack (top to bottom):
     # depth 0: 0, depth 1: 0, depth 2: 435459550305, depth 3: 5(length)
-
     # Get the length from depth 3
     dup.3
     # [length, 0, 0, 435459550305, 5]
@@ -345,7 +339,6 @@ proc._assert_name_length
     u32gt
     # [result, 0, 0, 435459550305, 5]
     # result is 1 if length > 20 (BAD), 0 if length <= 20 (GOOD)
-
     # Assert result is 0 (length should be <= 20)
     assertz.err=NAME_LEN_HIGH
     # [0, 0, 435459550305, 5] - original NAME preserved
@@ -416,7 +409,10 @@ proc._update_owner
 end
 
 proc._assert_only_owner
-    push.0 exec.active_note::get_sender
+    push.0 
+    exec.active_note::get_sender
+    movup.2
+    drop
     push.1
     exec.active_account::get_item
     drop drop
@@ -455,6 +451,7 @@ proc._get_balance
     # [PAYMENT_TOKEN] - returns Word as stored: [token_prefix, token_suffix, 0, 0]
     drop drop
     # [token_prefix, token_suffix]
+    swap
     exec.active_account::get_balance
     # [balance]
 end

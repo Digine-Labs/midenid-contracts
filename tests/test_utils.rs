@@ -212,6 +212,9 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
 
     // Create initialization note
     // init function expects: [price, token_prefix, token_suffix]
+
+    // SWAPPED PLACES OF INPUTS
+    // MIDEN SWAPS PLACES IN FUNCTION. 
     let initialize_inputs = NoteInputs::new(
         [
             Felt::new(fungible_asset.faucet_id().suffix().into()),
