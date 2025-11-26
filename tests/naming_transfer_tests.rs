@@ -51,10 +51,6 @@ async fn test_owner_can_update_price() -> anyhow::Result<()> {
     // Verify price is updated to 200
     let updated_price_slot = ctx.naming.storage().get_item(5)?;
     let updated_price_word: Word = updated_price_slot.into();
-    println!("0 {:?}", updated_price_word.get(0).unwrap().as_int());
-    println!("1 {:?}", updated_price_word.get(1).unwrap().as_int());
-    println!("2 {:?}", updated_price_word.get(2).unwrap().as_int());
-    println!("3 {:?}", updated_price_word.get(3).unwrap().as_int());
 
     assert_eq!(updated_price_word.get(0).unwrap().as_int(), new_price);
 
