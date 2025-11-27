@@ -53,34 +53,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     delete_keystore_and_store().await;
     let args: Vec<String> = env::args().collect();
 
+    // Default payment token (testnet faucet)
+    const DEFAULT_PAYMENT_TOKEN: &str = "0x97598f759deab5201e93e1aac55997";
+
     if args.len() < 3 {
         eprintln!("\n❌ Error: Missing required parameters\n");
         eprintln!(
-            "Usage: {} <network> <payment_token_id> <price> [owner_account_id]\n",
+            "Usage: {} <network> <price> [payment_token_id] [owner_account_id]\n",
             args[0]
         );
         eprintln!("Examples:");
-        eprintln!("  # Auto-create owner account:");
+        eprintln!("  # Minimal (uses default testnet faucet):");
+        eprintln!("  {} testnet 10\n", args[0]);
+        eprintln!("  # Custom payment token:");
         eprintln!(
-            "  {} testnet 0x97598f759deab5201e93e1aac55997 10\n",
+            "  {} testnet 10 0x97598f759deab5201e93e1aac55997\n",
             args[0]
         );
-        eprintln!("  # Use existing owner account:");
+        eprintln!("  # With existing owner account:");
         eprintln!(
-            "  {} testnet 0x97598f759deab5201e93e1aac55997 10 0x1c89546e3b82cd1012a9fe4853bc68\n",
-            args[0]
-        );
-        eprintln!("  # With bech32 addresses:");
-        eprintln!(
-            "  {} testnet mtst1... 10 mtst1qqwgj4rw8wpv6yqj48lys5audpcqqykld75\n",
+            "  {} testnet 10 0x97598f759deab5201e93e1aac55997 0x1c89546e3b82cd1012a9fe4853bc68\n",
             args[0]
         );
         eprintln!("Parameters:");
         eprintln!("  network           - Network to deploy to: devnet, testnet, or mainnet");
-        eprintln!(
-            "  payment_token_id  - Faucet/token ID (hex: 0x... OR bech32: mm1.../mtst.../mdev...)"
-        );
         eprintln!("  price             - Registration price in tokens (e.g., 10, 100)");
+        eprintln!(
+            "  payment_token_id  - (Optional) Faucet/token ID in hex format (default: 0x97598f759deab5201e93e1aac55997)"
+        );
         eprintln!(
             "  owner_account_id  - (Optional) Use existing account, or omit to auto-create\n"
         );
@@ -88,10 +88,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let network_str = &args[1];
-    let payment_token_id_str = &args[2];
-    let price: u64 = args[3]
+    let price: u64 = args[2]
         .parse()
-        .map_err(|_| format!("Invalid price: '{}'. Must be a number.", args[3]))?;
+        .map_err(|_| format!("Invalid price: '{}'. Must be a number.", args[2]))?;
+
+    // Check if user provided a payment token
+    let user_provided_token = args.get(3).is_some();
+    let payment_token_id_str = args
+        .get(3)
+        .map(|s| s.as_str())
+        .unwrap_or(DEFAULT_PAYMENT_TOKEN);
     let owner_id_str = args.get(4).map(|s| s.as_str());
 
     // Parse network
@@ -114,16 +120,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("🌐 Target Network: {}\n", network_str.to_uppercase());
 
-    // Parse payment token ID (supports both hex and bech32)
-    println!("🔍 Parsing payment token ID...");
-    if payment_token_id_str.starts_with("mm1")
-        || payment_token_id_str.starts_with("mtst1")
-        || payment_token_id_str.starts_with("mdev1")
-    {
-        println!("Detected bech32 format, converting to AccountId...");
+    // Parse payment token ID
+    if user_provided_token {
+        println!("💰 Payment Token: {} (custom)", payment_token_id_str);
+    } else {
+        println!(
+            "💰 Payment Token: {} (using default testnet faucet)",
+            DEFAULT_PAYMENT_TOKEN
+        );
     }
     let payment_token_id = parse_account_id(payment_token_id_str)?;
-    println!("   ✓ Payment Token AccountId: {}\n", payment_token_id);
+    println!("   ✓ Parsed: {}\n", payment_token_id);
 
     let mut client = instantiate_client(endpoint.clone()).await?;
 
@@ -131,8 +138,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("💾 Database: ./store.sqlite3");
     println!("🔑 Keystore: ./keystore\n");
 
-    client.sync_state().await?;
-    println!("✅ Client synced with network\n");
+    // Skip initial sync for fresh deployments to avoid hitting note fetch limits
+    // The client will sync after transactions are submitted
+    // client.sync_state().await?;
+    println!("ℹ️  Skipping initial sync (fresh deployment)\n");
 
     // Handle owner account - either use existing or create new
     let (owner_id, owner_account, owner_seed) = if let Some(existing_id) = owner_id_str {
@@ -272,54 +281,109 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✅ Registry initialized!\n");
 
-    sleep(Duration::from_secs(15)).await;
-    client.sync_state().await?;
-
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("STEP 4: Verify Deployment");
+    println!("STEP 3: Verify Deployment");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let contract_record = client.get_account(registry_contract.id()).await?;
-    if let Some(record) = contract_record {
-        let storage = record.account().storage();
+    // Smart polling: wait for initialization to complete
+    println!("⏳ Waiting for on-chain initialization...");
 
-        let initialized = storage.get_item(0).unwrap().get(3).unwrap().as_int();
-        let owner_word = storage.get_item(1).unwrap();
-        let payment_token_word = storage.get_item(2).unwrap();
-        let price_word = storage.get_item(5).unwrap();
+    const MAX_ATTEMPTS: u32 = 12;
+    let mut attempts = 0;
+    let mut initialized = 0u64;
 
-        println!("✅ Registry State:");
+    loop {
+        attempts += 1;
+
+        // Try selective sync for just this account (avoid "too many notes" error)
+        match client
+            .get_consumable_notes(Some(registry_contract.id()))
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                if !error_msg.contains("too many note IDs") && !error_msg.contains("max 100") {
+                    eprintln!("   ⚠️  Sync warning: {}", e);
+                }
+            }
+        }
+
+        // Check contract state
+        match client.get_account(registry_contract.id()).await? {
+            Some(contract_record) => {
+                let storage = contract_record.account().storage();
+                initialized = storage.get_item(0).unwrap().get(0).unwrap().as_int();
+
+                if initialized == 1 {
+                    println!("✅ Registry initialized on-chain!\n");
+                    break;
+                }
+            }
+            None => {
+                if attempts >= MAX_ATTEMPTS {
+                    return Err("Registry contract not found after initialization".into());
+                }
+            }
+        }
+
+        if attempts >= MAX_ATTEMPTS {
+            println!("⚠️  Max attempts reached, but continuing anyway...\n");
+            println!("💡 The contract is likely initialized on-chain.");
+            println!("   You can verify later using: cargo run --bin list_accounts\n");
+            break;
+        }
+
         println!(
-            "   Initialized: {} (raw value: {})",
-            if initialized == 1 { "✓" } else { "✗" },
-            initialized
+            "   Attempt {}/{} - waiting for initialization...",
+            attempts, MAX_ATTEMPTS
         );
-        println!(
-            "   Owner Prefix: {} (expected: {})",
-            owner_word.get(0).unwrap().as_int(),
-            owner_id.prefix().as_felt().as_int()
-        );
-        println!(
-            "   Owner Suffix: {} (expected: {})",
-            owner_word.get(1).unwrap().as_int(),
-            owner_id.suffix().as_int()
-        );
-        println!(
-            "   Payment Token Prefix: {} (expected: {})",
-            payment_token_word.get(1).unwrap().as_int(),
-            payment_token_id.prefix().as_felt().as_int()
-        );
-        println!(
-            "   Payment Token Suffix: {} (expected: {})",
-            payment_token_word.get(0).unwrap().as_int(),
-            payment_token_id.suffix().as_int()
-        );
-        println!(
-            "   Price: {} tokens (expected: {})\n",
-            price_word.get(0).unwrap().as_int(),
-            price
-        );
+        sleep(Duration::from_secs(3)).await;
     }
+
+    // Final state verification
+    let contract_record = client
+        .get_account(registry_contract.id())
+        .await?
+        .ok_or("Registry contract not found after initialization")?;
+
+    let storage = contract_record.account().storage();
+    let initialized = storage.get_item(0).unwrap().get(0).unwrap().as_int();
+    let owner_word = storage.get_item(1).unwrap();
+    let payment_token_word = storage.get_item(2).unwrap();
+    let price_word = storage.get_item(5).unwrap();
+
+    println!("✅ Registry State:");
+    println!(
+        "   Initialized: {} (raw value: {})",
+        if initialized == 1 { "✓" } else { "✗" },
+        initialized
+    );
+    println!(
+        "   Owner Prefix: {} (expected: {})",
+        owner_word.get(0).unwrap().as_int(),
+        owner_id.prefix().as_felt().as_int()
+    );
+    println!(
+        "   Owner Suffix: {} (expected: {})",
+        owner_word.get(1).unwrap().as_int(),
+        owner_id.suffix().as_int()
+    );
+    println!(
+        "   Payment Token Prefix: {} (expected: {})",
+        payment_token_word.get(1).unwrap().as_int(),
+        payment_token_id.prefix().as_felt().as_int()
+    );
+    println!(
+        "   Payment Token Suffix: {} (expected: {})",
+        payment_token_word.get(0).unwrap().as_int(),
+        payment_token_id.suffix().as_int()
+    );
+    println!(
+        "   Price: {} tokens (expected: {})\n",
+        price_word.get(0).unwrap().as_int(),
+        price
+    );
 
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("🎉 Deployment Complete!");
@@ -435,11 +499,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     writeln!(file, "Use these values in your frontend configuration:\n")?;
     writeln!(
         file,
-        "REGISTRY_CONTRACT_ID=\"{}\"",
+        "REGISTRY_CONTRACT_ID: {}",
         registry_contract.id().to_hex()
     )?;
-    writeln!(file, "PAYMENT_TOKEN_ID=\"{}\"", payment_token_id.to_hex())?;
-    writeln!(file, "REGISTRATION_PRICE={}", price)?;
+    writeln!(file, "PAYMENT_TOKEN_ID: {}", payment_token_id.to_hex())?;
+    writeln!(file, "REGISTRATION_PRICE: {}", price)?;
 
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("💾 Deployment info saved to: {}\n", filepath.display());

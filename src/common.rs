@@ -32,7 +32,7 @@ use rand::{RngCore, rngs::StdRng};
 use serde::de::value::Error;
 use std::{fs, path::Path, sync::Arc};
 
-type Client = MidenClient<FilesystemKeyStore<rand::prelude::StdRng>>;
+pub type Client = MidenClient<FilesystemKeyStore<rand::prelude::StdRng>>;
 
 // Clears keystore & default sqlite file
 pub async fn delete_keystore_and_store() {
@@ -134,8 +134,6 @@ pub async fn create_public_note_with_library_and_inputs(
         .await
         .unwrap();
 
-    client.sync_state().await.unwrap();
-
     Ok(note)
 }
 
@@ -178,9 +176,6 @@ pub async fn create_public_note_with_library(
         .await
         .unwrap();
 
-    // let _ = client.submit_transaction(tx_result).await;
-    client.sync_state().await.unwrap();
-
     Ok(note)
 }
 
@@ -218,9 +213,6 @@ pub async fn create_public_note(
         .submit_new_transaction(creator_account.id(), note_req)
         .await
         .unwrap();
-
-    // let _ = client.submit_transaction(tx_result).await;
-    client.sync_state().await.unwrap();
 
     Ok(note)
 }
