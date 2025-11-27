@@ -26,8 +26,10 @@ async fn test_initialize_registry() -> anyhow::Result<()> {
     // Verify owner is set (slot 1)
     let owner_slot = ctx.naming.storage().get_item(1)?;
     let owner_word: Word = owner_slot.into();
-    let stored_prefix = owner_word.get(1).unwrap().as_int();
-    let stored_suffix = owner_word.get(0).unwrap().as_int();
+    let stored_prefix = owner_word.get(0).unwrap().as_int();
+    let stored_suffix = owner_word.get(1).unwrap().as_int();
+
+    // SUFFIX & PREFIX INDEX SWAP
 
     assert_eq!(stored_prefix, ctx.owner.id().prefix().as_u64());
     assert_eq!(stored_suffix, ctx.owner.id().suffix().as_int());
@@ -35,8 +37,10 @@ async fn test_initialize_registry() -> anyhow::Result<()> {
     // Verify payment token is set (slot 2)
     let token_slot = ctx.naming.storage().get_item(2)?;
     let token_word: Word = token_slot.into();
-    let token_prefix = token_word.get(1).unwrap().as_int();
-    let token_suffix = token_word.get(0).unwrap().as_int();
+    let token_prefix = token_word.get(0).unwrap().as_int();
+    let token_suffix = token_word.get(1).unwrap().as_int();
+
+    // SUFFIX & PREFIX INDEX SWAP
 
     assert_eq!(
         token_prefix,
