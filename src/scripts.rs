@@ -1,6 +1,6 @@
 use miden_assembly::{DefaultSourceManager, Library, LibraryPath, ast::{Module, ModuleKind}};
 use miden_client::{
-    Client, account::{AccountBuilder, AccountStorageMode, AccountType}, auth::NoAuth, keystore::FilesystemKeyStore, note::{NoteAssets, NoteInputs}, transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder}
+    Client, account::{AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::NoAuth, keystore::FilesystemKeyStore, note::{NoteAssets, NoteInputs}, transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder}
 };
 use miden_crypto::Felt;
 use miden_objects::account::AccountComponent;
@@ -53,6 +53,35 @@ pub async fn deploy() -> anyhow::Result<()> {
     client.sync_state().await?;
 
     println!("Setting prices");
+
+    let payment_token_id = AccountId::from_hex("0x54bf4e12ef20082070758b022456c7")?;
+
+    let set_prices_note_inputs = NoteInputs::new([
+        Felt::new(payment_token_id.suffix().into()),
+        Felt::new(payment_token_id.prefix().into()),
+    ].to_vec())?;
+
+    let set_prices_note = create_note_for_naming("set_all_prices_testnet".to_string(), set_prices_note_inputs, deployer_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
+
+    let set_price_req = TransactionRequestBuilder::new()
+        .own_output_notes(vec![OutputNote::Full(set_prices_note)])
+        .build()?;
+
+    let set_prices_tx_id = client.submit_new_transaction(deployer_account.id(), set_price_req).await?;
+
+    println!(
+        "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
+        set_prices_tx_id
+    );
+    client.sync_state().await?;
+
+    println!("set prices tx submitted, waiting for onchain commitment");
+
+    wait_for_tx(&mut client, set_prices_tx_id).await?;
+
+    sleep(Duration::from_secs(6)).await;
+
+    client.sync_state().await?;
     Ok(())
 }
 
