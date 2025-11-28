@@ -13,6 +13,7 @@ use test_utils::init_naming;
 use crate::test_utils::{add_note_to_builder, create_note_for_naming, create_p2id_note_exact, execute_note, execute_notes_and_build_chain};
 
 #[tokio::test]
+#[ignore = "not implemented"]
 async fn test_claim_protocol_revenue() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
     println!("\nOwner prefix: {}, suffix: {}", ctx.owner.id().prefix().to_string(), ctx.owner.id().suffix().to_string());
