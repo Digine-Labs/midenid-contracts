@@ -1,0 +1,66 @@
+use.miden_name::naming
+use.miden::active_note
+use.std::sys
+## Len: 14
+## Input (arguments): [PAYMENT_TOKEN]
+const.ONE_LETTER_PRICE=5
+const.TWO_LETTER_PRICE=6
+const.THREE_LETTER_PRICE=7
+const.FOUR_LETTER_PRICE=8
+const.FIVE_LETTER_PRICE=9
+
+begin
+    push.0
+    exec.active_note::get_inputs
+    # [num_inputs, init_ptr]
+    drop drop
+    ### SET 1 LETTER
+    mem_loadw_be.0 drop drop
+    # [token_prefix, token_suffix]
+    push.1.0
+    # [0, letter_count, prefix, suffix]
+    push.ONE_LETTER_PRICE.0.0.0 swapw
+    # [0, letter_count, prefix, suffix, PRICE]
+    call.naming::set_price
+    exec.sys::truncate_stack
+
+    ### SET 2 LETTER
+    mem_loadw_be.0 drop drop
+    # [token_prefix, token_suffix]
+    push.2.0
+    # [0, letter_count, prefix, suffix]
+    push.TWO_LETTER_PRICE.0.0.0 swapw
+    # [0, letter_count, prefix, suffix, PRICE]
+    call.naming::set_price
+    exec.sys::truncate_stack
+
+    ### SET 3 LETTER
+    mem_loadw_be.0 drop drop
+    # [token_prefix, token_suffix]
+    push.3.0
+    # [0, letter_count, prefix, suffix]
+    push.THREE_LETTER_PRICE.0.0.0 swapw
+    # [0, letter_count, prefix, suffix, PRICE]
+    call.naming::set_price
+    exec.sys::truncate_stack
+
+    ### SET 4 LETTER
+    mem_loadw_be.0 drop drop
+    # [token_prefix, token_suffix]
+    push.4.0
+    # [0, letter_count, prefix, suffix]
+    push.FOUR_LETTER_PRICE.0.0.0 swapw
+    # [0, letter_count, prefix, suffix, PRICE]
+    call.naming::set_price
+    exec.sys::truncate_stack
+
+    ### SET 5 LETTER
+    mem_loadw_be.0 drop drop
+    # [token_prefix, token_suffix]
+    push.5.0
+    # [0, letter_count, prefix, suffix]
+    push.FIVE_LETTER_PRICE.0.0.0 swapw
+    # [0, letter_count, prefix, suffix, PRICE]
+    call.naming::set_price
+    exec.sys::truncate_stack
+end
