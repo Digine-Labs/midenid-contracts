@@ -1,6 +1,6 @@
 # Miden Name Registry
 
-A decentralized name resolution system built on the [Miden](https://miden.xyz), enabling human-readable names to map to Miden account addresses.
+A decentralized name resolution system built on [Miden](https://miden.xyz), enabling human-readable names to map to Miden account addresses with advanced features like referrals, domain expiry, and revenue management.
 
 🌐 **Website**: [miden.name](https://miden.name)
 
@@ -10,27 +10,31 @@ Miden Name Registry is a smart contract system that provides ENS-like functional
 
 ## Current Status
 
-Miden Name is actively developed and any functionality can be changed, removed, or updated during development. The initial version includes only a simple registry and access-controlled utilities.
+Miden Name is actively developed and any functionality can be changed, removed, or updated during development. The current version includes a comprehensive registry with domain ownership, transfers, expiry management, referral system, and revenue tracking.
 
 ### Key Features
 
 - **Bidirectional Mapping**: Maps names to account IDs and vice versa
-- **Multiple Payment Tokens**: Registration can be done by different tokens
-- **Owner Controls**: Registry owner can update prices and transfer ownership
-- **Unique Names**: Each name can only be registered once
-- **Multiple Names**: Any accounts can own any amount of names
-- **Transferable Names**: Name owners can transfer names to another accounts
-- **Dynamic Pricing**: Registration fee depends on the length of the name
-- **External Pricing Contract**: Name prices calculated by pricing contract. Each tokens have different pricing contract.
+- **Domain Ownership**: Separate domain ownership from account mapping (requires activation)
+- **Domain Expiry**: Domains expire after registration period (1-10 years)
+- **Domain Extension**: Owners can extend domain registration before expiry
+- **Transferable Names**: Domain owners can transfer ownership to other accounts
+- **Multiple Names Per Account**: Accounts can own unlimited domains
+- **Dynamic Pricing**: Registration fee depends on domain length
+- **Discount System**: Multi-year registrations get discounts (3+ years: 30%, 5+ years: 50%)
+- **Referral System**: Referrers earn a percentage of registration fees
+- **Revenue Tracking**: Protocol tracks total and claimable revenue per token
+- **Owner Controls**: Registry owner can update prices, set referral rates, and claim revenue
+- **Expired Domain Cleanup**: Permissionless function to clear expired domain mappings
 
-If you are learning Miden as a developer. You can find practices for following examples;
-- Calling external contract from another contract
-- Initializing network contracts
-- Ownership implementation
-- Storage handling
-- Note input handling
-- Receiving assets to contract
-- Using mockchain to write tests
+If you are learning Miden as a developer, you can find practices for the following examples:
+- Account-based smart contracts with storage maps
+- Note-based transaction system
+- Ownership and access control patterns
+- Payment validation and asset handling
+- Time-based logic (domain expiry)
+- Referral and revenue distribution systems
+- Storage optimization techniques
 
 ## Architecture
 
@@ -39,42 +43,57 @@ If you are learning Miden as a developer. You can find practices for following e
 All core logic is implemented in Miden Assembly (`.masm` files):
 
 #### Accounts
-- **[naming.masm](masm/accounts/miden_id.masm)**: Main name registry contract
-  - Storage slots:
-    - `SLOT[0]`: Initialization flag
-    - `SLOT[1]`: Owner account
-    - `SLOT[2]`: Treasury account
-    - `SLOT[3]`: Payment token to Pricing contract mapping
-    - `SLOT[4]`: Account ID to Domain mapping
-    - `SLOT[5]`: Domain to Account ID mapping
-    - `SLOT[6]`: Domain to Domain owner mapping
-    - `SLOT[7]`: Pricing contract to calculate_price procedure root mapping
-- **[pricing.masm](masm/accounts/pricing.masm)**: Pricing contract that calculates price of a name. Each token should have different pricing contract instance.
-- **[identity.masm](masm/accounts/identity.masm)**: Identity contract that stores users public identities (Under development)
+
+- **[naming.masm](masm/accounts/naming.masm)**: Main name registry contract
+  - Storage slots (see Storage Layout section below)
+  - Exports: `register`, `register_with_referrer`, `activate_domain`, `transfer`, `extend_domain`, `clear_expired_domain`, `init`, `receive_asset`, `update_registry_owner`, `set_price`, `set_referrer_rate`, `claim_protocol_revenue`
+
+- **[identity.masm](masm/accounts/identity.masm)**: Identity contract for user profiles (under development)
 
 #### Notes
-- **[initialize_naming.masm](masm/notes/initialize_naming.masm)**: Initializes naming registry
-- **[initialize_pricing.masm](masm/notes/initialize_pricing.masm)**: Initializes pricing contract
-- **[register_name.masm](masm/notes/register_name.masm)**: Register a new name with payment
-- **[transfer_domain.masm](masm/notes/transfer_domain.masm)**: Transfers domain to another account
-- **[P2N.masm](masm/notes/P2N.masm)**: Pay-to-note for payment handling (TBD)
 
-#### Scripts
-- **[nop.masm](masm/scripts/nop.masm)**: No-operation script for testing
+Note scripts enable cross-account interactions and contract calls:
+
+- **[initialize_naming.masm](masm/notes/initialize_naming.masm)**: Initializes naming registry with owner and year timestamp
+- **[register_name.masm](masm/notes/register_name.masm)**: Register a new domain with payment
+- **[register_with_referrer.masm](masm/notes/register_with_referrer.masm)**: Register with referral code
+- **[activate_domain.masm](masm/notes/activate_domain.masm)**: Activate domain mapping to account ID
+- **[transfer_domain.masm](masm/notes/transfer_domain.masm)**: Transfer domain ownership to another account
+- **[extend_domain.masm](masm/notes/extend_domain.masm)**: Extend domain registration period
+- **[clear_expired_domain.masm](masm/notes/clear_expired_domain.masm)**: Clear expired domain mappings
+- **[set_all_prices.masm](masm/notes/set_all_prices.masm)**: Set prices for all domain lengths
+- **[set_all_prices_testnet.masm](masm/notes/set_all_prices_testnet.masm)**: Set test prices for testnet
+- **[set_referrer_rate.masm](masm/notes/set_referrer_rate.masm)**: Set referral commission rate
+- **[claim_protocol_revenue.masm](masm/notes/claim_protocol_revenue.masm)**: Claim accumulated protocol revenue
+- **[transfer_ownership.masm](masm/notes/transfer_ownership.masm)**: Transfer registry ownership
+- **[P2N.masm](masm/notes/P2N.masm)**: Pay-to-note for payment handling
 
 #### Auth
+
 - **[no_auth.masm](masm/auth/no_auth.masm)**: No-auth authentication component for public access
 
 ### Testing Infrastructure (Rust)
 
-The `src/` and `tests/` directories contain Rust code exclusively for testing and validating the Miden Assembly contracts:
+The `src/` and `tests/` directories contain Rust code for testing, deployment, and utilities:
 
-- **[src/notes.rs](src/notes.rs)**: Note related utility functions that widely used on tests
-- **[src/utils.rs](src/utils.rs)**: Utilities that widely used on tests
+#### Source Modules
 
-- **[tests/encoding_test.rs](tests/encoding_test.rs)**: Encoding and decoding of domain tests
-- **[tests/naming_test.rs](tests/naming_test.rs)**: Naming registry tests
-- **[tests/pricing_test.rs](tests/pricing_test.rs)**: Pricing tests
+- **[src/client.rs](src/client.rs)**: Client initialization and keystore management
+- **[src/accounts.rs](src/accounts.rs)**: Account creation utilities (deployer, naming contract)
+- **[src/notes.rs](src/notes.rs)**: Note creation utilities for contract interactions
+- **[src/transaction.rs](src/transaction.rs)**: Transaction waiting and status checking
+- **[src/scripts.rs](src/scripts.rs)**: Deployment scripts for the registry
+- **[src/domain.rs](src/domain.rs)**: Domain name encoding/decoding functions
+- **[src/storage.rs](src/storage.rs)**: Storage slot definitions for contract initialization
+
+#### Test Files
+
+- **[tests/test_utils.rs](tests/test_utils.rs)**: Shared test utilities and helpers
+- **[tests/encoding_test.rs](tests/encoding_test.rs)**: Domain encoding/decoding validation
+- **[tests/naming_register_tests.rs](tests/naming_register_tests.rs)**: Domain registration tests
+- **[tests/naming_transfer_tests.rs](tests/naming_transfer_tests.rs)**: Domain transfer tests
+- **[tests/naming_referral_tests.rs](tests/naming_referral_tests.rs)**: Referral system tests
+- **[tests/naming_protocol_tests.rs](tests/naming_protocol_tests.rs)**: Protocol-level functionality tests
 
 ## Getting Started
 
@@ -82,7 +101,7 @@ The `src/` and `tests/` directories contain Rust code exclusively for testing an
 
 - Rust toolchain (1.70+)
 - Miden client dependencies
-- Access to Miden testnet
+- Access to Miden testnet or local node
 
 ### Installation
 
@@ -97,39 +116,35 @@ cargo build --release
 
 ### Running Tests
 
-Tests run against the Miden testnet by default. For local development, we provide automated scripts to set up and run a local Miden node.
-
-#### Using Automated Scripts (Recommended for Local Development)
-
-Miden Name Registry tests run on testnet. However, we have implemented scripts in the scripts folder to set up, start, and test a local node.The `scripts/` folder contains shell scripts to simplify local node setup and testing:
-
-- **[setup_node.sh](scripts/setup_node.sh)**: Installs miden-node, creates required directories, and bootstraps a local node with genesis data
-- **[start_node.sh](scripts/start_node.sh)**: Starts the local Miden node with RPC server on port 57291
-- **[start_node_and_test.sh](scripts/start_node_and_test.sh)**: Complete automation script that starts the node, waits for it to be ready, runs all tests, and cleans up the node process automatically
+Tests run against the Miden testnet by default. Tests must run sequentially due to shared SQLite state.
 
 ```bash
-# One-time setup: Install and bootstrap local node
-bash scripts/setup_node.sh
-
-# Option 1: Run tests with automatic node management (recommended)
-bash scripts/start_node_and_test.sh
-
-# Option 2: Manual node control
-bash scripts/start_node.sh  # In one terminal
-cargo test --release -- --nocapture --test-threads=1  # In another terminal
-```
-
-#### Manual Test Commands
-
-```bash
-# Run all tests (requires testnet or local node access)
+# Run all tests
 cargo test --release -- --nocapture --test-threads=1
 
 # Run specific test file
-cargo test --release --test name_registration_test -- --nocapture --test-threads=1
+cargo test --release --test naming_register_tests -- --nocapture --test-threads=1
 
-# Run test demos
-cargo run
+# Run single test
+cargo test --release --test naming_register_tests -- --nocapture --test-threads=1 test_register_name
+```
+
+### CLI Usage
+
+The project includes a CLI for deployment and management:
+
+```bash
+# Show available commands
+cargo run -- --help
+
+# Deploy the naming contract
+cargo run -- deploy
+
+# Initialize the registry (planned)
+cargo run -- init --owner <owner_account_id>
+
+# Register a name (planned)
+cargo run -- register --name alice --account <account_id>
 ```
 
 ### Development Commands
@@ -145,102 +160,69 @@ cargo fmt
 cargo clippy
 ```
 
-## Deployment
-
-For production deployment to testnet or mainnet, see the comprehensive **[DEPLOYMENT.md](DEPLOYMENT.md)** guide.
-
-**Quick Start:**
-```bash
-cargo run --release --bin deploy -- <network> <payment_token_id> <price> [owner_account_id]
-```
-
-Example:
-```bash
-# Deploy to testnet with auto-created owner account
-cargo run --release --bin deploy -- testnet 0x97598f759deab5201e93e1aac55997 10
-```
-
-The deployment script will:
-- Deploy the registry contract as public, immutable
-- Create or use an existing owner account
-- Initialize the registry with payment token and price
-- Save deployment info to `./deployments/` directory
-
-## Usage Examples
-
-### Deploying and Initializing Registry (Testing)
-
-```rust
-let mut helper = RegistryTestHelper::setup_with_deployed_contract().await?;
-let owner_account = helper.create_account("Owner").await?;
-let faucet_account = helper.create_faucet("REG", 8, 1_000_000).await?;
-
-// Initialize with price of 100 tokens
-helper.initialize_registry_with_faucet(&owner_account, Some(&faucet_account)).await?;
-```
-
-### Registering a Name
-
-```rust
-// Register name "alice" for user account
-helper.register_name("alice", &user_account, payment_note).await?;
-
-// Verify registration
-let resolved_id = helper.get_account_for_name("alice").await?;
-assert_eq!(resolved_id, Some(user_account.id()));
-```
-
-### Updating Price
-
-```rust
-// Owner updates registration price to 200
-helper.update_price(&owner_account, 200).await?;
-
-// Verify new price
-let state = helper.get_contract_account_record().await?;
-let price = helper.get_price(&state);
-assert_eq!(price, 200);
-```
-
 ## Storage Layout
 
-The contract uses Miden's storage system with numbered slots:
+The naming contract uses Miden's storage system with numbered slots:
 
-| Slot | Content | Description |
-|------|---------|-------------|
-| 0 | Initialization flag | 0 = uninitialized, 1 = initialized |
-| 1 | Owner prefix | First part of owner account ID |
-| 2 | Owner suffix & Token | Owner suffix + payment token info |
-| 3 | Name→ID mapping | Sparse Merkle Tree root for name lookups |
-| 4 | ID→Name mapping | Sparse Merkle Tree root for reverse lookups |
-| 5 | Registration price | Cost in fungible tokens to register |
+| Slot | Content | Type | Description |
+|------|---------|------|-------------|
+| 0 | Initialization flag | Value | 0 = uninitialized, 1 = initialized |
+| 1 | Owner account | Value | Registry owner's account ID |
+| 2 | Prices | Map | `[0, letter_count, token_prefix, token_suffix] -> price` |
+| 3 | Account→Domain mapping | Map | Account ID to owned domain name |
+| 4 | Domain→Account mapping | Map | Domain name to linked account ID |
+| 5 | Domain→Owner mapping | Map | Domain name to owner account ID |
+| 6 | Referral rate | Map | Referrer account to commission rate (basis points) |
+| 7 | Referral total revenue | Map | Referrer account to total earned revenue |
+| 8 | Referral claimed revenue | Map | Referrer account to claimed revenue |
+| 9 | Domain count | Value | Total number of registered domains |
+| 10 | Total revenue | Map | `[0, 0, token_prefix, token_suffix] -> total_amount` |
+| 11 | Claimed revenue | Map | `[0, 0, token_prefix, token_suffix] -> claimed_amount` |
+| 12 | Domain expiry dates | Map | Domain name to expiry timestamp |
+| 13 | One year timestamp | Value | Number of seconds in one year (for calculations) |
 
 ## Contract Constraints
 
-- **Maximum name length**: 20 characters
-- **One name per account**: Each account can only register one name
-- **Unique names**: Each name can only be registered once
-- **Owner-only operations**: Price updates and ownership transfers require owner authentication
-- **Payment validation**: Registration requires exact payment amount from specified token
+- **Maximum domain length**: 21 characters (alphanumeric: a-z, 0-9)
+- **Minimum domain length**: 1 character
+- **Multiple domains per account**: Accounts can own unlimited domains
+- **Unique active domains**: Only one account can have an active mapping per domain
+- **Registration period**: 1-10 years per registration
+- **Owner-only operations**: Price updates, referral rates, ownership transfer, revenue claims
+- **Domain ownership**: Registration creates ownership; activation creates account mapping
+- **Expiry enforcement**: Expired domains can be cleared permissionlessly
+- **Referral rate limit**: Maximum 25% (2500 basis points)
+- **Discount tiers**: 3+ years = 30% off, 5+ years = 50% off
+
+## Domain Lifecycle
+
+1. **Registration**: User pays to register domain, becomes owner, domain starts inactive
+2. **Activation**: Owner activates domain to link it to their account ID
+3. **Active Period**: Domain resolves to owner's account, can be extended before expiry
+4. **Expiry**: Domain expires after registration period ends
+5. **Cleanup**: Anyone can call `clear_expired_domain` to remove expired mappings
+6. **Re-registration**: Expired domain can be registered again by anyone
 
 ## Testing
 
-Tests run against Miden testnet and validate:
+Tests validate the following functionality:
 
-- ✅ Registry initialization and double-init prevention
-- ✅ Name registration with payment validation
-- ✅ Bidirectional mapping consistency
-- ✅ Duplicate name rejection
-- ✅ One-name-per-account enforcement
-- ✅ Price update functionality
-- ✅ Ownership transfer
-- ✅ Payment token validation
+- ✅ Registry initialization
+- ✅ Domain registration with payment
+- ✅ Domain activation and mapping
+- ✅ Domain transfer between accounts
+- ✅ Domain expiry and extension
+- ✅ Expired domain cleanup
+- ✅ Referral system and revenue distribution
+- ✅ Multi-year discounts
+- ✅ Protocol revenue tracking
+- ✅ Owner controls (price updates, referral rates)
+- ✅ Domain encoding/decoding
+- ✅ Access control enforcement
 
 ## Resources
 
 - [Miden Name](https://miden.name)
 - [Miden Documentation](https://0xmiden.github.io/miden-docs/index.html)
 - [Miden VM Documentation](https://0xmiden.github.io/miden-docs/imported/miden-vm/src/intro/main.html)
-- [Miden](https://miden.xyz)
-
-
+- [Miden Network](https://miden.xyz)
