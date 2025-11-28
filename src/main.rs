@@ -5,11 +5,7 @@ use midenid_contracts::common::{
     instantiate_client,
 };
 
-use miden_client::{
-    Word,
-    rpc::Endpoint,
-    transaction::TransactionRequestBuilder,
-};
+use miden_client::{Word, rpc::Endpoint, transaction::TransactionRequestBuilder};
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
@@ -30,18 +26,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -------------------------------------------------------------------------
     let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
 
-    let counter_contract =
-        create_public_immutable_contract(&mut client, &counter_code).await?;
+    let counter_contract = create_public_immutable_contract(&mut client, &counter_code).await?;
 
-    client
-        .add_account(&counter_contract, false)
-        .await
-        .unwrap();
+    client.add_account(&counter_contract, false).await.unwrap();
 
-    println!(
-        "📄 Counter contract ID: {}",
-        counter_contract.id()
-    );
+    println!("📄 Counter contract ID: {}", counter_contract.id());
 
     // -------------------------------------------------------------------------
     // STEP 2 – Compile the increment script
