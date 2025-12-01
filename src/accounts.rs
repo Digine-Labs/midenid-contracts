@@ -1,15 +1,12 @@
-use miden_assembly::{DefaultSourceManager, Library, LibraryPath, ast::{Module, ModuleKind}};
+
 use miden_client::{
-    Client, ClientError, DebugMode, account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::{AuthSecretKey, NoAuth}, builder::ClientBuilder, keystore::FilesystemKeyStore, rpc::Endpoint, store::TransactionFilter, transaction::{OutputNote, TransactionId, TransactionRequestBuilder, TransactionStatus}};
-use miden_crypto::{Felt, Word, dsa::rpo_falcon512::SecretKey};
-use miden_lib::{account::auth::{self, AuthRpoFalcon512}, account::wallets::BasicWallet, transaction::TransactionKernel};
+    Client, account::{Account, AccountBuilder, AccountStorageMode, AccountType}, auth::{AuthSecretKey, NoAuth}, keystore::FilesystemKeyStore};
+use miden_lib::{account::auth::{ AuthRpoFalcon512}, account::wallets::BasicWallet, transaction::TransactionKernel};
 use miden_objects::account::AccountComponent;
 use rand::{RngCore, rngs::StdRng};
-use std::{fs, path::Path, sync::Arc, time::Duration};
-use tokio::time::sleep;
+use std::{fs, path::Path, sync::Arc};
 
 use crate::storage::naming_storage;
-type ClientType = Client<FilesystemKeyStore<rand::prelude::StdRng>>;
 
 pub async fn create_deployer_account(client: &mut Client<FilesystemKeyStore<StdRng>>, keystore: &mut Arc<FilesystemKeyStore<StdRng>>) -> anyhow::Result<Account> {
     let mut init_seed = [0_u8; 32];

@@ -1,15 +1,12 @@
-use miden_assembly::{DefaultSourceManager, Library, LibraryPath, ast::{Module, ModuleKind}};
+
 use miden_client::{
-    Client, account::{AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::NoAuth, keystore::FilesystemKeyStore, note::{NoteAssets, NoteInputs}, transaction::{OutputNote, TransactionKernel, TransactionRequestBuilder}
+    account::{AccountId}, note::{NoteAssets, NoteInputs}, transaction::{OutputNote, TransactionRequestBuilder}
 };
 use miden_crypto::Felt;
-use miden_objects::account::AccountComponent;
-use rand::{RngCore, rngs::StdRng};
-use std::{fs, path::Path};
 use tokio::time::{sleep, Duration};
 
 
-use crate::{accounts::{create_deployer_account, create_naming_account}, client::{create_keystore, initiate_client}, notes::create_note_for_naming, storage::naming_storage, transaction::wait_for_tx};
+use crate::{accounts::{create_deployer_account, create_naming_account}, client::{create_keystore, initiate_client}, notes::create_note_for_naming, transaction::wait_for_tx};
 
 pub async fn deploy() -> anyhow::Result<()> {
     println!("Starting Miden Name Registry deployment...");

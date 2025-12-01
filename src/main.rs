@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use midenname_contracts::{client::initiate_client, scripts::deploy};
+use midenname_contracts::{scripts::deploy};
 
 #[derive(Parser)]
 #[command(name = "midenname-contracts")]

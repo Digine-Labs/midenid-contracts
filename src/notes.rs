@@ -1,10 +1,7 @@
 use miden_assembly::{DefaultSourceManager, Library, LibraryPath, ast::{Module, ModuleKind}};
-use miden_client::{
-    Client, ScriptBuilder, account::{AccountBuilder, AccountId, AccountStorageMode, AccountType}, auth::NoAuth, keystore::FilesystemKeyStore, note::{Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, transaction::TransactionKernel
+use miden_client::{ScriptBuilder, account::{AccountId}, note::{Note, NoteAssets, NoteExecutionHint, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, transaction::TransactionKernel
 };
 use miden_crypto::{Felt, Word};
-use miden_objects::account::AccountComponent;
-use rand::{RngCore, rngs::StdRng};
 use std::{fs, path::Path, sync::Arc};
 
 pub async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: AccountId, target_id: AccountId, assets: NoteAssets) -> anyhow::Result<Note> {
