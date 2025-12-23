@@ -14,7 +14,7 @@ const.ERR_NAME_NOT_REGISTERED="Target name is not registered on registry"
 const.ERR_P2N_TARGET_NAME_MISMATCH="P2N's target name address and resolved address do not match"
 
 #! Pay-to-Name script: adds all assets from the note to the account, assuming name of the account
-#! registeren on Miden Name Service.
+#! registered on Miden Name Service.
 #!
 #! Requires that the account exposes:
 #! - miden::contracts::wallets::basic::receive_asset procedure.
@@ -41,7 +41,7 @@ begin
     eq.4 assert.err=ERR_P2N_WRONG_NUMBER_OF_INPUTS
     # => [inputs_ptr, EMPTY_WORD]
 
-    # read the target account ID from the note inputs
+    # read the target account name WORD from the note inputs
     mem_loadw
     # => [NAME_WORD]
 
