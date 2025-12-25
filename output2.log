@@ -1,0 +1,177 @@
+warning: unused variable: `keystore`
+  --> src/scripts.rs:19:5
+   |
+19 |     keystore: &mut Arc<FilesystemKeyStore<StdRng>>,
+   |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_keystore`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `midenname-contracts` (lib) generated 1 warning
+   Compiling midenname-contracts v0.1.0 (/home/boreas/digine-midenid-contracts/midenid-contracts)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.28s
+     Running `target/debug/local_deploy_and_register`
+Starting Miden Name Registry deployment...
+=================================================
+Deleting existing store & keystore (store.sqlite3)
+Deletion complete.
+=================================================
+Latest block: 633613
+Deployer account ID: "0x9d1a0cd20760d31041003328493f3a"
+one or more warnings were emitted
+Naming account ID: "0xa69bd023e2c5fe40346e7aac18a6f8"
+Starting Miden Name Registry deployment...
+=================================================
+Init note creation started
+one or more warnings were emitted
+Submitted initialization note transaction.
+View transaction on MidenScan: https://testnet.midenscan.com/tx/0x04f71dfd854031fb36ab57a79cc1de57a568cd47c74e2622bedd0370dc536f30
+naming initialize note creation tx submitted, waiting for onchain commitment
+Transaction 0x04f71dfd854031fb36ab57a79cc1de57a568cd47c74e2622bedd0370dc536f30 not yet committed. Waiting...
+Transaction 0x04f71dfd854031fb36ab57a79cc1de57a568cd47c74e2622bedd0370dc536f30 not yet committed. Waiting...
+Transaction 0x04f71dfd854031fb36ab57a79cc1de57a568cd47c74e2622bedd0370dc536f30 not yet committed. Waiting...
+✅ transaction 0x04f71dfd854031fb36ab57a79cc1de57a568cd47c74e2622bedd0370dc536f30 committed
+=================================================
+Consuming initialization notes...
+Consuming initialization notes via transaction: 0x1658881bbef42a0e94915bcbc41cd2d8d625e9cda2b0d71682c00d0d676fc3ac
+Transaction 0x1658881bbef42a0e94915bcbc41cd2d8d625e9cda2b0d71682c00d0d676fc3ac not yet committed. Waiting...
+Transaction 0x1658881bbef42a0e94915bcbc41cd2d8d625e9cda2b0d71682c00d0d676fc3ac not yet committed. Waiting...
+Transaction 0x1658881bbef42a0e94915bcbc41cd2d8d625e9cda2b0d71682c00d0d676fc3ac not yet committed. Waiting...
+✅ transaction 0x1658881bbef42a0e94915bcbc41cd2d8d625e9cda2b0d71682c00d0d676fc3ac committed
+✅ Initialization Notes consumed successfully!
+=================================================
+=================================================
+✅ Miden Name Registry deployed successfully! ✅
+Creating 5 accounts...
+=================================================
+Deployer account ID: "0x9f9f78f9d0f3e41023c5d0fa2d5d40"
+✅ Created account 1/5: "0x9f9f78f9d0f3e41023c5d0fa2d5d40"
+Deployer account ID: "0x6d706b87998177103eeb8b53237c6e"
+✅ Created account 2/5: "0x6d706b87998177103eeb8b53237c6e"
+Deployer account ID: "0x22b3a450a099da1019a696baaf54d4"
+✅ Created account 3/5: "0x22b3a450a099da1019a696baaf54d4"
+Deployer account ID: "0x092e3c73f9e833102e0b82df473007"
+✅ Created account 4/5: "0x092e3c73f9e833102e0b82df473007"
+Deployer account ID: "0x0a4821b1fddc7f10451a6b7f371030"
+✅ Created account 5/5: "0x0a4821b1fddc7f10451a6b7f371030"
+=================================================
+🎉 Successfully created all 5 accounts!
+
+[Deploying Fungible Faucet]
+=================================================
+Faucet account ID: "mdev1azlqrvy37tga6gpde5tqjg4fcyrenwkg"
+Symbol: TRY, Decimals: 6, Max Supply: 100000000000000000
+=================================================
+✅ Faucet deployed successfully!
+
+[Funding Account]
+=================================================
+Funding account 1/5: "0x9f9f78f9d0f3e41023c5d0fa2d5d40"
+Funding TX request built.
+Transaction 0x477da7c264012f24f6a155773e3f16b87e1d3756fee1c7e83d02591ebc73ad16 not yet committed. Waiting...
+Transaction 0x477da7c264012f24f6a155773e3f16b87e1d3756fee1c7e83d02591ebc73ad16 not yet committed. Waiting...
+✅ transaction 0x477da7c264012f24f6a155773e3f16b87e1d3756fee1c7e83d02591ebc73ad16 committed
+Submitted funding transaction: 0x477da7c264012f24f6a155773e3f16b87e1d3756fee1c7e83d02591ebc73ad16 
+Account 1/5: "0x9f9f78f9d0f3e41023c5d0fa2d5d40"
+=================================================
+Funding account 2/5: "0x6d706b87998177103eeb8b53237c6e"
+Funding TX request built.
+Transaction 0xed33d65cfdd9b801659dc6d2be434fbcdb9f20b8c3d959f5077666d6d0d1b73c not yet committed. Waiting...
+✅ transaction 0xed33d65cfdd9b801659dc6d2be434fbcdb9f20b8c3d959f5077666d6d0d1b73c committed
+Submitted funding transaction: 0xed33d65cfdd9b801659dc6d2be434fbcdb9f20b8c3d959f5077666d6d0d1b73c 
+Account 2/5: "0x6d706b87998177103eeb8b53237c6e"
+=================================================
+Funding account 3/5: "0x22b3a450a099da1019a696baaf54d4"
+Funding TX request built.
+Transaction 0xf896d4bb51b1390ed450374fb6cf3d3e96a25ab81962c82fb0127190ebffbba4 not yet committed. Waiting...
+Transaction 0xf896d4bb51b1390ed450374fb6cf3d3e96a25ab81962c82fb0127190ebffbba4 not yet committed. Waiting...
+✅ transaction 0xf896d4bb51b1390ed450374fb6cf3d3e96a25ab81962c82fb0127190ebffbba4 committed
+Submitted funding transaction: 0xf896d4bb51b1390ed450374fb6cf3d3e96a25ab81962c82fb0127190ebffbba4 
+Account 3/5: "0x22b3a450a099da1019a696baaf54d4"
+=================================================
+Funding account 4/5: "0x092e3c73f9e833102e0b82df473007"
+Funding TX request built.
+Transaction 0x62a7afde839d73b5e428137148fe9b28d1dfa220340071f4f64d16be901470a7 not yet committed. Waiting...
+Transaction 0x62a7afde839d73b5e428137148fe9b28d1dfa220340071f4f64d16be901470a7 not yet committed. Waiting...
+✅ transaction 0x62a7afde839d73b5e428137148fe9b28d1dfa220340071f4f64d16be901470a7 committed
+Submitted funding transaction: 0x62a7afde839d73b5e428137148fe9b28d1dfa220340071f4f64d16be901470a7 
+Account 4/5: "0x092e3c73f9e833102e0b82df473007"
+=================================================
+Funding account 5/5: "0x0a4821b1fddc7f10451a6b7f371030"
+Funding TX request built.
+Transaction 0x91b8effea47274da51375a043bc852175837d4800f325cc26cc5fe48c31d8367 not yet committed. Waiting...
+Transaction 0x91b8effea47274da51375a043bc852175837d4800f325cc26cc5fe48c31d8367 not yet committed. Waiting...
+✅ transaction 0x91b8effea47274da51375a043bc852175837d4800f325cc26cc5fe48c31d8367 committed
+Submitted funding transaction: 0x91b8effea47274da51375a043bc852175837d4800f325cc26cc5fe48c31d8367 
+Account 5/5: "0x0a4821b1fddc7f10451a6b7f371030"
+=================================================
+
+Funding completed.
+
+[Consuming Funding Note For Account 1/5: "0x9f9f78f9d0f3e41023c5d0fa2d5d40"]
+=================================================
+Found 1 consumable note. Consuming it now...
+Transaction 0xe288db22046bc9b4e675a4107cc5cf5e31905390c6698bd04bb0b420ef8ec8ca not yet committed. Waiting...
+Transaction 0xe288db22046bc9b4e675a4107cc5cf5e31905390c6698bd04bb0b420ef8ec8ca not yet committed. Waiting...
+✅ transaction 0xe288db22046bc9b4e675a4107cc5cf5e31905390c6698bd04bb0b420ef8ec8ca committed
+✅ Account 1/5 - Note consumed successfully. TX: 0xe288db22046bc9b4e675a4107cc5cf5e31905390c6698bd04bb0b420ef8ec8ca
+
+[Consuming Funding Note For Account 2/5: "0x6d706b87998177103eeb8b53237c6e"]
+=================================================
+Found 1 consumable note. Consuming it now...
+Transaction 0xd543e7ede17ed0329dae6fe667e2589276dda2aab5871aa6951b3b05ae3b7878 not yet committed. Waiting...
+Transaction 0xd543e7ede17ed0329dae6fe667e2589276dda2aab5871aa6951b3b05ae3b7878 not yet committed. Waiting...
+✅ transaction 0xd543e7ede17ed0329dae6fe667e2589276dda2aab5871aa6951b3b05ae3b7878 committed
+✅ Account 2/5 - Note consumed successfully. TX: 0xd543e7ede17ed0329dae6fe667e2589276dda2aab5871aa6951b3b05ae3b7878
+
+[Consuming Funding Note For Account 3/5: "0x22b3a450a099da1019a696baaf54d4"]
+=================================================
+Found 1 consumable note. Consuming it now...
+Transaction 0xcca864af25479ed3a99565662433d46d661736f977ce6f868d8ffaa80b2b8031 not yet committed. Waiting...
+Transaction 0xcca864af25479ed3a99565662433d46d661736f977ce6f868d8ffaa80b2b8031 not yet committed. Waiting...
+✅ transaction 0xcca864af25479ed3a99565662433d46d661736f977ce6f868d8ffaa80b2b8031 committed
+✅ Account 3/5 - Note consumed successfully. TX: 0xcca864af25479ed3a99565662433d46d661736f977ce6f868d8ffaa80b2b8031
+
+[Consuming Funding Note For Account 4/5: "0x092e3c73f9e833102e0b82df473007"]
+=================================================
+Found 1 consumable note. Consuming it now...
+Transaction 0x5bb926d019cc277dad6eadab8f57b70fb8af71e2d5ef763b4734813c407fdaa4 not yet committed. Waiting...
+Transaction 0x5bb926d019cc277dad6eadab8f57b70fb8af71e2d5ef763b4734813c407fdaa4 not yet committed. Waiting...
+Transaction 0x5bb926d019cc277dad6eadab8f57b70fb8af71e2d5ef763b4734813c407fdaa4 not yet committed. Waiting...
+✅ transaction 0x5bb926d019cc277dad6eadab8f57b70fb8af71e2d5ef763b4734813c407fdaa4 committed
+✅ Account 4/5 - Note consumed successfully. TX: 0x5bb926d019cc277dad6eadab8f57b70fb8af71e2d5ef763b4734813c407fdaa4
+
+[Consuming Funding Note For Account 5/5: "0x0a4821b1fddc7f10451a6b7f371030"]
+=================================================
+Found 1 consumable note. Consuming it now...
+Transaction 0x58aa8bde4e9c60e7a7a58a21afc2fb20aba5411e548b818c4be0c62a1af559e8 not yet committed. Waiting...
+Transaction 0x58aa8bde4e9c60e7a7a58a21afc2fb20aba5411e548b818c4be0c62a1af559e8 not yet committed. Waiting...
+✅ transaction 0x58aa8bde4e9c60e7a7a58a21afc2fb20aba5411e548b818c4be0c62a1af559e8 committed
+✅ Account 5/5 - Note consumed successfully. TX: 0x58aa8bde4e9c60e7a7a58a21afc2fb20aba5411e548b818c4be0c62a1af559e8
+
+[Setting prices]
+=================================================
+Set price note creation started
+one or more warnings were emitted
+Submitted set price note transaction.
+View transaction on MidenScan: https://testnet.midenscan.com/tx/0xbb47b73bc7efe3114ebe2f715e0a624ce12502f426f1c03d0d365e16b59c9897
+set prices tx submitted, waiting for onchain commitment
+=================================================
+Transaction 0xbb47b73bc7efe3114ebe2f715e0a624ce12502f426f1c03d0d365e16b59c9897 not yet committed. Waiting...
+Transaction 0xbb47b73bc7efe3114ebe2f715e0a624ce12502f426f1c03d0d365e16b59c9897 not yet committed. Waiting...
+Transaction 0xbb47b73bc7efe3114ebe2f715e0a624ce12502f426f1c03d0d365e16b59c9897 not yet committed. Waiting...
+✅ transaction 0xbb47b73bc7efe3114ebe2f715e0a624ce12502f426f1c03d0d365e16b59c9897 committed
+✅ Notes pricing successfully!
+
+[Sending register notes]
+=================================================
+Creating register note for account: "0x9f9f78f9d0f3e41023c5d0fa2d5d40"
+Generated domain string: 16392
+Encoded domain: Word([0, 0, 125160005916, 5])
+one or more warnings were emitted
+Transaction 0x8dd1a8bf39ff8fcfbadc3192f8b466ed1ce7a0cc50e4996b54b2336ab8820ec2 not yet committed. Waiting...
+Transaction 0x8dd1a8bf39ff8fcfbadc3192f8b466ed1ce7a0cc50e4996b54b2336ab8820ec2 not yet committed. Waiting...
+✅ transaction 0x8dd1a8bf39ff8fcfbadc3192f8b466ed1ce7a0cc50e4996b54b2336ab8820ec2 committed
+Error: transaction request error
+
+Caused by:
+    specified authenticated input note with id 0xdb3022e84327b4975f8437a7242852b25ac442a3d2414eb4bebe2d9877e66e3d is missing

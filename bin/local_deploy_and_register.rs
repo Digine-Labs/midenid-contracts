@@ -22,6 +22,7 @@ use miden_client_sqlite_store::ClientBuilderSqliteExt;
 use miden_lib::note::create_p2id_note;
 use miden_objects::asset::TokenSymbol;
 use midenname_contracts::accounts::{create_deployer_account, create_naming_account};
+use midenname_contracts::client::initiate_client;
 use midenname_contracts::domain::encode_domain;
 use midenname_contracts::scripts::deploy;
 use midenname_contracts::{notes::create_note_for_naming, transaction::wait_for_tx};
@@ -38,6 +39,30 @@ use tokio::time::sleep;
 // cargo run --bin local_deploy_and_register 2>&1 | tee output.log
 // HOW TO RUN
 
+// #[tokio::main]
+// async fn main() -> anyhow::Result<()> {
+//     println!("Starting Miden Name Registry deployment...");
+//     println!("=================================================");
+//     println!("Deleting existing store & keystore (store.sqlite3)");
+//     let _ = std::fs::remove_file("store.sqlite3");
+//     let _ = std::fs::remove_dir("keystore");
+//     println!("Deletion complete.");
+//     println!("=================================================");
+
+//     let mut keystore = midenname_contracts::client::create_keystore()?;
+
+//     // Initiate local client / we can initiate testnet client by using initiate_client function
+//     let mut client = initiate_client(keystore.clone()).await?;
+
+//     let naming_acc = AccountId::from_hex("0x182acb7af06cfc007b1b5ebb033859")?;
+
+//     _safe_account_import(&mut client, naming_acc).await?;
+
+//     find_consumable_notes(&mut client, naming_acc).await?;
+
+//     Ok(())
+// }
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     println!("Starting Miden Name Registry deployment...");
@@ -51,11 +76,11 @@ async fn main() -> anyhow::Result<()> {
     let mut keystore = midenname_contracts::client::create_keystore()?;
 
     // Initiate local client / we can initiate testnet client by using initiate_client function
-    let mut client = initiate_local_client(keystore.clone()).await?;
+    let mut client = initiate_client(keystore.clone()).await?;
 
     // Define all account IDs here
     let deployer_account = create_deployer_account(&mut client, &mut keystore).await?;
-    let naming_account = create_naming_account(&mut client, false).await?;
+    let naming_account = create_naming_account(&mut client, true).await?;
 
     // deploy contracts
     deploy(
@@ -67,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     // Create 70 accounts
-    let all_accounts = create_multiple_accounts(&mut client, &mut keystore, 2).await?;
+    let all_accounts = create_multiple_accounts(&mut client, &mut keystore, 5).await?;
 
     // Deploy a fungible faucet
     let faucet_id = deploy_fungible_faucet(
@@ -230,7 +255,7 @@ async fn fund_account(
     println!("\n[Funding Account]");
     println!("=================================================");
 
-    let amount: u64 = 1_000_000;
+    let amount: u64 = 1_000_000_00;
 
     let fungible_asset = FungibleAsset::new(faucet_id, amount).unwrap();
 
@@ -535,6 +560,8 @@ async fn find_consumable_notes(
         attempt += 1;
         println!("\n🔍 Attempt {}/{}", attempt, max_attempts);
 
+        client.sync_state().await?;
+
         let consumable_notes = client.get_consumable_notes(Some(naming_account)).await?;
 
         if !consumable_notes.is_empty() {
@@ -628,7 +655,7 @@ async fn _consume_single_note(
     naming_account: AccountId,
 ) -> anyhow::Result<()> {
     let note =
-        NoteId::try_from_hex("0x70ea026678980c2fe5ade933171df2982cf4882a589eee3cb28c386c608613b8")?;
+        NoteId::try_from_hex("0xdc2f55cf8b1e86952e47fe99bf966f2892cb1ab22c6a76bcaa641e1ffca2de12")?;
 
     println!("Consuming note: {:?}", note);
 
