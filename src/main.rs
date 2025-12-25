@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
-use midenname_contracts::{scripts::deploy};
+use midenname_contracts::accounts::{create_deployer_account, create_naming_account};
+use midenname_contracts::client::initiate_client;
+use midenname_contracts::scripts::deploy;
 
 #[derive(Parser)]
 #[command(name = "midenname-contracts")]
@@ -40,7 +42,26 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Deploy => {
             println!("Deploying Miden Name Registry contract...\n");
-            deploy().await?;
+            println!("=================================================");
+            println!("Deleting existing store & keystore (store.sqlite3)");
+            let _ = std::fs::remove_file("store.sqlite3");
+            let _ = std::fs::remove_dir("keystore");
+            println!("Deletion complete.");
+            println!("=================================================");
+            let mut keystore = midenname_contracts::client::create_keystore()?;
+            let mut client = initiate_client(keystore.clone()).await?;
+
+            // Define all account IDs here
+            let deployer_account = create_deployer_account(&mut client, &mut keystore).await?;
+            let naming_account = create_naming_account(&mut client, false).await?;
+            // deploy contracts
+            deploy(
+                &mut client,
+                &mut keystore,
+                deployer_account.id(),
+                naming_account.id(),
+            )
+            .await?;
         }
         Commands::Init { owner } => {
             println!("Initializing registry...");

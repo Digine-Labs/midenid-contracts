@@ -46,7 +46,14 @@ pub async fn create_deployer_account(
 
 pub async fn create_naming_account(
     client: &mut Client<FilesystemKeyStore<StdRng>>,
+    is_network: bool,
 ) -> anyhow::Result<Account> {
+    let mode = if is_network {
+        AccountStorageMode::Network
+    } else {
+        AccountStorageMode::Public
+    };
+
     let account_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
 
     let account_component = AccountComponent::compile(
@@ -61,7 +68,7 @@ pub async fn create_naming_account(
 
     let account = AccountBuilder::new(seed)
         .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Public)
+        .storage_mode(mode)
         .with_component(account_component.clone())
         .with_auth_component(NoAuth)
         .build()?;
