@@ -89,7 +89,7 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
     // Wait for the note transaction to be committed
     wait_for_tx(&mut client, init_tx_id).await.unwrap();
 
-    sleep(Duration::from_secs(12)).await;
+    sleep(Duration::from_secs(6)).await;
 
     client.sync_state().await?;
 
@@ -138,11 +138,35 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
     // Wait for the note transaction to be committed
     wait_for_tx(&mut client, set_price_tx_id).await.unwrap();
 
-    sleep(Duration::from_secs(12)).await;
+    sleep(Duration::from_secs(6)).await;
 
     client.sync_state().await?;
 
     /// TODO BURADA PRICES MAPINI KONTROL ET OLMUS MU DIYE
+    let new_account_state = client.get_account(naming_account.id()).await.unwrap();
+
+    
+    if let Some(account) = new_account_state.as_ref() {
+        let one_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(1), Felt::new(0)]);
+        let one_letter_price: Word = account.account().storage().get_map_item(2, one_letter_word).unwrap().into();
+        println!("🔢 one letter price value: {}", one_letter_price.to_string());
+
+        let two_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(2), Felt::new(0)]);
+        let two_letter_price: Word = account.account().storage().get_map_item(2, two_letter_word).unwrap().into();
+        println!("🔢 one letter price value: {}", two_letter_price.to_string());
+
+        let three_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(3), Felt::new(0)]);
+        let three_letter_price: Word = account.account().storage().get_map_item(2, three_letter_word).unwrap().into();
+        println!("🔢 one letter price value: {}", three_letter_price.to_string());
+
+        let four_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(4), Felt::new(0)]);
+        let four_letter_price: Word = account.account().storage().get_map_item(2, four_letter_word).unwrap().into();
+        println!("🔢 one letter price value: {}", four_letter_price.to_string());
+
+        let five_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(5), Felt::new(0)]);
+        let five_letter_price: Word = account.account().storage().get_map_item(2, five_letter_word).unwrap().into();
+        println!("🔢 one letter price value: {}", five_letter_price.to_string());
+    }
 
     Ok(())
 }
