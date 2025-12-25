@@ -3,17 +3,53 @@ use miden_assembly::{
     ast::{Module, ModuleKind},
 };
 use miden_client::{
-    ScriptBuilder,
-    account::AccountId,
-    note::{
+    Client, ScriptBuilder, account::AccountId, note::{
         Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata,
         NoteRecipient, NoteTag, NoteType,
-    },
-    transaction::TransactionKernel,
+    }, transaction::TransactionKernel, keystore::FilesystemKeyStore,
 };
 use miden_crypto::{Felt, Word};
-use rand::Rng;
+use rand::{RngCore, rngs::StdRng, Rng};
 use std::{fs, path::Path, sync::Arc};
+
+pub async fn create_note_for_naming_with_client(
+    name: String,
+    inputs: NoteInputs,
+    sender: AccountId,
+    _target_id: AccountId,
+    assets: NoteAssets,
+    client: &mut Client<FilesystemKeyStore<StdRng>>
+) -> anyhow::Result<Note> {
+    let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
+    let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
+    let library = create_library(naming_code, "miden_name::naming")?;
+
+    let serial_num =     Word::new([
+        Felt::new(client.rng().next_u64()),
+        Felt::new(client.rng().next_u64()),
+        Felt::new(client.rng().next_u64()),
+        Felt::new(client.rng().next_u64()),
+    ]);
+
+    let note_script = client
+        .script_builder()
+        .with_dynamically_linked_library(&library)?
+        .compile_note_script(&note_code)?;
+
+
+    let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
+    //let tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap();
+    let tag = NoteTag::from_account_id(_target_id);
+    let metadata = NoteMetadata::new(
+        sender,
+        NoteType::Public,
+        tag,
+        NoteExecutionHint::none(),
+        Felt::new(0),
+    )?;
+    let note = Note::new(assets, metadata, recipient);
+    Ok(note)
+}
 
 pub async fn create_note_for_naming(
     name: String,

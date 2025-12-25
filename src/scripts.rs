@@ -4,9 +4,9 @@ use miden_client::{
     note::{NoteAssets, NoteInputs},
     transaction::{OutputNote, TransactionRequestBuilder},
 };
-use miden_crypto::Felt;
+use miden_crypto::{Felt, Word};
 use tokio::time::{Duration, sleep};
-
+use std::{fs, path::Path, sync::Arc};
 
 use crate::{
     accounts::{create_deployer_account, create_naming_account, create_network_naming_account},
@@ -31,9 +31,9 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
     let naming_account = create_network_naming_account(&mut client).await?;
 
     // Init note
-    let script_code = std::fs::read_to_string(std::path::Path::new("./masm/scripts/init_on_chain.masm")).unwrap();
+    let script_code = fs::read_to_string(Path::new("./masm/scripts/init_on_chain.masm")).unwrap();
 
-    let account_code = std::fs::read_to_string(std::path::Path::new("./masm/accounts/naming.masm")).unwrap();
+    let account_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
     let library_path = "miden_name::naming";
 
     let library = create_library(account_code, library_path)?;
@@ -51,6 +51,54 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
 
     // Wait for the transaction to be committed
     wait_for_tx(&mut client, tx_id).await.unwrap();
+
+    // Contract initialzed
+
+    let initialize_inputs = NoteInputs::new(
+        [
+            Felt::new(deployer_account.id().suffix().into()),
+            Felt::new(deployer_account.id().prefix().into()),
+            Felt::new(0),
+            Felt::new(0),
+        ]
+        .to_vec(),
+    )?;
+    let init_note = create_note_for_naming(
+        "initialize_naming".to_string(),
+        initialize_inputs,
+        deployer_account.id(),
+        naming_account.id(),
+        NoteAssets::new(vec![]).unwrap(),
+    ).await?;
+
+    let init_req = TransactionRequestBuilder::new()
+        .own_output_notes(vec![OutputNote::Full(init_note)])
+        .build()?;
+
+    let init_tx_id = client.submit_new_transaction(deployer_account.id(), init_req).await?;
+    println!(
+        "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
+        init_tx_id
+    );
+
+    client.sync_state().await?;
+
+    println!("network init note creation tx submitted, waiting for onchain commitment");
+
+    // Wait for the note transaction to be committed
+    wait_for_tx(&mut client, init_tx_id).await.unwrap();
+
+    sleep(Duration::from_secs(6)).await;
+
+    client.sync_state().await?;
+
+    // Checking updated state
+    let new_account_state = client.get_account(naming_account.id()).await.unwrap();
+
+    if let Some(account) = new_account_state.as_ref() {
+        let count: Word = account.account().storage().get_item(0).unwrap().into();
+        println!("🔢 Final deployer prefix value: {}", count.to_string());
+    }
     Ok(())
 }
 
