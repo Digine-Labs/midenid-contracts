@@ -31,9 +31,9 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
     let naming_account = create_network_naming_account(&mut client).await?;
 
     // Init note
-    let script_code = std::fs::read_to_string(std::path::Path::new("../masm/scripts/init_on_chain.masm")).unwrap();
+    let script_code = std::fs::read_to_string(std::path::Path::new("./masm/scripts/init_on_chain.masm")).unwrap();
 
-    let account_code = std::fs::read_to_string(std::path::Path::new("../masm/accounts/naming.masm")).unwrap();
+    let account_code = std::fs::read_to_string(std::path::Path::new("./masm/accounts/naming.masm")).unwrap();
     let library_path = "miden_name::naming";
 
     let library = create_library(account_code, library_path)?;
