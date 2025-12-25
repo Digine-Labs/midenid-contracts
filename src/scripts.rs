@@ -100,6 +100,50 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
         let count: Word = account.account().storage().get_item(0).unwrap().into();
         println!("🔢 Final deployer prefix value: {}", count.to_string());
     }
+
+    // SET PRICE
+    let payment_token_id = AccountId::from_hex("0x54bf4e12ef20082070758b022456c7")?;
+
+    let set_prices_note_inputs = NoteInputs::new(
+        [
+            Felt::new(payment_token_id.suffix().into()),
+            Felt::new(payment_token_id.prefix().into()),
+        ]
+        .to_vec(),
+    )?;
+
+    let set_prices_note = create_note_for_naming_with_client(
+        "set_all_prices_testnet".to_string(),
+        set_prices_note_inputs,
+        deployer_account.id(),
+        naming_account.id(),
+        NoteAssets::new(vec![]).unwrap(),
+        &mut client
+    ).await?;
+
+    let set_price_req = TransactionRequestBuilder::new()
+        .own_output_notes(vec![OutputNote::Full(set_prices_note)])
+        .build()?;
+
+    let set_price_tx_id = client.submit_new_transaction(deployer_account.id(), set_price_req).await?;
+    println!(
+        "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
+        set_price_tx_id
+    );
+
+    client.sync_state().await?;
+
+    println!("network set price note creation tx submitted, waiting for onchain commitment");
+
+    // Wait for the note transaction to be committed
+    wait_for_tx(&mut client, set_price_tx_id).await.unwrap();
+
+    sleep(Duration::from_secs(12)).await;
+
+    client.sync_state().await?;
+
+    /// TODO BURADA PRICES MAPINI KONTROL ET OLMUS MU DIYE
+
     Ok(())
 }
 
