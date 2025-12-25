@@ -88,7 +88,7 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
     // Wait for the note transaction to be committed
     wait_for_tx(&mut client, init_tx_id).await.unwrap();
 
-    sleep(Duration::from_secs(6)).await;
+    sleep(Duration::from_secs(12)).await;
 
     client.sync_state().await?;
 
