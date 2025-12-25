@@ -11,7 +11,7 @@ use std::{fs, path::Path, sync::Arc};
 use crate::{
     accounts::{create_deployer_account, create_naming_account, create_network_naming_account},
     client::{create_keystore, initiate_client},
-    notes::{create_library, create_note_for_naming},
+    notes::{create_library, create_note_for_naming, create_note_for_naming_with_client},
     transaction::wait_for_tx,
 };
 
@@ -63,12 +63,13 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
         ]
         .to_vec(),
     )?;
-    let init_note = create_note_for_naming(
+    let init_note = create_note_for_naming_with_client(
         "initialize_naming".to_string(),
         initialize_inputs,
         deployer_account.id(),
         naming_account.id(),
         NoteAssets::new(vec![]).unwrap(),
+        &mut client
     ).await?;
 
     let init_req = TransactionRequestBuilder::new()

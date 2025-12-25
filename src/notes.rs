@@ -39,7 +39,10 @@ pub async fn create_note_for_naming_with_client(
 
     let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
     //let tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap();
-    let tag = NoteTag::from_account_id(_target_id);
+    //let tag = NoteTag::from_account_id(_target_id);
+    let prefix_id: u64 = _target_id.prefix().into();
+    let high_bits = prefix_id >> 34;
+    let tag = NoteTag::NetworkAccount(high_bits as u32);
     let metadata = NoteMetadata::new(
         sender,
         NoteType::Public,
