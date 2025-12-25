@@ -153,19 +153,19 @@ pub async fn deploy_as_network_account() -> anyhow::Result<()> {
 
         let two_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(2), Felt::new(0)]);
         let two_letter_price: Word = account.account().storage().get_map_item(2, two_letter_word).unwrap().into();
-        println!("🔢 one letter price value: {}", two_letter_price.to_string());
+        println!("🔢 two letter price value: {}", two_letter_price.to_string());
 
         let three_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(3), Felt::new(0)]);
         let three_letter_price: Word = account.account().storage().get_map_item(2, three_letter_word).unwrap().into();
-        println!("🔢 one letter price value: {}", three_letter_price.to_string());
+        println!("🔢 three letter price value: {}", three_letter_price.to_string());
 
         let four_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(4), Felt::new(0)]);
         let four_letter_price: Word = account.account().storage().get_map_item(2, four_letter_word).unwrap().into();
-        println!("🔢 one letter price value: {}", four_letter_price.to_string());
+        println!("🔢 four letter price value: {}", four_letter_price.to_string());
 
         let five_letter_word = Word::new([Felt::new(payment_token_id.suffix().as_int()), Felt::new(payment_token_id.prefix().as_u64()), Felt::new(5), Felt::new(0)]);
         let five_letter_price: Word = account.account().storage().get_map_item(2, five_letter_word).unwrap().into();
-        println!("🔢 one letter price value: {}", five_letter_price.to_string());
+        println!("🔢 five letter price value: {}", five_letter_price.to_string());
     }
 
     Ok(())
