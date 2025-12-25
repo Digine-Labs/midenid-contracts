@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use midenname_contracts::{scripts::deploy};
+use midenname_contracts::scripts::{deploy, deploy_as_network_account};
 
 #[derive(Parser)]
 #[command(name = "midenname-contracts")]
@@ -13,6 +13,7 @@ struct Cli {
 enum Commands {
     /// Deploy the naming contract to the network
     Deploy,
+    DeployNetwork,
 
     /// Initialize the deployed registry with owner and payment token
     Init {
@@ -41,6 +42,9 @@ async fn main() -> anyhow::Result<()> {
         Commands::Deploy => {
             println!("Deploying Miden Name Registry contract...\n");
             deploy().await?;
+        }
+        Commands::DeployNetwork => {
+            deploy_as_network_account().await?;
         }
         Commands::Init { owner } => {
             println!("Initializing registry...");

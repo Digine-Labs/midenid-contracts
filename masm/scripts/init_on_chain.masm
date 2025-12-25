@@ -1,0 +1,5 @@
+use.miden_name::naming
+
+begin
+    call.naming::init_on_chain
+end

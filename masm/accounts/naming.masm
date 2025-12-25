@@ -19,6 +19,7 @@ const.REF_CLAIMED_REVENUE_SLOT=8
 const.DOMAIN_COUNT_SLOT=9
 const.TOTAL_REVENUE_SLOT=10 # protocol total revenue map([0, 0, token_prefix, token_suffix] -> amount)
 const.CLAIMED_REVENUE_SLOT=11
+const.ONCHAIN_INIT_SLOT=12
 #const.DOMAIN_EXPIRY_DATES=12 # domain expiry dates map(DOMAIN -> expiry timestamp)
 #const.ONE_YEAR_TIMESTAMP_SLOT=13
 
@@ -149,6 +150,11 @@ export.init
     push.OWNER_SLOT exec.native_account::set_item dropw
     # []
     push.1.0.0.0 push.INIT_FLAG_SLOT exec.native_account::set_item dropw
+end
+
+## Nonsense function just to init contract on chain
+export.init_on_chain
+    push.1.0.0.0 push.ONCHAIN_INIT_SLOT exec.native_account::set_item dropw
 end
 
 # Input: [ASSET]

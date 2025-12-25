@@ -7,12 +7,52 @@ use miden_client::{
 use miden_crypto::Felt;
 use tokio::time::{Duration, sleep};
 
+
 use crate::{
-    accounts::{create_deployer_account, create_naming_account},
+    accounts::{create_deployer_account, create_naming_account, create_network_naming_account},
     client::{create_keystore, initiate_client},
-    notes::create_note_for_naming,
+    notes::{create_library, create_note_for_naming},
     transaction::wait_for_tx,
 };
+
+pub async fn deploy_as_network_account() -> anyhow::Result<()> {
+    println!("Starting Miden Name Registry deployment ( Using network account )");
+    println!("=================================================");
+    println!("Deleting existing store & keystore (store.sqlite3)");
+    let _ = std::fs::remove_file("store.sqlite3");
+    let _ = std::fs::remove_dir("keystore");
+    println!("Deletion complete.");
+    println!("=================================================");
+
+    let mut keystore = create_keystore()?;
+    let mut client = initiate_client(keystore.clone()).await?;
+
+    let deployer_account = create_deployer_account(&mut client, &mut keystore).await?;
+    let naming_account = create_network_naming_account(&mut client).await?;
+
+    // Init note
+    let script_code = std::fs::read_to_string(std::path::Path::new("../masm/scripts/init_on_chain.masm")).unwrap();
+
+    let account_code = std::fs::read_to_string(std::path::Path::new("../masm/accounts/naming.masm")).unwrap();
+    let library_path = "miden_name::naming";
+
+    let library = create_library(account_code, library_path)?;
+
+    let tx_script = client.script_builder().with_dynamically_linked_library(&library)?.compile_tx_script(&script_code)?;
+
+    let tx_init_request = TransactionRequestBuilder::new().custom_script(tx_script).build().unwrap();
+
+    let tx_id = client.submit_new_transaction(naming_account.id(), tx_init_request).await?;
+
+    println!(
+        "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
+        tx_id
+    );
+
+    // Wait for the transaction to be committed
+    wait_for_tx(&mut client, tx_id).await.unwrap();
+    Ok(())
+}
 
 pub async fn deploy() -> anyhow::Result<()> {
     println!("Starting Miden Name Registry deployment...");
