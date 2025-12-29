@@ -87,9 +87,8 @@ export.register
     exec._assert_domain_available
     exec._assert_domain_rules
     exec._assert_payment_token
-    
-    #exec._calculate_domain_price
-    # [price]
+
+    # []
     exec._unsafe_receive_asset
     # []
     # Update domain owner
