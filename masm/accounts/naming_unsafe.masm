@@ -102,7 +102,6 @@ export.register
     exec._clear_domain_mapping
 
     #exec._calculate_domain_price
-    debug.stack.4
     # [price]
     #exec._increase_total_revenue
     

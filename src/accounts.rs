@@ -1,6 +1,6 @@
 use miden_client::{
     Client,
-    account::{Account, AccountBuilder, AccountStorageMode, AccountType},
+    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType},
     auth::{AuthSecretKey, NoAuth},
     keystore::FilesystemKeyStore,
 };
@@ -44,42 +44,21 @@ pub async fn create_deployer_account(
     Ok(deployer_account)
 }
 
-pub async fn create_network_naming_account(
-    client: &mut Client<FilesystemKeyStore<StdRng>>,
-) -> anyhow::Result<Account> {
-    let account_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
-
-    let account_component = AccountComponent::compile(
-            &account_code,
-            TransactionKernel::assembler().with_debug_mode(true),
-            naming_storage(),
-        )?
-        .with_supports_all_types();
-
-    let mut seed = [0_u8; 32];
-    client.rng().fill_bytes(&mut seed);
-
-    let account = AccountBuilder::new(seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Network)
-        .with_auth_component(NoAuth)
-        .with_component(account_component.clone())
-        .build()?;
-
-    client.add_account(&account, false).await.unwrap();
-    
-    println!("Naming account ID: {:?}", account.id().to_string());
-    Ok(account)
-}
-
 pub async fn create_naming_account(
     client: &mut Client<FilesystemKeyStore<StdRng>>,
+    is_network: bool,
 ) -> anyhow::Result<Account> {
-    let account_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
+    let account_code = fs::read_to_string(Path::new("./masm/accounts/naming_unsafe.masm")).unwrap();
+
+    let storage_mode = if is_network {
+        AccountStorageMode::Network
+    } else {
+        AccountStorageMode::Public
+    };
 
     let account_component = AccountComponent::compile(
         &account_code,
-        TransactionKernel::assembler(),
+        TransactionKernel::assembler().with_debug_mode(true),
         naming_storage(),
     )?
     .with_supports_all_types();
@@ -89,13 +68,30 @@ pub async fn create_naming_account(
 
     let account = AccountBuilder::new(seed)
         .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(AccountStorageMode::Public)
-        .with_component(account_component.clone())
+        .storage_mode(storage_mode)
         .with_auth_component(NoAuth)
+        .with_component(account_component.clone())
         .build()?;
 
-    client.add_account(&account, false).await?;
+    client.add_account(&account, false).await.unwrap();
 
     println!("Naming account ID: {:?}", account.id().to_string());
     Ok(account)
+}
+
+pub async fn safe_account_import(
+    client: &mut miden_client::Client<
+        miden_client::keystore::FilesystemKeyStore<rand::rngs::StdRng>,
+    >,
+    account_id: AccountId,
+) -> anyhow::Result<()> {
+    if client.get_account(account_id).await?.is_none() {
+        match client.import_account_by_id(account_id).await {
+            std::result::Result::Ok(_) => {}
+            std::result::Result::Err(e) => {
+                eprintln!("Warning: Failed to import account: {:?}", e);
+            }
+        }
+    }
+    std::result::Result::Ok(())
 }
