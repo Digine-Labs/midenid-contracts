@@ -1,16 +1,16 @@
 use miden_assembly::{
-    DefaultSourceManager, Library, LibraryPath,
+    DefaultSourceManager, Library,
     ast::{Module, ModuleKind},
 };
 use miden_client::{
-    ScriptBuilder,
     account::AccountId,
     note::{
-        Note, NoteAssets, NoteExecutionHint, NoteExecutionMode, NoteInputs, NoteMetadata,
+        Note, NoteAssets, NoteInputs, NoteMetadata,
         NoteRecipient, NoteTag, NoteType,
     },
-    transaction::TransactionKernel,
 };
+use miden_protocol::transaction::TransactionKernel;
+use miden_standards::code_builder::CodeBuilder;
 use miden_crypto::{Felt, Word};
 use rand::Rng;
 use std::{fs, path::Path, sync::Arc};
@@ -27,33 +27,29 @@ pub async fn create_note_for_naming(
     let library = create_library(naming_code, "miden_name::naming")?;
     let serial = generate_random_serial_number();
 
-    let note_script = ScriptBuilder::new(true)
-        .with_dynamically_linked_library(&library)
-        .unwrap()
-        .compile_note_script(note_code)
-        .unwrap();
+    let note_script = CodeBuilder::default()
+        .with_dynamically_linked_library(&library)?
+        .compile_note_script(note_code)?;
 
     let recipient = NoteRecipient::new(serial, note_script, inputs.clone());
-    let tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap();
+    let tag = NoteTag::with_account_target(target_id);
     let metadata = NoteMetadata::new(
         sender,
         NoteType::Public,
         tag,
-        NoteExecutionHint::always(),
-        Felt::new(0),
-    )?;
+    );
     let note = Note::new(assets, metadata, recipient);
     Ok(note)
 }
 
 pub fn create_library(account_code: String, library_path: &str) -> anyhow::Result<Library> {
-    let assembler = TransactionKernel::assembler().with_debug_mode(true);
     let source_manager = Arc::new(DefaultSourceManager::default());
+    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
     let module = Module::parser(ModuleKind::Library)
         .parse_str(
-            LibraryPath::new(library_path)?,
+            library_path,
             account_code,
-            &source_manager,
+            source_manager,
         )
         .unwrap();
     let library = assembler.clone().assemble_library([module]).unwrap();
@@ -62,9 +58,6 @@ pub fn create_library(account_code: String, library_path: &str) -> anyhow::Resul
 }
 
 /// Generates a random serial number for note creation
-///
-/// Similar to TypeScript's generateRandomSerialNumber()
-/// Returns a Word containing 4 random Felt values
 pub fn generate_random_serial_number() -> Word {
     let mut rng = rand::rng();
 

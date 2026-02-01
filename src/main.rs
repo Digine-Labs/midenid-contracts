@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use midenname_contracts::{scripts::deploy};
+use midenname_contracts::scripts::{deploy, register_name};
 
 #[derive(Parser)]
 #[command(name = "midenname-contracts")]
@@ -14,22 +14,19 @@ enum Commands {
     /// Deploy the naming contract to the network
     Deploy,
 
-    /// Initialize the deployed registry with owner and payment token
-    Init {
-        /// Owner account ID
-        #[arg(long)]
-        owner: Option<String>,
-    },
-
     /// Register a new name
     Register {
-        /// Name to register
+        /// Name to register (lowercase alphanumeric, max 20 chars)
         #[arg(long)]
         name: String,
 
-        /// Account ID to map the name to
+        /// Naming contract account ID (hex)
         #[arg(long)]
-        account: Option<String>,
+        naming: String,
+
+        /// Deployer/sender account ID (hex)
+        #[arg(long)]
+        deployer: String,
     },
 }
 
@@ -42,25 +39,12 @@ async fn main() -> anyhow::Result<()> {
             println!("Deploying Miden Name Registry contract...\n");
             deploy().await?;
         }
-        Commands::Init { owner } => {
-            println!("Initializing registry...");
-            if let Some(owner_id) = owner {
-                println!("Owner: {}", owner_id);
-                // TODO: Implement initialization logic
-                println!("Note: Initialization logic not yet implemented");
-            } else {
-                println!("Error: --owner is required for initialization");
-            }
-        }
-        Commands::Register { name, account } => {
-            println!("Registering name: {}", name);
-            if let Some(account_id) = account {
-                println!("Account: {}", account_id);
-                // TODO: Implement registration logic
-                println!("Note: Registration logic not yet implemented");
-            } else {
-                println!("Error: --account is required for registration");
-            }
+        Commands::Register {
+            name,
+            naming,
+            deployer,
+        } => {
+            register_name(name, naming, deployer).await?;
         }
     }
 

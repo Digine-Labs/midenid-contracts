@@ -1,4 +1,4 @@
-use miden_crypto::{Felt, Word};
+use miden_protocol::{Felt, Word};
 
 // Helper function to encode a single character to its numeric representation
 pub fn encode_char(chr: char) -> Option<u8> {
@@ -169,4 +169,3 @@ pub fn decode_domain(encoded_domain: Word) -> String {
 
     decoded_chars.into_iter().collect()
 }
-

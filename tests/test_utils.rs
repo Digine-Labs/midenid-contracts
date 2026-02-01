@@ -1,11 +1,11 @@
-use std::{fs, ops::Not, path::Path, sync::Arc};
+use std::{fs, path::Path, sync::Arc};
 
 use anyhow::Ok;
-use miden_assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, ast::{Module, ModuleKind}};
-use miden_client::{ScriptBuilder, account::{Account, AccountBuilder, AccountId, AccountStorageMode}, asset::{Asset, FungibleAsset}, note::{Note, NoteAssets, NoteExecutionHint, NoteId, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::OutputNote};
+use miden_assembly::{Assembler, DefaultSourceManager, Library, ast::{Module, ModuleKind}};
+use miden_client::{account::{Account, AccountBuilder, AccountId, AccountStorageMode}, asset::{Asset, FungibleAsset}, note::{Note, NoteAssets, NoteId, NoteInputs, NoteMetadata, NoteRecipient, NoteTag, NoteType}, testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1, transaction::OutputNote};
 use miden_crypto::{Felt, Word};
-use miden_lib::{account::auth, note::WellKnownNote, transaction::TransactionKernel};
-use miden_objects::account::AccountComponent;
+use miden_standards::{account::auth, note::WellKnownNote, code_builder::CodeBuilder};
+use miden_protocol::{account::AccountComponent, transaction::TransactionKernel};
 use miden_testing::{Auth, MockChain, MockChainBuilder, TransactionContextBuilder};
 use midenname_contracts::storage::naming_storage;
 use rand::{Rng, SeedableRng};
@@ -15,10 +15,16 @@ pub fn create_test_naming_account() -> Account {
     let storage_slots = naming_storage();
     let code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
 
-    let component = AccountComponent::compile(
-        code.clone(), 
-        TransactionKernel::assembler().with_debug_mode(true), 
-        storage_slots
+    let source_manager = Arc::new(DefaultSourceManager::default());
+    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
+    let module = Module::parser(ModuleKind::Library)
+        .parse_str("naming", code, source_manager)
+        .unwrap();
+    let library = assembler.clone().assemble_library([module]).unwrap();
+
+    let component = AccountComponent::new(
+        library,
+        storage_slots,
     ).unwrap().with_supports_all_types();
 
     let account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
@@ -35,15 +41,13 @@ pub async fn create_note_for_naming(name: String, inputs: NoteInputs, sender: Ac
     let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
     let library = create_library(naming_code, "miden_name::naming")?;
 
-    let note_script = ScriptBuilder::new(true)
-        .with_dynamically_linked_library(&library)
-        .unwrap()
-        .compile_note_script(note_code)
-        .unwrap();
+    let note_script = CodeBuilder::default()
+        .with_dynamically_linked_library(&library)?
+        .compile_note_script(note_code)?;
 
     let recipient = NoteRecipient::new(Word::default(), note_script, inputs.clone());
-    let tag = NoteTag::from_account_id(target_id);
-    let metadata = NoteMetadata::new(sender, NoteType::Public, tag, NoteExecutionHint::Always, Felt::new(0))?;
+    let tag = NoteTag::with_account_target(target_id);
+    let metadata = NoteMetadata::new(sender, NoteType::Public, tag);
     let note = Note::new(assets, metadata, recipient);
     Ok(note)
 }
@@ -53,15 +57,13 @@ pub async fn create_note_for_naming_with_custom_serial_num(name: String, inputs:
     let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
     let library = create_library(naming_code, "miden_name::naming")?;
 
-    let note_script = ScriptBuilder::new(true)
-        .with_dynamically_linked_library(&library)
-        .unwrap()
-        .compile_note_script(note_code)
-        .unwrap();
+    let note_script = CodeBuilder::default()
+        .with_dynamically_linked_library(&library)?
+        .compile_note_script(note_code)?;
 
     let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
-    let tag = NoteTag::from_account_id(target_id);
-    let metadata = NoteMetadata::new(sender, NoteType::Public, tag, NoteExecutionHint::Always, Felt::new(0))?;
+    let tag = NoteTag::with_account_target(target_id);
+    let metadata = NoteMetadata::new(sender, NoteType::Public, tag);
     let note = Note::new(assets, metadata, recipient);
     Ok(note)
 }
@@ -71,14 +73,14 @@ pub fn create_p2id_note_exact(
     target: AccountId,
     assets: Vec<Asset>,
     note_type: NoteType,
-    aux: Felt,
+    _aux: Felt,
     serial_num: Word,
 ) -> anyhow::Result<Note> {
     let recipient = build_p2id_recipient(target, serial_num)?;
 
-    let tag = NoteTag::from_account_id(target);
+    let tag = NoteTag::with_account_target(target);
 
-    let metadata = NoteMetadata::new(sender, note_type, tag, NoteExecutionHint::always(), aux)?;
+    let metadata = NoteMetadata::new(sender, note_type, tag);
     let vault = NoteAssets::new(assets)?;
 
     Ok(Note::new(vault, metadata, recipient))
@@ -100,7 +102,6 @@ pub fn get_test_prices() -> Vec<Felt> {
 
 pub struct TestingContext {
     pub builder: MockChainBuilder,
-    //pub chain: MockChain,
     pub owner: Account,
     pub registrar_1: Account,
     pub registrar_2: Account,
@@ -124,7 +125,6 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     let domain_registrar_account_3 = builder.add_existing_wallet_with_assets(Auth::BasicAuth, vec![fungible_asset_3.into()])?;
     let mut naming_account = create_test_naming_account();
     builder.add_account(naming_account.clone())?;
-    //let mut mockchain = builder.build()?;
     let one_year_time: u32 = 500;
 
     let initialize_inputs = NoteInputs::new([
@@ -138,10 +138,8 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
         Felt::new(0),
     ].to_vec())?;
     let init_note = create_note_for_naming("initialize_naming".to_string(), initialize_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
-    
-    //execute_note(&mut mockchain, init_note, &mut naming_account).await?;
+
     add_note_to_builder(&mut builder, init_note.clone())?;
-    // Set prices
 
     let note_inputs = NoteInputs::new([
             Felt::new(fungible_asset_1.faucet_id().suffix().into()),
@@ -150,11 +148,9 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
     let set_prices_note = create_note_for_naming("set_all_prices".to_string(), note_inputs, owner_account.id(), naming_account.id(), NoteAssets::new(vec![]).unwrap()).await?;
 
     add_note_to_builder(&mut builder, set_prices_note.clone())?;
-    //set_test_prices(&mut mockchain, owner_account.id(), &mut naming_account, fungible_asset_1.faucet_id()).await?;
-    //add_set_prices_notes(&mut builder,owner_account.id(), &mut naming_account, fungible_asset_1.faucet_id()).await?;
 
-    Ok(TestingContext { builder: builder, owner: owner_account, registrar_1: domain_registrar_account, 
-        registrar_2: domain_registrar_account_2, registrar_3: domain_registrar_account_3, naming: naming_account, 
+    Ok(TestingContext { builder: builder, owner: owner_account, registrar_1: domain_registrar_account,
+        registrar_2: domain_registrar_account_2, registrar_3: domain_registrar_account_3, naming: naming_account,
         fungible_asset: fungible_asset_1, one_year: one_year_time, initialize_note: init_note, set_prices_note: set_prices_note })
 }
 
@@ -189,12 +185,12 @@ pub async fn execute_note(chain: &mut MockChain, note_id: NoteId, target: &mut A
 
 
 fn create_library(account_code: String, library_path: &str) -> anyhow::Result<Library> {
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
     let source_manager = Arc::new(DefaultSourceManager::default());
+    let assembler: Assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone());
     let module = Module::parser(ModuleKind::Library).parse_str(
-        LibraryPath::new(library_path)?,
+        library_path,
         account_code,
-        &source_manager,
+        source_manager,
     ).unwrap();
     let library = assembler.clone().assemble_library([module]).unwrap();
 

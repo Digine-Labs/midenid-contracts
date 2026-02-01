@@ -1,9 +1,9 @@
-use.miden_name::naming
-use.miden::active_note
-use.std::sys
+use miden_name::naming
+use miden::protocol::active_note
+use miden::core::sys
 
-const.NEW_OWNER_PTR=0
-const.DOMAIN_PTR=4
+const NEW_OWNER_PTR=0
+const DOMAIN_PTR=4
 
 # Input (arguments): [NEW_OWNER, DOMAIN]
 begin
