@@ -1,11 +1,11 @@
-use.miden_name::naming
-use.miden::active_note
-use.std::sys
+use miden_name::naming
+use miden::protocol::active_note
+use miden::core::sys
 
-const.REFERRER_PTR=0
-const.TOKEN_PTR=4
-const.DOMAIN_PTR=8
-const.REG_LEN_PTR=12
+const REFERRER_PTR=0
+const TOKEN_PTR=4
+const DOMAIN_PTR=8
+const REG_LEN_PTR=12
 # Input (arguments): [REFERRER, TOKEN, DOMAIN, REG_LEN]
 begin
     push.0

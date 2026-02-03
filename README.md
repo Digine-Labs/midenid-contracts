@@ -139,14 +139,34 @@ The project includes a CLI for deployment and management:
 cargo run -- --help
 ```
 
+### Network Selection
+
+By default, all commands connect to **devnet**. To use **testnet** instead, pass the `--testnet` flag before the subcommand:
+
+```bash
+# Devnet (default)
+cargo run -- deploy
+
+# Testnet
+cargo run -- --testnet deploy
+```
+
+The `--testnet` flag works with all subcommands.
+
 ### Deploy the Naming Contract
 
 ```bash
-# Local deployment
+# Deploy as public account (default) on devnet
 cargo run -- deploy
 
-# Deploy as network account (production)
+# Deploy as network account on devnet
 cargo run -- deploy --as-network
+
+# Deploy as public account on testnet
+cargo run -- --testnet deploy
+
+# Deploy as network account on testnet
+cargo run -- --testnet deploy --as-network
 ```
 
 ### Initialize Registry

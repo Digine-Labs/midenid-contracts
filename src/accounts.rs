@@ -4,29 +4,29 @@ use miden_client::{
     auth::{AuthSecretKey, NoAuth},
     keystore::FilesystemKeyStore,
 };
-use miden_lib::{
-    account::auth::AuthRpoFalcon512, account::wallets::BasicWallet, transaction::TransactionKernel,
+use miden_standards::{
+    account::auth::AuthFalcon512Rpo, account::wallets::BasicWallet,
 };
-use miden_objects::account::AccountComponent;
-use rand::{RngCore, rngs::StdRng};
+use miden_protocol::{account::AccountComponent, transaction::TransactionKernel};
+use rand::RngCore;
 use std::{fs, path::Path, sync::Arc};
 
 use crate::storage::naming_storage;
 
 pub async fn create_deployer_account(
-    client: &mut Client<FilesystemKeyStore<StdRng>>,
-    keystore: &mut Arc<FilesystemKeyStore<StdRng>>,
+    client: &mut Client<FilesystemKeyStore>,
+    keystore: &mut Arc<FilesystemKeyStore>,
 ) -> anyhow::Result<Account> {
     let mut init_seed = [0_u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let key_pair = AuthSecretKey::new_rpo_falcon512();
+    let key_pair = AuthSecretKey::new_falcon512_rpo();
 
     // Build the account
     let deployer_account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountUpdatableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().to_commitment()))
+        .with_auth_component(AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -45,7 +45,7 @@ pub async fn create_deployer_account(
 }
 
 pub async fn create_naming_account(
-    client: &mut Client<FilesystemKeyStore<StdRng>>,
+    client: &mut Client<FilesystemKeyStore>,
     is_network: bool,
 ) -> anyhow::Result<Account> {
     let account_code = fs::read_to_string(Path::new("./masm/accounts/naming_unsafe.masm")).unwrap();
@@ -56,9 +56,18 @@ pub async fn create_naming_account(
         AccountStorageMode::Public
     };
 
-    let account_component = AccountComponent::compile(
-        &account_code,
-        TransactionKernel::assembler().with_debug_mode(true),
+    // Compile the account code using the assembler
+    let source_manager = Arc::new(miden_assembly::DefaultSourceManager::default());
+    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone())
+        .with_dynamic_library(miden_standards::StandardsLib::default())
+        .expect("failed to load standards lib");
+    let module = miden_assembly::ast::Module::parser(miden_assembly::ast::ModuleKind::Library)
+        .parse_str("naming", account_code, source_manager)
+        .unwrap();
+    let library = assembler.clone().assemble_library([module]).unwrap();
+
+    let account_component = AccountComponent::new(
+        library,
         naming_storage(),
     )?
     .with_supports_all_types();
@@ -80,9 +89,7 @@ pub async fn create_naming_account(
 }
 
 pub async fn safe_account_import(
-    client: &mut miden_client::Client<
-        miden_client::keystore::FilesystemKeyStore<rand::rngs::StdRng>,
-    >,
+    client: &mut Client<FilesystemKeyStore>,
     account_id: AccountId,
 ) -> anyhow::Result<()> {
     if client.get_account(account_id).await?.is_none() {

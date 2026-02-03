@@ -1,86 +1,87 @@
-use.miden::active_account
-use.miden::native_account
-use.miden::account_id
-use.miden::input_note
-use.miden::output_note
-use.miden::active_note
-use.miden::tx
+use miden::protocol::active_account
+use miden::protocol::native_account
+use miden::protocol::account_id
+use miden::protocol::input_note
+use miden::protocol::output_note
+use miden::protocol::active_note
+use miden::protocol::tx
+use miden::standards::wallets::basic->basic_wallet
 
-## Storage Slots
-const.INIT_FLAG_SLOT=0
-const.OWNER_SLOT=1
-const.PRICES_SLOT=2 # domain prices map([0, letter_count, payment_token_prefix, payment_token_suffix] -> [PRICE])
-const.ACCOUNT_ID_TO_DOMAIN_SLOT=3
-const.DOMAIN_TO_ACCOUNT_ID_SLOT=4
-const.DOMAIN_TO_OWNER_SLOT=5
-const.REF_RATE_SLOT=6
-const.REF_TOTAL_REVENUE_SLOT=7
-const.REF_CLAIMED_REVENUE_SLOT=8
-const.DOMAIN_COUNT_SLOT=9
-const.TOTAL_REVENUE_SLOT=10 # protocol total revenue map([0, 0, token_prefix, token_suffix] -> amount)
-const.CLAIMED_REVENUE_SLOT=11
-const.ONCHAIN_INIT_SLOT=12
+# Storage Slots
+const INIT_FLAG_SLOT = word("naming::init_flag")
+const OWNER_SLOT = word("naming::owner")
+const PRICES_SLOT = word("naming::prices") # domain prices map([0, letter_count, payment_token_prefix, payment_token_suffix] -> [PRICE])
+const ACCOUNT_ID_TO_DOMAIN_SLOT = word("naming::account_to_domain")
+const DOMAIN_TO_ACCOUNT_ID_SLOT = word("naming::domain_to_account")
+const DOMAIN_TO_OWNER_SLOT = word("naming::domain_to_owner")
+const REF_RATE_SLOT = word("naming::ref_rate")
+const REF_TOTAL_REVENUE_SLOT = word("naming::ref_total_revenue")
+const REF_CLAIMED_REVENUE_SLOT = word("naming::ref_claimed_revenue")
+const DOMAIN_COUNT_SLOT = word("naming::domain_count")
+const TOTAL_REVENUE_SLOT = word("naming::total_revenue") # protocol total revenue map([0, 0, token_prefix, token_suffix] -> amount)
+const CLAIMED_REVENUE_SLOT = word("naming::claimed_revenue")
+const ONCHAIN_INIT_SLOT = word("naming::onchain_init")
 #const.DOMAIN_EXPIRY_DATES=12 # domain expiry dates map(DOMAIN -> expiry timestamp)
 #const.ONE_YEAR_TIMESTAMP_SLOT=13
 
-## Errors
-const.ERR_ONLY_OWNER="Only owner"
-const.ERR_ONLY_DOMAIN_OWNER="Only domain owner"
-const.ERR_ALREADY_INITIALIZED="Contract already initialized"
-const.ERR_PAYMENT_TOKEN_NOT_ALLOWED="This payment token not allowed"
-const.ERR_PRICE_ZERO="Price zero for this length"
-const.ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
-const.ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less than price"
-const.ERR_DOMAIN_NOT_AVAILABLE="Domain is already taken"
-const.ERR_DOMAIN_LENGTH_TOO_HIGH="21 characters allowed"
-const.ERR_REF_RATE_OVERLIMIT="Ref rate higher or equal to 10000"
-const.ERR_REF_RATE_TOO_HIGH="Max 2500 ref rate"
-const.ERR_REF_RATE_ZERO="Ref rate zero"
-const.ERR_REF_NOT_EXIST="Referrer rate is zero"
-const.DOMAIN_LENGTH_TOO_HIGH="Maximum 21 characters allowed"
-const.ERR_INVALID_DOMAIN_LENGTH="Domain length field does not match actual character count"
-const.ERR_EMPTY_DOMAIN="Domain length zero"
-const.ERR_CALCULATE_DISCOUNT_OVERFLOW="Overflow at discount calc"
-const.ERR_CALCULATE_DISCOUNT_UNDERFLOW="Underflow at discount calc"
-const.ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH="Max 10 years"
-const.ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH="Timestamp len overflow"
-const.ERR_DOMAIN_NOT_EXPIRED="Domain not expired"
-const.ERR_U32_OVERFLOW="U32 Overflow"
-const.ERR_DOMAIN_EXPIRED="Domain expired"
-const.ERR_UNDERFLOW_AT_FEE_CALC="Fee calculation underflow"
-const.ERR_OVERFLOW_AT_FEE_CALC="Fee calculation overflow"
+# Errors
+const ERR_ONLY_OWNER="Only owner"
+const ERR_ONLY_DOMAIN_OWNER="Only domain owner"
+const ERR_ALREADY_INITIALIZED="Contract already initialized"
+const ERR_PAYMENT_TOKEN_NOT_ALLOWED="This payment token not allowed"
+const ERR_PRICE_ZERO="Price zero for this length"
+const ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
+const ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less than price"
+const ERR_DOMAIN_NOT_AVAILABLE="Domain is already taken"
+const ERR_DOMAIN_LENGTH_TOO_HIGH="21 characters allowed"
+const ERR_REF_RATE_OVERLIMIT="Ref rate higher or equal to 10000"
+const ERR_REF_RATE_TOO_HIGH="Max 2500 ref rate"
+const ERR_REF_RATE_ZERO="Ref rate zero"
+const ERR_REF_NOT_EXIST="Referrer rate is zero"
+const DOMAIN_LENGTH_TOO_HIGH="Maximum 21 characters allowed"
+const ERR_INVALID_DOMAIN_LENGTH="Domain length field does not match actual character count"
+const ERR_EMPTY_DOMAIN="Domain length zero"
+const ERR_CALCULATE_DISCOUNT_OVERFLOW="Overflow at discount calc"
+const ERR_CALCULATE_DISCOUNT_UNDERFLOW="Underflow at discount calc"
+const ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH="Max 10 years"
+const ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH="Timestamp len overflow"
+const ERR_DOMAIN_NOT_EXPIRED="Domain not expired"
+const ERR_U32_OVERFLOW="U32 Overflow"
+const ERR_DOMAIN_EXPIRED="Domain expired"
+const ERR_UNDERFLOW_AT_FEE_CALC="Fee calculation underflow"
+const ERR_OVERFLOW_AT_FEE_CALC="Fee calculation overflow"
 
-## Memory Pointers
+# Memory Pointers
 
-const.MEM_DOMAIN=0x0020 # WORD
-const.MEM_PAYMENT_TOKEN=0x0024 # WORD
-const.MEM_REFERRER=0x0028 # WORD
-const.MEM_DOMAIN_NEW_OWNER=0x002C # WORD
+const MEM_DOMAIN=0x0020 # WORD
+const MEM_PAYMENT_TOKEN=0x0024 # WORD
+const MEM_REFERRER=0x0028 # WORD
+const MEM_DOMAIN_NEW_OWNER=0x002C # WORD
 #const.MEM_REG_LEN=0x0030 # WORD
-const.MEM_RECIPIENT=0x0034 # WORD
-const.MEM_NOTE_DETAILS=0x0038 # WORD
-const.MEM_REF_RATE=0x003C # WORD
-const.MEM_TOTAL_PAID_AMT=0x0050 # felt
-const.MEM_PROTOCOL_FEE_AMT=0x0051 # felt
-const.MEM_REFERRER_FEE_AMT=0x0052 # felt
+const MEM_RECIPIENT=0x0034 # WORD
+const MEM_NOTE_DETAILS=0x0038 # WORD
+const MEM_REF_RATE=0x003C # WORD
+const MEM_TOTAL_PAID_AMT=0x0050 # felt
+const MEM_PROTOCOL_FEE_AMT=0x0051 # felt
+const MEM_REFERRER_FEE_AMT=0x0052 # felt
 
-## Constants
+# Constants
 #const.YEAR=31536000 # In seconds
 #const.MAX_REG_LEN=10 # Years
-const.MAX_NAME_LENGTH=21
-const.MAX_REF_RATE=10000 # Basis point
-const.REF_RATE_LIMIT=2500 # %25
+const MAX_NAME_LENGTH=21
+const MAX_REF_RATE=10000 # Basis point
+const REF_RATE_LIMIT=2500 # %25
 
-const.MAX_FELT_PART=0xFFFFFFFFFFFFFF # 8*7 bits
+const MAX_FELT_PART=0xFFFFFFFFFFFFFF # 8*7 bits
 
-const.PAD_4TH_CHAR=16777216
-const.PAD_3RD_CHAR=65536
-const.PAD_2ND_CHAR=256
-const.PAD_1ST_CHAR=1
+const PAD_4TH_CHAR=16777216
+const PAD_3RD_CHAR=65536
+const PAD_2ND_CHAR=256
+const PAD_1ST_CHAR=1
 
 # Input: [PAYMENT_TOKEN, DOMAIN]
 # Output: []
-export.register
+pub proc register
     mem_storew_be.MEM_PAYMENT_TOKEN dropw
     mem_storew_be.MEM_DOMAIN dropw
     # []
@@ -112,7 +113,7 @@ end
 
 # Input: [DOMAIN]
 # This function must be called to activate and match domain with account id
-export.activate_domain
+pub proc activate_domain
     mem_storew_be.MEM_DOMAIN dropw
     exec._assert_only_domain_owner
 
@@ -121,7 +122,7 @@ export.activate_domain
 end
 
 # Inputs: [NEW_OWNER, DOMAIN]
-export.transfer
+pub proc transfer
     mem_storew_be.MEM_DOMAIN_NEW_OWNER dropw
     mem_storew_be.MEM_DOMAIN dropw
 
@@ -135,29 +136,29 @@ export.transfer
 end
 
 # Inputs: [TOKEN]
-export.claim_referral_earnings
+pub proc claim_referral_earnings
     nop
     # TODO
 end
 
 # Input: [OWNER]
-export.init
-    push.INIT_FLAG_SLOT exec.active_account::get_item drop drop drop
+pub proc init
+    push.INIT_FLAG_SLOT[0..2] exec.active_account::get_item drop drop drop
     assertz.err=ERR_ALREADY_INITIALIZED
     # [OWNER]
-    push.OWNER_SLOT exec.native_account::set_item dropw
+    push.OWNER_SLOT[0..2] exec.native_account::set_item dropw
     # []
-    push.1.0.0.0 push.INIT_FLAG_SLOT exec.native_account::set_item dropw
+    push.1.0.0.0 push.INIT_FLAG_SLOT[0..2] exec.native_account::set_item dropw
 end
 
-## Nonsense function just to init contract on chain
-export.init_on_chain
-    push.1.0.0.0 push.ONCHAIN_INIT_SLOT exec.native_account::set_item dropw
+# Nonsense function just to init contract on chain
+pub proc init_on_chain
+    push.1.0.0.0 push.ONCHAIN_INIT_SLOT[0..2] exec.native_account::set_item dropw
 end
 
 # Input: [ASSET]
 # Output: [pad(16)]
-export.receive_asset
+pub proc receive_asset
     exec.native_account::add_asset
     # => [ASSET', pad(12)]
 
@@ -166,28 +167,28 @@ export.receive_asset
     # => [pad(16)]
 end
 
-## Only owner methods
+# Only owner methods
 
 # Input: [NEW_OWNER]
 # Output: []
-export.update_registry_owner
+pub proc update_registry_owner
     exec._assert_only_owner
     # [0, 0, new_owner_prefix, new_owner_suffix]
-    push.OWNER_SLOT
+    push.OWNER_SLOT[0..2]
     exec.native_account::set_item
     dropw
 end
 
 # Input: [0, letter_count, token_prefix, token_suffix, PRICE]
 # Output: []
-export.set_price
+pub proc set_price
     exec._assert_only_owner
-    push.PRICES_SLOT 
-    exec.native_account::set_map_item dropw dropw
+    push.PRICES_SLOT[0..2] 
+    exec.native_account::set_map_item dropw
 end
 
 # Input: [TOKEN, NOTE_DETAILS, RECIPIENT]
-export.claim_protocol_revenue
+pub proc claim_protocol_revenue
     mem_storew_be.MEM_PAYMENT_TOKEN dropw
     mem_storew_be.MEM_NOTE_DETAILS dropw
     mem_storew_be.MEM_RECIPIENT dropw
@@ -210,55 +211,55 @@ export.claim_protocol_revenue
 end
 
 # Input: [TOKEN]
-export.withdraw_assets
+pub proc withdraw_assets
     mem_storew_be.MEM_PAYMENT_TOKEN dropw
     exec._assert_only_owner
     nop
 end
 
-## Internal Methods
+# Internal Methods
 
 # Input: [] Memory [DOMAIN]
 # Output: []
-proc._clear_domain_mapping
+proc _clear_domain_mapping
     padw mem_loadw_be.MEM_DOMAIN
     # [DOMAIN]
-    push.DOMAIN_TO_ACCOUNT_ID_SLOT exec.active_account::get_map_item
+    push.DOMAIN_TO_ACCOUNT_ID_SLOT[0..2] exec.active_account::get_map_item
     # [ACCOUNT]
     padw swapw
     # [ACCOUNT, ZERO]
-    push.ACCOUNT_ID_TO_DOMAIN_SLOT exec.native_account::set_map_item dropw dropw
+    push.ACCOUNT_ID_TO_DOMAIN_SLOT[0..2] exec.native_account::set_map_item dropw
     # []
     padw mem_loadw_be.MEM_DOMAIN
     # [DOMAIN]
     padw swapw
     # [DOMAIN, ZERO]
-    push.DOMAIN_TO_ACCOUNT_ID_SLOT exec.native_account::set_map_item dropw dropw
+    push.DOMAIN_TO_ACCOUNT_ID_SLOT[0..2] exec.native_account::set_map_item dropw
     # []
 end
 
 # Input: [amt] Memory [PAYMENT_TOKEN]
 # Output: []
-proc._increase_total_revenue
+proc _increase_total_revenue
     padw mem_loadw_be.MEM_PAYMENT_TOKEN
-    push.TOTAL_REVENUE_SLOT exec.active_account::get_map_item drop drop drop
+    push.TOTAL_REVENUE_SLOT[0..2] exec.active_account::get_map_item drop drop drop
     # [total_amount, amt]
     add push.0.0.0
     # [FINAL_AMT]
     padw mem_loadw_be.MEM_PAYMENT_TOKEN
     # [PAYMENT_TOKEN, FINAL_AMT]
-    push.TOTAL_REVENUE_SLOT exec.native_account::set_map_item dropw dropw
+    push.TOTAL_REVENUE_SLOT[0..2] exec.native_account::set_map_item dropw
     # []
 end
 
 # Input: [] Memory [PAYMENT_TOKEN]
 # Output: [claimable_revenue]
-proc._get_remaining_revenue
+proc _get_remaining_revenue
     padw mem_loadw_be.MEM_PAYMENT_TOKEN
-    push.TOTAL_REVENUE_SLOT exec.active_account::get_map_item drop drop drop
+    push.TOTAL_REVENUE_SLOT[0..2] exec.active_account::get_map_item drop drop drop
     # [total_revenue]
     padw mem_loadw_be.MEM_PAYMENT_TOKEN
-    push.CLAIMED_REVENUE_SLOT exec.active_account::get_map_item drop drop drop
+    push.CLAIMED_REVENUE_SLOT[0..2] exec.active_account::get_map_item drop drop drop
     # [claimed_revenue, total_revenue]
     u32assert2 u32overflowing_sub assertz.err=ERR_U32_OVERFLOW
     # [claimable_revenue]
@@ -266,7 +267,7 @@ end
 
 # Input: [amt] Memory [PAYMENT_TOKEN]
 # Output: [ASSET]
-proc._get_asset
+proc _get_asset
     push.0 swap
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
     # [prefix, suffix, amt, 0]
@@ -274,39 +275,39 @@ end
 
 # Input: [account_prefix, account_suffix] Memory [DOMAIN]
 # Output: []
-proc._update_domain_map
+proc _update_domain_map
     push.0.0 dupw
     # [ACCOUNT, ACCOUNT]
     padw mem_loadw_be.MEM_DOMAIN
-    push.DOMAIN_TO_ACCOUNT_ID_SLOT
-    exec.native_account::set_map_item dropw dropw
+    push.DOMAIN_TO_ACCOUNT_ID_SLOT[0..2]
+    exec.native_account::set_map_item dropw
     # [ACCOUNT]
     padw mem_loadw_be.MEM_DOMAIN swapw
     # [ACCOUNT, DOMAIN]
-    push.ACCOUNT_ID_TO_DOMAIN_SLOT
-    exec.native_account::set_map_item dropw dropw
+    push.ACCOUNT_ID_TO_DOMAIN_SLOT[0..2]
+    exec.native_account::set_map_item dropw
     # []
 end
 
 # Input: [new_owner_prefix, new_owner_suffix] Memory [DOMAIN]
 # Output: []
-proc._update_domain_owner
+proc _update_domain_owner
     push.0.0
     # [0,0, prefix, suffix]
     padw mem_loadw_be.MEM_DOMAIN
     
     # [DOMAIN, 0, 0, prefix, suffix]
-    push.DOMAIN_TO_OWNER_SLOT
+    push.DOMAIN_TO_OWNER_SLOT[0..2]
     # [slot, DOMAIN, 0, 0, prefix, suffix]
-    exec.native_account::set_map_item dropw dropw
+    exec.native_account::set_map_item dropw
     # []
 end
 
 # Input: [] Memory [DOMAIN]
 # Output: []
-proc._assert_only_domain_owner
+proc _assert_only_domain_owner
     padw mem_loadw_be.MEM_DOMAIN
-    push.DOMAIN_TO_OWNER_SLOT
+    push.DOMAIN_TO_OWNER_SLOT[0..2]
     # [slot, DOMAIN]
     exec.active_account::get_map_item drop drop
     # [owner_prefix, owner_suffix]
@@ -319,37 +320,37 @@ end
 
 # Input: []
 # Output: []
-proc._after_domain_register
+proc _after_domain_register
     exec._increase_domain_count
 end
 
 # Input: []
 # Output: []
-proc._increase_domain_count
-    push.DOMAIN_COUNT_SLOT
+proc _increase_domain_count
+    push.DOMAIN_COUNT_SLOT[0..2]
     exec.active_account::get_item drop drop drop
     # [total_supply]
     add.1 push.0.0.0
     # [0, 0, 0, total_supply + 1]
-    push.DOMAIN_COUNT_SLOT exec.native_account::set_item dropw
+    push.DOMAIN_COUNT_SLOT[0..2] exec.native_account::set_item dropw
 end
 
 # Input: [] Memory [DOMAIN, PAYMENT_TOKEN]
 # Output: [price]
 # Call it after validate domain
-proc._calculate_domain_price
+proc _calculate_domain_price
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
     # [prefix, suffix]
     padw mem_loadw_be.MEM_DOMAIN swap.3 drop drop drop
     # [length, prefix, suffix]
     push.0
-    push.PRICES_SLOT exec.active_account::get_map_item drop drop drop
+    push.PRICES_SLOT[0..2] exec.active_account::get_map_item drop drop drop
     # [price]
 end
 
 # Input: [] Memory [PAYMENT_TOKEN]
 # Output: [balance]
-proc._get_balance
+proc _get_balance
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
     exec.active_account::get_balance
     # [balance]
@@ -357,10 +358,10 @@ end
 
 # Input: [min_amt] Memory [PAYMENT_TOKEN]
 # Output: []
-proc._receive_payment
+proc _receive_payment
     exec._get_balance
     # [before_bal, min_amt]
-    exec.active_note::add_assets_to_account
+    exec.basic_wallet::add_assets_to_account
     exec._get_balance
     # [after_bal, before_bal, min_amt]
     swap u32overflowing_sub assertz.err=ERR_VALIDATE_PAYMENT_SUB_OVERFLOW
@@ -368,19 +369,19 @@ proc._receive_payment
     # []
 end
 
-proc._unsafe_receive_asset
-    exec.active_note::add_assets_to_account
+proc _unsafe_receive_asset
+    exec.basic_wallet::add_assets_to_account
 end
 
 # Input: [] Memory [PAYMENT_TOKEN]
 # Output: []
-proc._assert_payment_token
+proc _assert_payment_token
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
     push.1
     # [letter, prefix, suffix]
     push.0
     # [PRICES_KEY]
-    push.PRICES_SLOT
+    push.PRICES_SLOT[0..2]
     exec.active_account::get_map_item drop drop drop
     # [price]
     gt.0 assert.err=ERR_PAYMENT_TOKEN_NOT_ALLOWED
@@ -389,10 +390,10 @@ end
 
 # Input: []
 # Output: []
-proc._assert_only_owner
+proc _assert_only_owner
     push.0 exec.input_note::get_sender
     # [caller_prefix, caller_suffix]
-    push.OWNER_SLOT
+    push.OWNER_SLOT[0..2]
     exec.active_account::get_item
     # [0, 0, owner_prefix, owner_suffix, caller_prefix, caller_suffix]
     drop drop
@@ -403,9 +404,9 @@ end
 
 # Input: [] Memory [DOMAIN]
 # Output: []
-proc._assert_domain_available
+proc _assert_domain_available
     padw mem_loadw_be.MEM_DOMAIN
-    push.DOMAIN_TO_OWNER_SLOT
+    push.DOMAIN_TO_OWNER_SLOT[0..2]
     exec.active_account::get_map_item drop drop
     push.0.0 exec.account_id::is_equal
 
@@ -414,7 +415,7 @@ end
 
 # Input: [] Memory [DOMAIN]
 # Output: []
-proc._assert_domain_rules
+proc _assert_domain_rules
     padw mem_loadw_be.MEM_DOMAIN
     dupw
     # [DOMAIN, DOMAIN]
@@ -428,12 +429,12 @@ proc._assert_domain_rules
 end
 
 ############################
-## Domain length validations
+# Domain length validations
 ############################
 
 # Input: [] Memory [DOMAIN]
 # Output: [length]
-proc._get_domain_length
+proc _get_domain_length
     padw mem_loadw_be.MEM_DOMAIN
     swap.3 drop drop drop
     # [length]
@@ -441,7 +442,7 @@ end
 
 # Input: [length, felt1, felt2, felt3] -> DOMAIN
 # Output: []
-proc._validate_domain_length
+proc _validate_domain_length
     # Stack: [length, felt1, felt2, felt3]
     dup eq.0 assertz.err=ERR_EMPTY_DOMAIN
     dup lte.21 assert.err=ERR_DOMAIN_LENGTH_TOO_HIGH
@@ -464,7 +465,7 @@ end
 
 # Input: [felt]
 # Output: [count]
-proc._count_chars_in_felt
+proc _count_chars_in_felt
     u32split
     # [u32_high, u32_low]
     exec._count_chars_in_u32
@@ -478,7 +479,7 @@ end
 
 # Input: [u32]
 # Output: [count]
-proc._count_chars_in_u32
+proc _count_chars_in_u32
     push.0 swap # push count
     # [u32, count]
     u32divmod.PAD_4TH_CHAR swap

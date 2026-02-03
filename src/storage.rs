@@ -1,30 +1,26 @@
-use miden_client::account::{StorageMap, StorageSlot};
-use miden_crypto::{Felt, Word};
+use miden_protocol::account::{StorageMap, StorageSlot, StorageSlotName};
+use miden_crypto::Word;
 
-fn empty_storage_value() -> StorageSlot {
-    StorageSlot::Value(Word::new([
-        Felt::new(0),
-        Felt::new(0),
-        Felt::new(0),
-        Felt::new(0),
-    ]))
+pub fn slot_name(name: &str) -> StorageSlotName {
+    StorageSlotName::new(name).expect("invalid storage slot name")
 }
 
 pub fn naming_storage() -> Vec<StorageSlot> {
-    let storage_slots: Vec<StorageSlot> = vec![
-        empty_storage_value(), // Init flag
-        empty_storage_value(), // owner
-        StorageSlot::Map(StorageMap::new()), // domain prices map([0, letter_count, payment_token_prefix, payment_token_suffix] -> [PRICE])
-        StorageSlot::Map(StorageMap::new()), // account to domain
-        StorageSlot::Map(StorageMap::new()), // domain to account
-        StorageSlot::Map(StorageMap::new()), // domain to owner
-        StorageSlot::Map(StorageMap::new()), // ref rate slot
-        StorageSlot::Map(StorageMap::new()), // ref -> total revenue
-        StorageSlot::Map(StorageMap::new()), // ref -> claimed revenue
-        empty_storage_value(), // domain count
-        StorageSlot::Map(StorageMap::new()), // token -> total revenue
-        StorageSlot::Map(StorageMap::new()), // total -> claimed revenue
-        empty_storage_value(), // onchain init dummy
-        ];
-    return storage_slots;
+    vec![
+        StorageSlot::with_value(slot_name("naming::init_flag"), Word::default()),
+        StorageSlot::with_value(slot_name("naming::owner"), Word::default()),
+        StorageSlot::with_map(slot_name("naming::prices"), StorageMap::new()),
+        StorageSlot::with_map(slot_name("naming::account_to_domain"), StorageMap::new()),
+        StorageSlot::with_map(slot_name("naming::domain_to_account"), StorageMap::new()),
+        StorageSlot::with_map(slot_name("naming::domain_to_owner"), StorageMap::new()),
+        StorageSlot::with_map(slot_name("naming::ref_rate"), StorageMap::new()),
+        StorageSlot::with_map(slot_name("naming::ref_total_revenue"), StorageMap::new()),
+        StorageSlot::with_map(slot_name("naming::ref_claimed_revenue"), StorageMap::new()),
+        StorageSlot::with_value(slot_name("naming::domain_count"), Word::default()),
+        StorageSlot::with_map(slot_name("naming::total_revenue"), StorageMap::new()),
+        StorageSlot::with_map(slot_name("naming::claimed_revenue"), StorageMap::new()),
+        StorageSlot::with_map(slot_name("naming::domain_expiry"), StorageMap::new()),
+        StorageSlot::with_value(slot_name("naming::one_year_timestamp"), Word::default()),
+        StorageSlot::with_value(slot_name("naming::onchain_init"), Word::default()),
+    ]
 }

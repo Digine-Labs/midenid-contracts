@@ -2,9 +2,9 @@ mod test_utils;
 
 use std::any::Any;
 
-use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteExecutionHint, NoteInputs, NoteTag, NoteType}, transaction::OutputNote};
+use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteInputs, NoteTag, NoteType}, transaction::OutputNote};
 use miden_crypto::{Felt, Word, rand::RpoRandomCoin};
-use miden_lib::note::create_p2id_note;
+use miden_standards::note::create_p2id_note;
 use midenname_contracts::domain::{encode_domain, encode_domain_as_felts, unsafe_encode_domain};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -41,7 +41,7 @@ async fn test_claim_protocol_revenue() -> anyhow::Result<()> {
     
     add_note_to_builder(&mut ctx.builder, register_note.clone())?;
 
-    let p2id_note = create_p2id_note_exact(ctx.naming.id(), ctx.owner.id(), vec![cost.into()], NoteType::Public, Felt::new(27), Word::default())?;
+    let p2id_note = create_p2id_note_exact(ctx.naming.id(), ctx.owner.id(), vec![cost.into()], NoteType::Public, Word::default())?;
     let p2id_recipient = p2id_note.recipient().digest();
     
     let withdraw_note_inputs = NoteInputs::new([
@@ -49,12 +49,10 @@ async fn test_claim_protocol_revenue() -> anyhow::Result<()> {
         p2id_recipient[1],
         p2id_recipient[2],
         p2id_recipient[3],
-        NoteExecutionHint::Always.into(),
         NoteType::Public.into(),
-        Felt::new(27),
-        NoteTag::from_account_id(ctx.naming.id()).into(),
+        NoteTag::with_account_target(ctx.naming.id()).into(),
         Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()),
+        Felt::new(ctx.fungible_asset.faucet_id().prefix().into()),
         Felt::new(0),
         Felt::new(0),
     ].to_vec())?;

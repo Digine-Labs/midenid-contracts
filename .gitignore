@@ -10,6 +10,7 @@ store.sqlite3
 /.claude
 CLAUDE.md
 /deployments
+/templates
 
 # Environment variables
 .env

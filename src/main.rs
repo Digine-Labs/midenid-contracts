@@ -7,6 +7,10 @@ use midenname_contracts::scripts::{
 #[command(name = "midenname-contracts")]
 #[command(about = "Miden Name Registry CLI", long_about = None)]
 struct Cli {
+    /// Use testnet instead of devnet (default: devnet)
+    #[arg(long, global = true)]
+    testnet: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -15,7 +19,7 @@ struct Cli {
 enum Commands {
     /// Deploy the naming contract to the network
     Deploy {
-        /// Is network account
+        /// Deploy as network account instead of public
         #[arg(long)]
         as_network: bool,
     },
@@ -72,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Deploy { as_network } => {
             println!("Deploying Miden Name Registry contract...\n");
-            deploy(as_network).await?;
+            deploy(as_network, cli.testnet).await?;
         }
         Commands::Init { owner } => {
             println!("Initializing registry...");
@@ -96,18 +100,18 @@ async fn main() -> anyhow::Result<()> {
             println!(
                 "Entered account needs to be funded and added to keystore to send the registration note."
             );
-            send_register_note(account, naming_account, faucet_id, name).await?;
+            send_register_note(account, naming_account, faucet_id, name, cli.testnet).await?;
         }
         Commands::ConsumeNote {
             note_id,
             naming_account_id,
         } => {
             println!("Consuming note with ID: {}", note_id);
-            consume_single_note(note_id, naming_account_id).await?;
+            consume_single_note(note_id, naming_account_id, cli.testnet).await?;
         }
         Commands::FindAndConsumeNotes { account } => {
             println!("Finding and consuming notes for account: {}", account);
-            find_consumable_notes(account).await?
+            find_consumable_notes(account, cli.testnet).await?
         }
     }
 

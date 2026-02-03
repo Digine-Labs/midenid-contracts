@@ -1,0 +1,8 @@
+store_filepath = "cli-store.sqlite3"
+secret_keys_directory = "cli-keystore"
+token_symbol_map_filepath = "token_symbol_map.toml"
+component_template_directory = "./templates"
+
+[rpc]
+endpoint = "https://rpc.devnet.miden.io"
+timeout_ms = 10000

@@ -1,10 +1,10 @@
 use miden_assembly::Library;
-use miden_client::{Client, ClientError, ScriptBuilder, keystore::FilesystemKeyStore, store::TransactionFilter, transaction::{TransactionId, TransactionScript, TransactionStatus}};
-use rand::rngs::StdRng;
+use miden_client::{Client, ClientError, keystore::FilesystemKeyStore, store::TransactionFilter, transaction::{TransactionId, TransactionScript, TransactionStatus}};
+use miden_standards::code_builder::CodeBuilder;
 use tokio::time::{sleep, Duration};
 
 pub async fn wait_for_tx(
-    client: &mut Client<FilesystemKeyStore<StdRng>>,
+    client: &mut Client<FilesystemKeyStore>,
     tx_id: TransactionId,
 ) -> Result<(), ClientError> {
     loop {
@@ -22,7 +22,7 @@ pub async fn wait_for_tx(
         };
 
         if tx_committed {
-            println!("✅ transaction {} committed", tx_id.to_hex());
+            println!("transaction {} committed", tx_id.to_hex());
             break;
         }
 
@@ -40,14 +40,11 @@ pub fn create_tx_script(
     library: Option<Library>,
 ) -> anyhow::Result<TransactionScript> {
     if let Some(lib) = library {
-        return Ok(ScriptBuilder::new(true)
-            .with_dynamically_linked_library(&lib)
-            .unwrap()
-            .compile_tx_script(script_code)
-            .unwrap());
+        return Ok(CodeBuilder::default()
+            .with_dynamically_linked_library(&lib)?
+            .compile_tx_script(script_code)?);
     };
 
-    Ok(ScriptBuilder::new(true)
-        .compile_tx_script(script_code)
-        .unwrap())
+    Ok(CodeBuilder::default()
+        .compile_tx_script(script_code)?)
 }

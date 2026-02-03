@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use miden_client::{builder::ClientBuilder, keystore::FilesystemKeyStore, rpc::{Endpoint, GrpcClient}, Client};
 use miden_client_sqlite_store::ClientBuilderSqliteExt;
-use rand::rngs::StdRng;
 
 const TIMEOUT: u64 = 10_000;
 
-pub async fn initiate_client(keystore: Arc<FilesystemKeyStore<StdRng>>) -> anyhow::Result<Client<FilesystemKeyStore<StdRng>>> {
-    let endpoint = Endpoint::testnet();
+pub async fn initiate_client(keystore: Arc<FilesystemKeyStore>, use_testnet: bool) -> anyhow::Result<Client<FilesystemKeyStore>> {
+    let endpoint = if use_testnet {
+        Endpoint::testnet()
+    } else {
+        Endpoint::devnet()
+    };
 
     let rpc_client = Arc::new(GrpcClient::new(&endpoint, TIMEOUT));
 
@@ -17,7 +20,6 @@ pub async fn initiate_client(keystore: Arc<FilesystemKeyStore<StdRng>>) -> anyho
         .rpc(rpc_client)
         .sqlite_store(store_path)
         .authenticator(keystore.clone())
-        .in_debug_mode(true.into())
         .build()
         .await?;
 
@@ -26,9 +28,9 @@ pub async fn initiate_client(keystore: Arc<FilesystemKeyStore<StdRng>>) -> anyho
     Ok(client)
 }
 
-pub fn create_keystore() -> anyhow::Result<Arc<FilesystemKeyStore<StdRng>>> {
+pub fn create_keystore() -> anyhow::Result<Arc<FilesystemKeyStore>> {
     let keystore_path = std::path::PathBuf::from("./keystore");
-    let keystore: Arc<FilesystemKeyStore<StdRng>> = Arc::new(FilesystemKeyStore::<StdRng>::new(keystore_path)?);
-    
+    let keystore: Arc<FilesystemKeyStore> = Arc::new(FilesystemKeyStore::new(keystore_path)?);
+
     Ok(keystore)
 }

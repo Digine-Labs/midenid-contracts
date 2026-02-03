@@ -3,6 +3,7 @@ mod test_utils;
 use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteInputs}};
 use miden_crypto::{Felt, Word};
 use midenname_contracts::domain::{encode_domain, encode_domain_as_felts, unsafe_encode_domain};
+use midenname_contracts::storage::slot_name;
 use test_utils::init_naming;
 
 use crate::test_utils::{add_note_to_builder, create_note_for_naming, execute_note, execute_notes_and_build_chain, get_test_prices, create_note_for_naming_with_custom_serial_num};
@@ -17,7 +18,7 @@ async fn test_naming_register_under_referrer() -> anyhow::Result<()> {
         Felt::new(0),
         Felt::new(0),
         Felt::new(ctx.registrar_2.id().suffix().as_int()),
-        Felt::new(ctx.registrar_2.id().prefix().as_u64()),
+        Felt::new(ctx.registrar_2.id().prefix().into()),
         Felt::new(0),
         Felt::new(0),
     ].to_vec())?;
@@ -29,7 +30,7 @@ async fn test_naming_register_under_referrer() -> anyhow::Result<()> {
     let domain_word = encode_domain("test".to_string());
     let register_note_inputs = NoteInputs::new([
         Felt::new(ctx.registrar_2.id().suffix().as_int()),
-        Felt::new(ctx.registrar_2.id().prefix().as_u64()),
+        Felt::new(ctx.registrar_2.id().prefix().into()),
         Felt::new(0),
         Felt::new(0),
         Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
@@ -53,14 +54,14 @@ async fn test_naming_register_under_referrer() -> anyhow::Result<()> {
 
     let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id(), set_ref_rate_note.id(), register_note.id()], &mut ctx.naming).await?;
 
-    let domain_owner_slot = ctx.naming.storage().get_map_item(5, domain_word)?;
-    let domain_expiry_slot = ctx.naming.storage().get_map_item(12, domain_word)?;
-    let domain_to_id = ctx.naming.storage().get_map_item(4, domain_word)?;
-    let id_to_domain = ctx.naming.storage().get_map_item(3, Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let domain_owner_slot = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_owner"), domain_word)?;
+    let domain_expiry_slot = ctx.naming.storage().get_map_item(&slot_name("naming::domain_expiry"), domain_word)?;
+    let domain_to_id = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(&slot_name("naming::account_to_domain"), Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
 
 
     assert_eq!(domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
-    assert_eq!(domain_owner_slot.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().as_u64());
+    assert_eq!(domain_owner_slot.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
 
     assert!(domain_expiry_slot.get(0).unwrap().as_int() >= (1700000000 + ctx.one_year).into());
 
@@ -71,12 +72,12 @@ async fn test_naming_register_under_referrer() -> anyhow::Result<()> {
     
     // Protocol values
 
-    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let total_revenue_slot = ctx.naming.storage().get_map_item(&slot_name("naming::total_revenue"), Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 444);
 
     // Referrer values
 
-    let referrer_slot = ctx.naming.storage().get_map_item(7, Word::new([Felt::new(ctx.registrar_2.id().suffix().as_int()), Felt::new(ctx.registrar_2.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let referrer_slot = ctx.naming.storage().get_map_item(&slot_name("naming::ref_total_revenue"), Word::new([Felt::new(ctx.registrar_2.id().suffix().as_int()), Felt::new(ctx.registrar_2.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(referrer_slot.get(0).unwrap().as_int(), 111);
     Ok(())
 }
@@ -92,7 +93,7 @@ async fn test_naming_referrer_revenue_accumulation() -> anyhow::Result<()> {
         Felt::new(0),
         Felt::new(0),
         Felt::new(ctx.registrar_2.id().suffix().as_int()),
-        Felt::new(ctx.registrar_2.id().prefix().as_u64()),
+        Felt::new(ctx.registrar_2.id().prefix().into()),
         Felt::new(0),
         Felt::new(0),
     ].to_vec())?;
@@ -104,7 +105,7 @@ async fn test_naming_referrer_revenue_accumulation() -> anyhow::Result<()> {
     let domain_word = encode_domain("test".to_string());
     let register_note_inputs = NoteInputs::new([
         Felt::new(ctx.registrar_2.id().suffix().as_int()),
-        Felt::new(ctx.registrar_2.id().prefix().as_u64()),
+        Felt::new(ctx.registrar_2.id().prefix().into()),
         Felt::new(0),
         Felt::new(0),
         Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
@@ -130,7 +131,7 @@ async fn test_naming_referrer_revenue_accumulation() -> anyhow::Result<()> {
     let domain_word_2 = encode_domain("test2".to_string());
     let register_note_inputs_2 = NoteInputs::new([
         Felt::new(ctx.registrar_2.id().suffix().as_int()),
-        Felt::new(ctx.registrar_2.id().prefix().as_u64()),
+        Felt::new(ctx.registrar_2.id().prefix().into()),
         Felt::new(0),
         Felt::new(0),
         Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
@@ -156,12 +157,12 @@ async fn test_naming_referrer_revenue_accumulation() -> anyhow::Result<()> {
     
     // Protocol values
 
-    let total_revenue_slot = ctx.naming.storage().get_map_item(10, Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let total_revenue_slot = ctx.naming.storage().get_map_item(&slot_name("naming::total_revenue"), Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 543);
 
     // Referrer values
 
-    let referrer_slot = ctx.naming.storage().get_map_item(7, Word::new([Felt::new(ctx.registrar_2.id().suffix().as_int()), Felt::new(ctx.registrar_2.id().prefix().as_u64()), Felt::new(0), Felt::new(0)]))?;
+    let referrer_slot = ctx.naming.storage().get_map_item(&slot_name("naming::ref_total_revenue"), Word::new([Felt::new(ctx.registrar_2.id().suffix().as_int()), Felt::new(ctx.registrar_2.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
     assert_eq!(referrer_slot.get(0).unwrap().as_int(), 135);
     Ok(())
 }
