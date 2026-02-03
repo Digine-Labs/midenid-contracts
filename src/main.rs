@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
-use midenname_contracts::scripts::{deploy, deploy_as_network_account};
+use midenname_contracts::scripts::{
+    consume_single_note, deploy, find_consumable_notes, send_register_note,
+};
 
 #[derive(Parser)]
 #[command(name = "midenname-contracts")]
@@ -12,8 +14,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Deploy the naming contract to the network
-    Deploy,
-    DeployNetwork,
+    Deploy {
+        /// Is network account
+        #[arg(long)]
+        as_network: bool,
+    },
 
     /// Initialize the deployed registry with owner and payment token
     Init {
@@ -24,13 +29,39 @@ enum Commands {
 
     /// Register a new name
     Register {
+        /// Note sender (Domain registerer) Account Id
+        #[arg(long)]
+        account: String,
+
+        /// Naming contract account id
+        #[arg(long)]
+        naming_account: String,
+
+        /// Faucet id to fund the registration
+        #[arg(long)]
+        faucet_id: String,
+
         /// Name to register
         #[arg(long)]
         name: String,
+    },
 
-        /// Account ID to map the name to
+    /// Consume Note
+    ConsumeNote {
+        /// Note ID to consume
         #[arg(long)]
-        account: Option<String>,
+        note_id: String,
+
+        /// Naming contract account id
+        #[arg(long)]
+        naming_account_id: String,
+    },
+
+    /// Find and consume notes
+    FindAndConsumeNotes {
+        /// Account id
+        #[arg(long)]
+        account: String,
     },
 }
 
@@ -39,12 +70,9 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Deploy => {
+        Commands::Deploy { as_network } => {
             println!("Deploying Miden Name Registry contract...\n");
-            deploy().await?;
-        }
-        Commands::DeployNetwork => {
-            deploy_as_network_account().await?;
+            deploy(as_network).await?;
         }
         Commands::Init { owner } => {
             println!("Initializing registry...");
@@ -56,15 +84,30 @@ async fn main() -> anyhow::Result<()> {
                 println!("Error: --owner is required for initialization");
             }
         }
-        Commands::Register { name, account } => {
+        Commands::Register {
+            name,
+            account,
+            naming_account,
+            faucet_id,
+        } => {
+            println!("\n");
+            println!("=================================================");
             println!("Registering name: {}", name);
-            if let Some(account_id) = account {
-                println!("Account: {}", account_id);
-                // TODO: Implement registration logic
-                println!("Note: Registration logic not yet implemented");
-            } else {
-                println!("Error: --account is required for registration");
-            }
+            println!(
+                "Entered account needs to be funded and added to keystore to send the registration note."
+            );
+            send_register_note(account, naming_account, faucet_id, name).await?;
+        }
+        Commands::ConsumeNote {
+            note_id,
+            naming_account_id,
+        } => {
+            println!("Consuming note with ID: {}", note_id);
+            consume_single_note(note_id, naming_account_id).await?;
+        }
+        Commands::FindAndConsumeNotes { account } => {
+            println!("Finding and consuming notes for account: {}", account);
+            find_consumable_notes(account).await?
         }
     }
 

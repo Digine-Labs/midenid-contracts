@@ -2,7 +2,7 @@
 
 A decentralized name resolution system built on [Miden](https://miden.xyz), enabling human-readable names to map to Miden account addresses with advanced features like referrals, domain expiry, and revenue management.
 
-🌐 **Website**: [miden.name](https://miden.name)
+**Website**: [miden.name](https://miden.name)
 
 ## Overview
 
@@ -129,22 +129,54 @@ cargo test --release --test naming_register_tests -- --nocapture --test-threads=
 cargo test --release --test naming_register_tests -- --nocapture --test-threads=1 test_register_name
 ```
 
-### CLI Usage
+## CLI Usage
 
 The project includes a CLI for deployment and management:
 
-```bash
-# Show available commands
-cargo run -- --help
+### Show Available Commands
 
-# Deploy the naming contract
+```bash
+cargo run -- --help
+```
+
+### Deploy the Naming Contract
+
+```bash
+# Local deployment
 cargo run -- deploy
 
-# Initialize the registry (planned)
-cargo run -- init --owner <owner_account_id>
+# Deploy as network account (production)
+cargo run -- deploy --as-network
+```
 
-# Register a name (planned)
-cargo run -- register --name alice --account <account_id>
+### Initialize Registry
+
+```bash
+cargo run -- init --owner <owner_account_id>
+```
+
+### Register a Domain
+
+```bash
+cargo run -- register \
+  --account <your_account_id> \
+  --naming-account <registry_account_id> \
+  --faucet-id <payment_token_id> \
+  --name <domain_name>
+```
+
+### Consume Note
+
+```bash
+cargo run -- consume-note \
+  --note-id <note_id> \
+  --naming-account-id <registry_account_id>
+```
+
+### Find and Consume Notes
+
+```bash
+cargo run -- find-and-consume-notes --account <account_id>
 ```
 
 ### Development Commands
@@ -207,18 +239,18 @@ The naming contract uses Miden's storage system with numbered slots:
 
 Tests validate the following functionality:
 
-- ✅ Registry initialization
-- ✅ Domain registration with payment
-- ✅ Domain activation and mapping
-- ✅ Domain transfer between accounts
-- ✅ Domain expiry and extension
-- ✅ Expired domain cleanup
-- ✅ Referral system and revenue distribution
-- ✅ Multi-year discounts
-- ✅ Protocol revenue tracking
-- ✅ Owner controls (price updates, referral rates)
-- ✅ Domain encoding/decoding
-- ✅ Access control enforcement
+- Registry initialization
+- Domain registration with payment
+- Domain activation and mapping
+- Domain transfer between accounts
+- Domain expiry and extension
+- Expired domain cleanup
+- Referral system and revenue distribution
+- Multi-year discounts
+- Protocol revenue tracking
+- Owner controls (price updates, referral rates)
+- Domain encoding/decoding
+- Access control enforcement
 
 ## Resources
 
