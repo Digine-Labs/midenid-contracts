@@ -1,0 +1,17 @@
+use miden_name::naming
+use miden::protocol::active_note
+use miden::core::sys
+
+const RECIPIENT=0
+const NOTE_DETAILS=4
+const TOKEN=8
+
+begin
+    push.0
+    exec.active_note::get_inputs drop drop
+
+    mem_loadw_be.RECIPIENT padw mem_loadw_be.NOTE_DETAILS padw mem_loadw_be.TOKEN
+    # [TOKEN, DETAILS, RECIPIENT]
+    call.naming::withdraw_assets
+    exec.sys::truncate_stack
+end

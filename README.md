@@ -24,7 +24,9 @@ Miden Name is actively developed and any functionality can be changed, removed, 
 - **Discount System**: Multi-year registrations get discounts (3+ years: 30%, 5+ years: 50%)
 - **Referral System**: Referrers earn a percentage of registration fees
 - **Revenue Tracking**: Protocol tracks total and claimable revenue per token
-- **Owner Controls**: Registry owner can update prices, set referral rates, and claim revenue
+- **Revenue Claiming**: Owner can claim accumulated protocol revenue (updates claimed tracker)
+- **Asset Withdrawal**: Owner can withdraw the full token balance to any account
+- **Owner Controls**: Registry owner can update prices, set referral rates, claim revenue, withdraw assets, and transfer ownership
 - **Expired Domain Cleanup**: Permissionless function to clear expired domain mappings
 
 If you are learning Miden as a developer, you can find practices for the following examples:
@@ -32,6 +34,7 @@ If you are learning Miden as a developer, you can find practices for the followi
 - Note-based transaction system
 - Ownership and access control patterns
 - Payment validation and asset handling
+- Output note creation and asset withdrawal from contract vaults
 - Time-based logic (domain expiry)
 - Referral and revenue distribution systems
 - Storage optimization techniques
@@ -46,7 +49,7 @@ All core logic is implemented in Miden Assembly (`.masm` files):
 
 - **[naming.masm](masm/accounts/naming.masm)**: Main name registry contract
   - Storage slots (see Storage Layout section below)
-  - Exports: `register`, `register_with_referrer`, `activate_domain`, `transfer`, `extend_domain`, `clear_expired_domain`, `init`, `receive_asset`, `update_registry_owner`, `set_price`, `set_referrer_rate`, `claim_protocol_revenue`
+  - Exports: `register`, `register_with_referrer`, `activate_domain`, `transfer`, `extend_domain`, `clear_expired_domain`, `init`, `receive_asset`, `update_registry_owner`, `set_price`, `set_referrer_rate`, `claim_protocol_revenue`, `withdraw_assets`
 
 - **[identity.masm](masm/accounts/identity.masm)**: Identity contract for user profiles (under development)
 
@@ -65,6 +68,7 @@ Note scripts enable cross-account interactions and contract calls:
 - **[set_all_prices_testnet.masm](masm/notes/set_all_prices_testnet.masm)**: Set test prices for testnet
 - **[set_referrer_rate.masm](masm/notes/set_referrer_rate.masm)**: Set referral commission rate
 - **[claim_protocol_revenue.masm](masm/notes/claim_protocol_revenue.masm)**: Claim accumulated protocol revenue
+- **[withdraw_assets.masm](masm/notes/withdraw_assets.masm)**: Withdraw full token balance from contract vault
 - **[transfer_ownership.masm](masm/notes/transfer_ownership.masm)**: Transfer registry ownership
 - **[P2N.masm](masm/notes/P2N.masm)**: Pay-to-note for payment handling
 
@@ -240,7 +244,7 @@ The naming contract uses Miden's storage system with numbered slots:
 - **Multiple domains per account**: Accounts can own unlimited domains
 - **Unique active domains**: Only one account can have an active mapping per domain
 - **Registration period**: 1-10 years per registration
-- **Owner-only operations**: Price updates, referral rates, ownership transfer, revenue claims
+- **Owner-only operations**: Price updates, referral rates, ownership transfer, revenue claims, asset withdrawals
 - **Domain ownership**: Registration creates ownership; activation creates account mapping
 - **Expiry enforcement**: Expired domains can be cleared permissionlessly
 - **Referral rate limit**: Maximum 25% (2500 basis points)
@@ -257,20 +261,50 @@ The naming contract uses Miden's storage system with numbered slots:
 
 ## Testing
 
-Tests validate the following functionality:
+Run all tests:
 
-- Registry initialization
-- Domain registration with payment
-- Domain activation and mapping
-- Domain transfer between accounts
-- Domain expiry and extension
-- Expired domain cleanup
-- Referral system and revenue distribution
-- Multi-year discounts
-- Protocol revenue tracking
-- Owner controls (price updates, referral rates)
-- Domain encoding/decoding
-- Access control enforcement
+```bash
+cargo test -- --nocapture
+```
+
+### Test Coverage (33 active tests, 2 ignored)
+
+#### Encoding Tests (`encoding_test.rs` — 5 tests)
+- Domain name encoding/decoding (single & multi-felt)
+
+#### Registration Tests (`naming_register_tests.rs` — 11 tests)
+- Registry initialization and owner setup
+- Domain registration with payment validation (exact, excess, insufficient amounts)
+- Domain activation and bidirectional mapping
+- Activation rejected for non-owner
+- Duplicate domain registration rejected (same & different owners)
+- Multiple domains registration and activation
+- Domain length validation (empty, too long, wrong character count)
+
+#### Transfer Tests (`naming_transfer_tests.rs` — 12 tests)
+- Domain transfer: happy path, clears old mappings
+- Domain transfer then reactivation by new owner
+- Domain transfer rejected for non-owner
+- Transfer of nonexistent domain rejected
+- Transfer preserves unrelated domains
+- Activate then transfer clears activation mappings
+- Chain transfer A→B→C
+- Circular transfer A→B→A with re-activation
+- Registry ownership transfer: happy path
+- Registry ownership transfer rejected for non-owner
+- New owner gains admin privileges (set_prices)
+- Old owner loses admin privileges after transfer
+
+#### Protocol Tests (`naming_protocol_tests.rs` — 5 tests)
+- Double initialization rejected
+- Dynamic price update with testnet prices script
+- Revenue accumulates across multiple registrations
+- Protocol revenue claiming (claim_protocol_revenue)
+- Full balance withdrawal (withdraw_assets)
+
+#### Referral Tests (`naming_referral_tests.rs` — 2 ignored)
+- ~~Register with referrer~~ *(requires naming_discount contract)*
+- ~~Referrer revenue accumulation~~ *(requires naming_discount contract)*
 
 ## Resources
 
