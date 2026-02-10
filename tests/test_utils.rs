@@ -180,6 +180,20 @@ pub async fn execute_note(chain: &mut MockChain, note_id: NoteId, target: &mut A
     Ok(())
 }
 
+pub async fn execute_note_with_expected_output(chain: &mut MockChain, note_id: NoteId, target: &mut Account, expected_output_notes: Vec<OutputNote>) -> anyhow::Result<()> {
+    let tx_ctx = chain.build_tx_context(target.id(), &[note_id], &[])?
+        .extend_expected_output_notes(expected_output_notes)
+        .build()?;
+
+    let executed_tx = tx_ctx.execute().await?;
+
+    target.apply_delta(&executed_tx.account_delta())?;
+    chain.add_pending_executed_transaction(&executed_tx)?;
+    chain.prove_next_block()?;
+
+    Ok(())
+}
+
 fn create_library(account_code: String, library_path: &str) -> anyhow::Result<Library> {
     let source_manager = Arc::new(DefaultSourceManager::default());
     let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone())

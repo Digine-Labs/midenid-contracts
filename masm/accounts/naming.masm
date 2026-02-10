@@ -195,28 +195,45 @@ pub proc claim_protocol_revenue
     mem_storew_be.MEM_NOTE_DETAILS dropw
     mem_storew_be.MEM_RECIPIENT dropw
     exec._assert_only_owner
-    # Create note
-
-
+    # Create output note
     padw mem_loadw_be.MEM_RECIPIENT
     padw mem_loadw_be.MEM_NOTE_DETAILS
-    #padw mem_loadw_be.MEM_PAYMENT_TOKEN
-    # Stack must be
-    # [tag, aux, note_type, exec_hint, RECIPIENT]
-    exec.output_note::create # TODO
-    # Create ASSET word
-    # []
+    drop drop
+    # [tag, note_type, RECIPIENT]
+    exec.output_note::create
+    # [note_idx]
     exec._get_remaining_revenue
-    # [claimable_revenue]
+    # [claimable_revenue, note_idx]
     exec._get_asset
-    # [ASSET]
+    # [ASSET, note_idx]
+    exec.native_account::remove_asset
+    # [ASSET, note_idx]
+    exec.output_note::add_asset
+    # []
+    exec._set_claimed_to_total
 end
 
-# Input: [TOKEN]
+# Input: [TOKEN, NOTE_DETAILS, RECIPIENT]
 pub proc withdraw_assets
     mem_storew_be.MEM_PAYMENT_TOKEN dropw
+    mem_storew_be.MEM_NOTE_DETAILS dropw
+    mem_storew_be.MEM_RECIPIENT dropw
     exec._assert_only_owner
-    nop
+    # Create output note
+    padw mem_loadw_be.MEM_RECIPIENT
+    padw mem_loadw_be.MEM_NOTE_DETAILS
+    drop drop
+    # [tag, note_type, RECIPIENT]
+    exec.output_note::create
+    # [note_idx]
+    exec._get_balance
+    # [balance, note_idx]
+    exec._get_asset
+    # [ASSET, note_idx]
+    exec.native_account::remove_asset
+    # [ASSET, note_idx]
+    exec.output_note::add_asset
+    # []
 end
 
 # Internal Methods
@@ -267,12 +284,25 @@ proc _get_remaining_revenue
     # [claimable_revenue]
 end
 
+# Input: [] Memory [PAYMENT_TOKEN]
+# Output: []
+# Sets claimed_revenue = total_revenue for the token
+proc _set_claimed_to_total
+    padw mem_loadw_be.MEM_PAYMENT_TOKEN
+    push.TOTAL_REVENUE_SLOT[0..2] exec.active_account::get_map_item
+    # [TOTAL_VALUE]
+    padw mem_loadw_be.MEM_PAYMENT_TOKEN
+    push.CLAIMED_REVENUE_SLOT[0..2] exec.native_account::set_map_item dropw
+end
+
 # Input: [amt] Memory [PAYMENT_TOKEN]
-# Output: [ASSET]
+# Output: [ASSET] where ASSET = [prefix, suffix, 0, amt] on stack
+# Word format: [amt, 0, suffix, prefix] matching FungibleAsset encoding
 proc _get_asset
-    push.0 swap
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
-    # [prefix, suffix, amt, 0]
+    # [prefix, suffix, amt]
+    push.0 movdn.2
+    # [prefix, suffix, 0, amt]
 end
 
 # Input: [account_prefix, account_suffix] Memory [DOMAIN]
