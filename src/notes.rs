@@ -12,7 +12,9 @@ use miden_client::{
     },
 };
 use miden_standards::code_builder::CodeBuilder;
+use miden_standards::note::NetworkAccountTarget;
 use miden_protocol::transaction::TransactionKernel;
+use miden_protocol::note::NoteExecutionHint;
 use miden_crypto::{Felt, Word};
 use rand::{Rng, RngCore};
 use std::{fs, path::Path, sync::Arc};
@@ -21,9 +23,10 @@ pub async fn create_note_for_naming_with_client(
     name: String,
     inputs: NoteInputs,
     sender: AccountId,
-    _target_id: AccountId,
+    target_id: AccountId,
     assets: NoteAssets,
     client: &mut Client<FilesystemKeyStore>,
+    is_network_account: bool,
 ) -> anyhow::Result<Note> {
     let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
     let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming_unsafe.masm")).unwrap();
@@ -41,12 +44,19 @@ pub async fn create_note_for_naming_with_client(
         .compile_note_script(note_code)?;
 
     let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
-    let tag = NoteTag::with_account_target(_target_id);
-    let metadata = NoteMetadata::new(
-        sender,
-        NoteType::Public,
-        tag,
-    );
+    let tag = NoteTag::with_account_target(target_id);
+
+    let metadata = if is_network_account {
+        // For network accounts, attach NetworkAccountTarget so the network can consume the note
+        let network_target = NetworkAccountTarget::new(target_id, NoteExecutionHint::Always)
+            .map_err(|e| anyhow::anyhow!("Failed to create NetworkAccountTarget: {}", e))?;
+        NoteMetadata::new(sender, NoteType::Public, tag)
+            .with_attachment(network_target.into())
+    } else {
+        // For public accounts, no attachment needed
+        NoteMetadata::new(sender, NoteType::Public, tag)
+    };
+
     let note = Note::new(assets, metadata, recipient);
     Ok(note)
 }
@@ -55,8 +65,9 @@ pub async fn create_note_for_naming(
     name: String,
     inputs: NoteInputs,
     sender: AccountId,
-    _target_id: AccountId,
+    target_id: AccountId,
     assets: NoteAssets,
+    is_network_account: bool,
 ) -> anyhow::Result<Note> {
     let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
     let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
@@ -68,12 +79,19 @@ pub async fn create_note_for_naming(
         .compile_note_script(note_code)?;
 
     let recipient = NoteRecipient::new(serial, note_script, inputs.clone());
-    let tag = NoteTag::with_account_target(_target_id);
-    let metadata = NoteMetadata::new(
-        sender,
-        NoteType::Public,
-        tag,
-    );
+    let tag = NoteTag::with_account_target(target_id);
+
+    let metadata = if is_network_account {
+        // For network accounts, attach NetworkAccountTarget so the network can consume the note
+        let network_target = NetworkAccountTarget::new(target_id, NoteExecutionHint::Always)
+            .map_err(|e| anyhow::anyhow!("Failed to create NetworkAccountTarget: {}", e))?;
+        NoteMetadata::new(sender, NoteType::Public, tag)
+            .with_attachment(network_target.into())
+    } else {
+        // For public accounts, no attachment needed
+        NoteMetadata::new(sender, NoteType::Public, tag)
+    };
+
     let note = Note::new(assets, metadata, recipient);
     Ok(note)
 }

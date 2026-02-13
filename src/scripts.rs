@@ -96,6 +96,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         naming_account.id(),
         NoteAssets::new(vec![]).unwrap(),
         &mut client,
+        is_network,
     )
     .await?;
 
@@ -155,6 +156,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         naming_account.id(),
         NoteAssets::new(vec![]).unwrap(),
         &mut client,
+        is_network,
     )
     .await?;
 
@@ -405,6 +407,7 @@ pub async fn send_register_note(
         naming_account,
         register_asset,
         &mut client,
+        is_network,
     )
     .await?;
 
