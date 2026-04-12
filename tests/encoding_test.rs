@@ -1,5 +1,5 @@
 use miden_crypto::{Felt, Word};
-use midenname_contracts::domain::{encode_domain, decode_domain};
+use midenname_contracts::domain::{decode_domain, encode_domain};
 
 #[test]
 fn encode_letter() {
@@ -31,7 +31,12 @@ fn encode_letters() {
 fn decode_letters() {
     let encoded: u64 = 0x503090c01;
 
-    let encoded_word: Word = Word::new([Felt::new(0), Felt::new(0), Felt::new(encoded), Felt::new(5_u64)]);
+    let encoded_word: Word = Word::new([
+        Felt::new(0),
+        Felt::new(0),
+        Felt::new(encoded),
+        Felt::new(5_u64),
+    ]);
 
     let decoded_domain: String = decode_domain(encoded_word);
     assert_eq!(decoded_domain, "alice");
@@ -52,7 +57,12 @@ fn encode_multiple_felts() {
 
 #[test]
 fn decode_multiple_felts() {
-    let encoded_word: Word = Word::new([Felt::new(0x50f0a), Felt::new(0x40e01020f0204), Felt::new(0xe010503090c01), Felt::new(17_u64)]);
+    let encoded_word: Word = Word::new([
+        Felt::new(0x50f0a),
+        Felt::new(0x40e01020f0204),
+        Felt::new(0xe010503090c01),
+        Felt::new(17_u64),
+    ]);
 
     let decoded_domain = decode_domain(encoded_word);
 

@@ -129,8 +129,8 @@ pub proc transfer
     exec._assert_only_domain_owner
     exec._clear_domain_mapping
 
-    padw mem_loadw_be.MEM_DOMAIN_NEW_OWNER drop drop
-    # [NEW_OWNER]
+    padw mem_loadw_be.MEM_DOMAIN_NEW_OWNER drop drop swap
+    # [suffix, prefix]
     exec._update_domain_owner
     # []
 end
@@ -351,7 +351,8 @@ end
 # Input: [] Memory [PAYMENT_TOKEN]
 # Output: [balance]
 proc _get_balance
-    padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
+    padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop swap
+    # [suffix, prefix]
     exec.active_account::get_balance
     # [balance]
 end
@@ -392,12 +393,12 @@ end
 # Output: []
 proc _assert_only_owner
     push.0 exec.input_note::get_sender
-    # [caller_prefix, caller_suffix]
+    # [caller_suffix, caller_prefix]
     push.OWNER_SLOT[0..2]
     exec.active_account::get_item
-    # [0, 0, owner_prefix, owner_suffix, caller_prefix, caller_suffix]
-    drop drop
-    # [owner_prefix, owner_suffix, caller_prefix, caller_suffix]
+    # [0, 0, owner_prefix, owner_suffix, caller_suffix, caller_prefix]
+    drop drop swap
+    # [owner_suffix, owner_prefix, caller_suffix, caller_prefix]
     exec.account_id::is_equal assert.err=ERR_ONLY_OWNER
     # []
 end

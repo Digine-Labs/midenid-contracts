@@ -8,11 +8,10 @@ const TOKEN=8
 
 begin
     push.0
-    exec.active_note::get_inputs drop drop
+    exec.active_note::get_storage drop drop
 
     mem_loadw_be.RECIPIENT padw mem_loadw_be.NOTE_DETAILS padw mem_loadw_be.TOKEN
     # [TOKEN, DETAILS, RECIPIENT]
-    debug.stack.12
     call.naming::claim_protocol_revenue
     exec.sys::truncate_stack
 end

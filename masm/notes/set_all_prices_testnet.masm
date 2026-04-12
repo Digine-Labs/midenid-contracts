@@ -11,7 +11,7 @@ const FIVE_LETTER_PRICE=20000000
 
 begin
     push.0
-    exec.active_note::get_inputs
+    exec.active_note::get_storage
     # [num_inputs, init_ptr]
     drop drop
     # SET 1 LETTER

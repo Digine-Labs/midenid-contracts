@@ -1,5 +1,5 @@
-use miden_protocol::account::{StorageMap, StorageSlot, StorageSlotName};
 use miden_crypto::Word;
+use miden_protocol::account::{StorageMap, StorageSlot, StorageSlotName};
 
 pub fn slot_name(name: &str) -> StorageSlotName {
     StorageSlotName::new(name).expect("invalid storage slot name")

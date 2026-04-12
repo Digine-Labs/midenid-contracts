@@ -1,7 +1,12 @@
 use miden_assembly::Library;
-use miden_client::{Client, ClientError, keystore::FilesystemKeyStore, store::TransactionFilter, transaction::{TransactionId, TransactionScript, TransactionStatus}};
+use miden_client::{
+    Client, ClientError,
+    keystore::FilesystemKeyStore,
+    store::TransactionFilter,
+    transaction::{TransactionId, TransactionScript, TransactionStatus},
+};
 use miden_standards::code_builder::CodeBuilder;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 pub async fn wait_for_tx(
     client: &mut Client<FilesystemKeyStore>,
@@ -45,6 +50,5 @@ pub fn create_tx_script(
             .compile_tx_script(script_code)?);
     };
 
-    Ok(CodeBuilder::default()
-        .compile_tx_script(script_code)?)
+    Ok(CodeBuilder::default().compile_tx_script(script_code)?)
 }

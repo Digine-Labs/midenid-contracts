@@ -8,7 +8,7 @@ const DOMAIN_PTR=4
 # Input (arguments): [NEW_OWNER, DOMAIN]
 begin
     push.0
-    exec.active_note::get_inputs
+    exec.active_note::get_storage
     drop drop
     mem_loadw_be.DOMAIN_PTR padw mem_loadw_be.NEW_OWNER_PTR
     # [NEW_OWNER, DOMAIN]

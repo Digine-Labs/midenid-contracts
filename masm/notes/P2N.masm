@@ -35,7 +35,7 @@ const ERR_P2N_TARGET_NAME_MISMATCH="P2N's target name address and resolved addre
 #!   greater than 2^63.
 begin
     # store the note inputs to memory starting at address 0
-    padw push.0 exec.active_note::get_inputs
+    padw push.0 exec.active_note::get_storage
     # => [num_inputs, inputs_ptr, EMPTY_WORD]
 
     # make sure the number of inputs is 4 (name is a full word)

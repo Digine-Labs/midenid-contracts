@@ -1,12 +1,18 @@
 mod test_utils;
 
-use miden_client::{asset::FungibleAsset, note::{NoteAssets, NoteInputs}};
+use miden_client::{
+    asset::FungibleAsset,
+    note::{NoteAssets, NoteStorage},
+};
 use miden_crypto::{Felt, Word};
 use midenname_contracts::domain::{encode_domain, encode_domain_as_felts, unsafe_encode_domain};
 use midenname_contracts::storage::slot_name;
 use test_utils::init_naming;
 
-use crate::test_utils::{add_note_to_builder, create_note_for_naming, execute_note, execute_notes_and_build_chain, get_test_prices, create_note_for_naming_with_custom_serial_num};
+use crate::test_utils::{
+    add_note_to_builder, create_note_for_naming, create_note_for_naming_with_custom_serial_num,
+    execute_note, execute_notes_and_build_chain, get_test_prices,
+};
 
 #[tokio::test]
 async fn test_naming_initialize() -> anyhow::Result<()> {
@@ -16,91 +22,173 @@ async fn test_naming_initialize() -> anyhow::Result<()> {
 
     execute_note(&mut chain, ctx.initialize_note.id(), &mut ctx.naming).await?;
     execute_note(&mut chain, ctx.set_prices_note.id(), &mut ctx.naming).await?;
-    
-    let init_slot = ctx.naming.storage().get_item(&slot_name("naming::init_flag"))?;
+
+    let init_slot = ctx
+        .naming
+        .storage()
+        .get_item(&slot_name("naming::init_flag"))?;
     let owner_slot = ctx.naming.storage().get_item(&slot_name("naming::owner"))?;
 
-    assert_eq!(init_slot.get(0).unwrap().as_int(), 1);
-    assert_eq!(owner_slot.get(1).unwrap().as_int(), ctx.owner.id().prefix().into());
-    assert_eq!(owner_slot.get(0).unwrap().as_int(), ctx.owner.id().suffix().as_int());
+    assert_eq!(init_slot.get(0).unwrap().as_canonical_u64(), 1);
+    assert_eq!(
+        owner_slot.get(1).unwrap().as_canonical_u64(),
+        ctx.owner.id().prefix().as_felt().as_canonical_u64()
+    );
+    assert_eq!(
+        owner_slot.get(0).unwrap().as_canonical_u64(),
+        ctx.owner.id().suffix().as_canonical_u64()
+    );
 
     // Assert prices
     let mock_prices = get_test_prices();
-    for i in 1..=5 { 
-        let price_slot = ctx.naming.storage()
-            .get_map_item(&slot_name("naming::prices"),
-                Word::new([
-                        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-                        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-                        Felt::new(i as u64),
-                        Felt::new(0)
-                    ]))?;
-        assert_eq!(price_slot.get(0).unwrap().as_int(), mock_prices[i as usize].as_int());
+    for i in 1..=5 {
+        let price_slot = ctx.naming.storage().get_map_item(
+            &slot_name("naming::prices"),
+            Word::new([
+                Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+                ctx.fungible_asset.faucet_id().prefix().as_felt(),
+                Felt::new(i as u64),
+                Felt::new(0),
+            ]),
+        )?;
+        assert_eq!(
+            price_slot.get(0).unwrap().as_canonical_u64(),
+            mock_prices[i as usize].as_canonical_u64()
+        );
     }
 
-    
     Ok(())
 }
- 
+
 #[tokio::test]
 async fn test_naming_register_activate() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let domain = encode_domain_as_felts("test".to_string());
     let domain_word = encode_domain("test".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        domain[3],
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            domain[3],
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let activate_note = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(domain_word.to_vec())?, ctx.registrar_1.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
+    let register_note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
+    let activate_note = create_note_for_naming(
+        "activate_domain".to_string(),
+        NoteStorage::new(domain_word.to_vec())?,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        NoteAssets::new(vec![])?,
+    )
+    .await?;
     add_note_to_builder(&mut ctx.builder, register_note.clone())?;
     add_note_to_builder(&mut ctx.builder, activate_note.clone())?;
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id(), register_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[
+            ctx.initialize_note.id(),
+            ctx.set_prices_note.id(),
+            register_note.id(),
+        ],
+        &mut ctx.naming,
+    )
+    .await?;
     //execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
 
-    
+    let domain_owner_slot = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_owner"), domain_word)?;
+    let domain_to_id = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(
+        &slot_name("naming::account_to_domain"),
+        Word::new([
+            Felt::new(ctx.registrar_1.id().suffix().as_canonical_u64()),
+            ctx.registrar_1.id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
 
-    let domain_owner_slot = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_owner"), domain_word)?;
-    let domain_to_id = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
-    let id_to_domain = ctx.naming.storage().get_map_item(&slot_name("naming::account_to_domain"), Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
+    assert_eq!(
+        domain_owner_slot.get(0).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().suffix().as_canonical_u64()
+    );
+    assert_eq!(
+        domain_owner_slot.get(1).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().prefix().as_felt().as_canonical_u64()
+    );
 
+    assert_eq!(domain_to_id.get(0).unwrap().as_canonical_u64(), 0); // Domain must be clean after register
+    assert_eq!(domain_to_id.get(1).unwrap().as_canonical_u64(), 0);
+    assert_eq!(id_to_domain.get(0).unwrap().as_canonical_u64(), 0);
+    assert_eq!(id_to_domain.get(1).unwrap().as_canonical_u64(), 0);
 
-    assert_eq!(domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
-    assert_eq!(domain_owner_slot.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
-
-    assert_eq!(domain_to_id.get(0).unwrap().as_int(), 0); // Domain must be clean after register
-    assert_eq!(domain_to_id.get(1).unwrap().as_int(), 0);
-    assert_eq!(id_to_domain.get(0).unwrap().as_int(), 0);
-    assert_eq!(id_to_domain.get(1).unwrap().as_int(), 0);
-    
     // Protocol values
 
-    let total_revenue_slot = ctx.naming.storage().get_map_item(&slot_name("naming::total_revenue"), Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
-    assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555);
+    let total_revenue_slot = ctx.naming.storage().get_map_item(
+        &slot_name("naming::total_revenue"),
+        Word::new([
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
+    assert_eq!(total_revenue_slot.get(0).unwrap().as_canonical_u64(), 555);
 
-    let total_domain_count = ctx.naming.storage().get_item(&slot_name("naming::domain_count"))?;
-    assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
-    
+    let total_domain_count = ctx
+        .naming
+        .storage()
+        .get_item(&slot_name("naming::domain_count"))?;
+    assert_eq!(total_domain_count.get(0).unwrap().as_canonical_u64(), 1);
+
     // Activate domain
 
-    
     execute_note(&mut chain, activate_note.id(), &mut ctx.naming).await?; // Use always updated account as target
 
-    let domain_to_id = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
-    let id_to_domain = ctx.naming.storage().get_map_item(&slot_name("naming::account_to_domain"), Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
+    let domain_to_id = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(
+        &slot_name("naming::account_to_domain"),
+        Word::new([
+            Felt::new(ctx.registrar_1.id().suffix().as_canonical_u64()),
+            ctx.registrar_1.id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
 
-    assert_eq!(domain_to_id.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int()); // Now domain mapping must be matched
-    assert_eq!(domain_to_id.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
+    assert_eq!(
+        domain_to_id.get(0).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().suffix().as_canonical_u64()
+    ); // Now domain mapping must be matched
+    assert_eq!(
+        domain_to_id.get(1).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().prefix().as_felt().as_canonical_u64()
+    );
     assert_eq!(id_to_domain, domain_word);
     Ok(())
 }
@@ -111,57 +199,110 @@ async fn test_naming_register_activate_by_not_owner() -> anyhow::Result<()> {
 
     let domain = encode_domain_as_felts("test".to_string());
     let domain_word = encode_domain("test".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        domain[3],
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            domain[3],
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    let activate_note = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(domain_word.to_vec())?, ctx.registrar_2.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
-    
+    let register_note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
+    let activate_note = create_note_for_naming(
+        "activate_domain".to_string(),
+        NoteStorage::new(domain_word.to_vec())?,
+        ctx.registrar_2.id(),
+        ctx.naming.id(),
+        NoteAssets::new(vec![])?,
+    )
+    .await?;
+
     add_note_to_builder(&mut ctx.builder, register_note.clone())?;
     add_note_to_builder(&mut ctx.builder, activate_note.clone())?;
 
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
     execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
 
-    let domain_owner_slot = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_owner"), domain_word)?;
-    let domain_to_id = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
-    let id_to_domain = ctx.naming.storage().get_map_item(&slot_name("naming::account_to_domain"), Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
+    let domain_owner_slot = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_owner"), domain_word)?;
+    let domain_to_id = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(
+        &slot_name("naming::account_to_domain"),
+        Word::new([
+            Felt::new(ctx.registrar_1.id().suffix().as_canonical_u64()),
+            ctx.registrar_1.id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
 
+    assert_eq!(
+        domain_owner_slot.get(0).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().suffix().as_canonical_u64()
+    );
+    assert_eq!(
+        domain_owner_slot.get(1).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().prefix().as_felt().as_canonical_u64()
+    );
 
-    assert_eq!(domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
-    assert_eq!(domain_owner_slot.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
+    assert_eq!(domain_to_id.get(0).unwrap().as_canonical_u64(), 0); // Domain must be clean after register
+    assert_eq!(domain_to_id.get(1).unwrap().as_canonical_u64(), 0);
+    assert_eq!(id_to_domain.get(0).unwrap().as_canonical_u64(), 0);
+    assert_eq!(id_to_domain.get(1).unwrap().as_canonical_u64(), 0);
 
-
-    assert_eq!(domain_to_id.get(0).unwrap().as_int(), 0); // Domain must be clean after register
-    assert_eq!(domain_to_id.get(1).unwrap().as_int(), 0);
-    assert_eq!(id_to_domain.get(0).unwrap().as_int(), 0);
-    assert_eq!(id_to_domain.get(1).unwrap().as_int(), 0);
-    
     // Protocol values
 
-    let total_revenue_slot = ctx.naming.storage().get_map_item(&slot_name("naming::total_revenue"), Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
-    assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555);
+    let total_revenue_slot = ctx.naming.storage().get_map_item(
+        &slot_name("naming::total_revenue"),
+        Word::new([
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
+    assert_eq!(total_revenue_slot.get(0).unwrap().as_canonical_u64(), 555);
 
-    let total_domain_count = ctx.naming.storage().get_item(&slot_name("naming::domain_count"))?;
-    assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
-    
+    let total_domain_count = ctx
+        .naming
+        .storage()
+        .get_item(&slot_name("naming::domain_count"))?;
+    assert_eq!(total_domain_count.get(0).unwrap().as_canonical_u64(), 1);
+
     // Activate domain - should fail because registrar_2 is not the owner
 
-    
     let result = execute_note(&mut chain, activate_note.id(), &mut ctx.naming).await;
 
     // This should fail because registrar_2 is not the domain owner
-    assert!(result.is_err(), "Expected activation by non-owner to fail, but it succeeded");
+    assert!(
+        result.is_err(),
+        "Expected activation by non-owner to fail, but it succeeded"
+    );
     Ok(())
 }
 
@@ -170,37 +311,62 @@ async fn test_naming_register_already_exist_domain() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let domain = encode_domain_as_felts("test".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        domain[3],
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            domain[3],
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    
+    let register_note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs.clone(),
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let register_note_2 = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_2.id(), ctx.naming.id(), register_asset).await?;
-    
+    let register_note_2 = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_2.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
+
     add_note_to_builder(&mut ctx.builder, register_note.clone())?;
     add_note_to_builder(&mut ctx.builder, register_note_2.clone())?;
 
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
-    
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
+
     execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
 
     // Try to register again with different owner
-    
+
     let result = execute_note(&mut chain, register_note_2.id(), &mut ctx.naming).await;
 
-    assert!(result.is_err(), "Expected domain register fails. But it succeeded");
+    assert!(
+        result.is_err(),
+        "Expected domain register fails. But it succeeded"
+    );
     Ok(())
 }
 
@@ -209,35 +375,60 @@ async fn test_naming_register_already_exist_domain_from_same_owner() -> anyhow::
     let mut ctx = init_naming().await?;
 
     let domain = encode_domain_as_felts("test".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        domain[3],
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            domain[3],
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let register_note = create_note_for_naming("register_name".to_string(), register_note_inputs.clone(), ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    
+    let register_note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs.clone(),
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let register_note_2 = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
+    let register_note_2 = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
     //execute_note(&mut ctx.chain, note, &mut ctx.naming).await?;
     add_note_to_builder(&mut ctx.builder, register_note.clone())?;
     add_note_to_builder(&mut ctx.builder, register_note_2.clone())?;
 
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
     execute_note(&mut chain, register_note.id(), &mut ctx.naming).await?;
     // Try to register again with different owner
-    
+
     let result = execute_note(&mut chain, register_note_2.id(), &mut ctx.naming).await;
 
-    assert!(result.is_err(), "Expected domain register fails. But it succeeded");
+    assert!(
+        result.is_err(),
+        "Expected domain register fails. But it succeeded"
+    );
     Ok(())
 }
 
@@ -249,121 +440,253 @@ async fn test_naming_register_two_domains_activate_after() -> anyhow::Result<()>
     let domain_word = encode_domain("test".to_string());
 
     // Notes
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        domain[3],
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            domain[3],
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 555)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let register_note_1 = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
+    let register_note_1 = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
     add_note_to_builder(&mut ctx.builder, register_note_1.clone())?;
-    let activate_note_1 = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(domain_word.to_vec())?, ctx.registrar_1.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
-    
-    add_note_to_builder(&mut ctx.builder, activate_note_1.clone())?;    
+    let activate_note_1 = create_note_for_naming(
+        "activate_domain".to_string(),
+        NoteStorage::new(domain_word.to_vec())?,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        NoteAssets::new(vec![])?,
+    )
+    .await?;
+
+    add_note_to_builder(&mut ctx.builder, activate_note_1.clone())?;
     let second_domain = encode_domain_as_felts("test2".to_string());
     let second_domain_word = encode_domain("test2".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        second_domain[0],
-        second_domain[1],
-        second_domain[2],
-        second_domain[3],
-        Felt::new(1), // register length
-        Felt::new(0),
-        Felt::new(0),
-        Felt::new(0),
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            second_domain[0],
+            second_domain[1],
+            second_domain[2],
+            second_domain[3],
+            Felt::new(1), // register length
+            Felt::new(0),
+            Felt::new(0),
+            Felt::new(0),
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 123)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let register_note_2 = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
-    add_note_to_builder(&mut ctx.builder, register_note_2.clone())?;    
-    
+    let register_note_2 = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
+    add_note_to_builder(&mut ctx.builder, register_note_2.clone())?;
 
-    let activate_note_2 = create_note_for_naming("activate_domain".to_string(), NoteInputs::new(second_domain_word.to_vec())?, ctx.registrar_1.id(), ctx.naming.id(), NoteAssets::new(vec![])?).await?;
-    add_note_to_builder(&mut ctx.builder, activate_note_2.clone())?;  
+    let activate_note_2 = create_note_for_naming(
+        "activate_domain".to_string(),
+        NoteStorage::new(second_domain_word.to_vec())?,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        NoteAssets::new(vec![])?,
+    )
+    .await?;
+    add_note_to_builder(&mut ctx.builder, activate_note_2.clone())?;
 
     // Execution
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
     execute_note(&mut chain, register_note_1.id(), &mut ctx.naming).await?;
 
-    let domain_owner_slot = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_owner"), domain_word)?;
-    let domain_to_id = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
-    let id_to_domain = ctx.naming.storage().get_map_item(&slot_name("naming::account_to_domain"), Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
+    let domain_owner_slot = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_owner"), domain_word)?;
+    let domain_to_id = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(
+        &slot_name("naming::account_to_domain"),
+        Word::new([
+            Felt::new(ctx.registrar_1.id().suffix().as_canonical_u64()),
+            ctx.registrar_1.id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
 
+    assert_eq!(
+        domain_owner_slot.get(0).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().suffix().as_canonical_u64()
+    );
+    assert_eq!(
+        domain_owner_slot.get(1).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().prefix().as_felt().as_canonical_u64()
+    );
 
-    assert_eq!(domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
-    assert_eq!(domain_owner_slot.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
+    assert_eq!(domain_to_id.get(0).unwrap().as_canonical_u64(), 0); // Domain must be clean after register
+    assert_eq!(domain_to_id.get(1).unwrap().as_canonical_u64(), 0);
+    assert_eq!(id_to_domain.get(0).unwrap().as_canonical_u64(), 0);
+    assert_eq!(id_to_domain.get(1).unwrap().as_canonical_u64(), 0);
 
-    assert_eq!(domain_to_id.get(0).unwrap().as_int(), 0); // Domain must be clean after register
-    assert_eq!(domain_to_id.get(1).unwrap().as_int(), 0);
-    assert_eq!(id_to_domain.get(0).unwrap().as_int(), 0);
-    assert_eq!(id_to_domain.get(1).unwrap().as_int(), 0);
-    
     // Protocol values
 
-    let total_revenue_slot = ctx.naming.storage().get_map_item(&slot_name("naming::total_revenue"), Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
-    assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555);
+    let total_revenue_slot = ctx.naming.storage().get_map_item(
+        &slot_name("naming::total_revenue"),
+        Word::new([
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
+    assert_eq!(total_revenue_slot.get(0).unwrap().as_canonical_u64(), 555);
 
-    let total_domain_count = ctx.naming.storage().get_item(&slot_name("naming::domain_count"))?;
-    assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
-    
+    let total_domain_count = ctx
+        .naming
+        .storage()
+        .get_item(&slot_name("naming::domain_count"))?;
+    assert_eq!(total_domain_count.get(0).unwrap().as_canonical_u64(), 1);
+
     // Activate domain
 
     execute_note(&mut chain, activate_note_1.id(), &mut ctx.naming).await?; // Use always updated account as target
 
-    let domain_to_id = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
-    let id_to_domain = ctx.naming.storage().get_map_item(&slot_name("naming::account_to_domain"), Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
+    let domain_to_id = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(
+        &slot_name("naming::account_to_domain"),
+        Word::new([
+            Felt::new(ctx.registrar_1.id().suffix().as_canonical_u64()),
+            ctx.registrar_1.id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
 
-    assert_eq!(domain_to_id.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int()); // Now domain mapping must be matched
-    assert_eq!(domain_to_id.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
+    assert_eq!(
+        domain_to_id.get(0).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().suffix().as_canonical_u64()
+    ); // Now domain mapping must be matched
+    assert_eq!(
+        domain_to_id.get(1).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().prefix().as_felt().as_canonical_u64()
+    );
     assert_eq!(id_to_domain, domain_word);
 
     // Register new domain
 
-    
     execute_note(&mut chain, register_note_2.id(), &mut ctx.naming).await?;
 
-    let second_domain_owner_slot = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_owner"), second_domain_word)?;
+    let second_domain_owner_slot = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_owner"), second_domain_word)?;
 
-    assert_eq!(second_domain_owner_slot.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int());
-    assert_eq!(second_domain_owner_slot.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
+    assert_eq!(
+        second_domain_owner_slot.get(0).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().suffix().as_canonical_u64()
+    );
+    assert_eq!(
+        second_domain_owner_slot.get(1).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().prefix().as_felt().as_canonical_u64()
+    );
 
     // Now activate second domain
 
-    
     execute_note(&mut chain, activate_note_2.id(), &mut ctx.naming).await?; // Use always updated account as target
 
-    let domain_to_id = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_account"), second_domain_word)?;
-    let id_to_domain = ctx.naming.storage().get_map_item(&slot_name("naming::account_to_domain"), Word::new([Felt::new(ctx.registrar_1.id().suffix().as_int()), Felt::new(ctx.registrar_1.id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
+    let domain_to_id = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_account"), second_domain_word)?;
+    let id_to_domain = ctx.naming.storage().get_map_item(
+        &slot_name("naming::account_to_domain"),
+        Word::new([
+            Felt::new(ctx.registrar_1.id().suffix().as_canonical_u64()),
+            ctx.registrar_1.id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
 
-    assert_eq!(domain_to_id.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int()); // Now domain mapping must be matched
-    assert_eq!(domain_to_id.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
+    assert_eq!(
+        domain_to_id.get(0).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().suffix().as_canonical_u64()
+    ); // Now domain mapping must be matched
+    assert_eq!(
+        domain_to_id.get(1).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().prefix().as_felt().as_canonical_u64()
+    );
     assert_eq!(id_to_domain, second_domain_word);
 
     // Check first domain mapping
 
-    let first_domain_to_id = ctx.naming.storage().get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
-    assert_eq!(first_domain_to_id.get(0).unwrap().as_int(), ctx.registrar_1.id().suffix().as_int()); // First domain must remain mapping to old address
-    assert_eq!(first_domain_to_id.get(1).unwrap().as_int(), ctx.registrar_1.id().prefix().into());
+    let first_domain_to_id = ctx
+        .naming
+        .storage()
+        .get_map_item(&slot_name("naming::domain_to_account"), domain_word)?;
+    assert_eq!(
+        first_domain_to_id.get(0).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().suffix().as_canonical_u64()
+    ); // First domain must remain mapping to old address
+    assert_eq!(
+        first_domain_to_id.get(1).unwrap().as_canonical_u64(),
+        ctx.registrar_1.id().prefix().as_felt().as_canonical_u64()
+    );
 
     // Ensure protocol values
 
-    let total_revenue_slot = ctx.naming.storage().get_map_item(&slot_name("naming::total_revenue"), Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
-    assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555 + 123);
+    let total_revenue_slot = ctx.naming.storage().get_map_item(
+        &slot_name("naming::total_revenue"),
+        Word::new([
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
+    assert_eq!(
+        total_revenue_slot.get(0).unwrap().as_canonical_u64(),
+        555 + 123
+    );
 
-    let total_domain_count = ctx.naming.storage().get_item(&slot_name("naming::domain_count"))?;
-    assert_eq!(total_domain_count.get(0).unwrap().as_int(), 2);
+    let total_domain_count = ctx
+        .naming
+        .storage()
+        .get_item(&slot_name("naming::domain_count"))?;
+    assert_eq!(total_domain_count.get(0).unwrap().as_canonical_u64(), 2);
     Ok(())
 }
 
@@ -372,22 +695,37 @@ async fn test_naming_register_less_amount() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let domain = encode_domain_as_felts("test".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        domain[3],
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            domain[3],
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 554)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
+    let note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
     add_note_to_builder(&mut ctx.builder, note.clone())?;
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
     let result = execute_note(&mut chain, note.id(), &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected revert but succeeded.");
@@ -399,29 +737,55 @@ async fn test_naming_register_higher_amount() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let domain = encode_domain_as_felts("test".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        domain[3],
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            domain[3],
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 1200)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
+    let note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
     add_note_to_builder(&mut ctx.builder, note.clone())?;
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
     execute_note(&mut chain, note.id(), &mut ctx.naming).await?;
 
-    let total_revenue_slot = ctx.naming.storage().get_map_item(&slot_name("naming::total_revenue"), Word::new([Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()), Felt::new(ctx.fungible_asset.faucet_id().prefix().into()), Felt::new(0), Felt::new(0)]))?;
-    assert_eq!(total_revenue_slot.get(0).unwrap().as_int(), 555); // Protocol only saves actual cost as revenue
+    let total_revenue_slot = ctx.naming.storage().get_map_item(
+        &slot_name("naming::total_revenue"),
+        Word::new([
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+        ]),
+    )?;
+    assert_eq!(total_revenue_slot.get(0).unwrap().as_canonical_u64(), 555); // Protocol only saves actual cost as revenue
 
-    let total_domain_count = ctx.naming.storage().get_item(&slot_name("naming::domain_count"))?;
-    assert_eq!(total_domain_count.get(0).unwrap().as_int(), 1);
+    let total_domain_count = ctx
+        .naming
+        .storage()
+        .get_item(&slot_name("naming::domain_count"))?;
+    assert_eq!(total_domain_count.get(0).unwrap().as_canonical_u64(), 1);
 
     Ok(())
 }
@@ -431,22 +795,37 @@ async fn test_naming_register_wrong_letter_length() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let domain = encode_domain_as_felts("testtesttesttest".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        Felt::new(11),
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            Felt::new(11),
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 554)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
+    let note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
     add_note_to_builder(&mut ctx.builder, note.clone())?;
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
     let result = execute_note(&mut chain, note.id(), &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected revert but succeeded.");
@@ -458,22 +837,37 @@ async fn test_naming_register_too_much_letters() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let domain = unsafe_encode_domain("testtesttesttest123123123123".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        domain[3],
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            domain[3],
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 554)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
+    let note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
     add_note_to_builder(&mut ctx.builder, note.clone())?;
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
     let result = execute_note(&mut chain, note.id(), &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected revert but succeeded.");
@@ -485,22 +879,37 @@ async fn test_naming_register_empty_domain() -> anyhow::Result<()> {
     let mut ctx = init_naming().await?;
 
     let domain = unsafe_encode_domain("".to_string());
-    let register_note_inputs = NoteInputs::new([
-        Felt::new(ctx.fungible_asset.faucet_id().suffix().as_int()),
-        ctx.fungible_asset.faucet_id().prefix().as_felt(),
-        Felt::new(0),
-        Felt::new(0),
-        domain[0],
-        domain[1],
-        domain[2],
-        Felt::new(3),
-    ].to_vec())?;
-    
+    let register_note_inputs = NoteStorage::new(
+        [
+            Felt::new(ctx.fungible_asset.faucet_id().suffix().as_canonical_u64()),
+            ctx.fungible_asset.faucet_id().prefix().as_felt(),
+            Felt::new(0),
+            Felt::new(0),
+            domain[0],
+            domain[1],
+            domain[2],
+            Felt::new(3),
+        ]
+        .to_vec(),
+    )?;
+
     let cost = FungibleAsset::new(ctx.fungible_asset.faucet_id(), 1231234)?;
     let register_asset = NoteAssets::new(vec![cost.into()])?;
-    let note = create_note_for_naming("register_name".to_string(), register_note_inputs, ctx.registrar_1.id(), ctx.naming.id(), register_asset).await?;
+    let note = create_note_for_naming(
+        "register_name".to_string(),
+        register_note_inputs,
+        ctx.registrar_1.id(),
+        ctx.naming.id(),
+        register_asset,
+    )
+    .await?;
     add_note_to_builder(&mut ctx.builder, note.clone())?;
-    let mut chain = execute_notes_and_build_chain(ctx.builder, &[ctx.initialize_note.id(), ctx.set_prices_note.id()], &mut ctx.naming).await?;
+    let mut chain = execute_notes_and_build_chain(
+        ctx.builder,
+        &[ctx.initialize_note.id(), ctx.set_prices_note.id()],
+        &mut ctx.naming,
+    )
+    .await?;
     let result = execute_note(&mut chain, note.id(), &mut ctx.naming).await;
 
     assert!(result.is_err(), "Expected revert but succeeded.");

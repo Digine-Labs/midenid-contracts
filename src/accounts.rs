@@ -1,13 +1,14 @@
 use miden_client::{
     Client,
     account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType},
-    auth::{AuthSecretKey, NoAuth},
-    keystore::FilesystemKeyStore,
+    auth::{AuthScheme, AuthSecretKey, NoAuth},
+    keystore::{FilesystemKeyStore, Keystore},
 };
-use miden_standards::{
-    account::auth::AuthFalcon512Rpo, account::wallets::BasicWallet,
+use miden_protocol::{
+    account::{AccountComponent, AccountComponentMetadata},
+    transaction::TransactionKernel,
 };
-use miden_protocol::{account::AccountComponent, transaction::TransactionKernel};
+use miden_standards::{account::auth::AuthSingleSig, account::wallets::BasicWallet};
 use rand::RngCore;
 use std::{fs, path::Path, sync::Arc};
 
@@ -20,13 +21,16 @@ pub async fn create_deployer_account(
     let mut init_seed = [0_u8; 32];
     client.rng().fill_bytes(&mut init_seed);
 
-    let key_pair = AuthSecretKey::new_falcon512_rpo();
+    let key_pair = AuthSecretKey::new_falcon512_poseidon2();
 
     // Build the account
     let deployer_account = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountUpdatableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(AuthFalcon512Rpo::new(key_pair.public_key().to_commitment()))
+        .with_auth_component(AuthSingleSig::new(
+            key_pair.public_key().to_commitment(),
+            AuthScheme::Falcon512Poseidon2,
+        ))
         .with_component(BasicWallet)
         .build()
         .unwrap();
@@ -35,7 +39,7 @@ pub async fn create_deployer_account(
     client.add_account(&deployer_account, false).await?;
 
     // Add the key pair to the keystore
-    keystore.add_key(&key_pair).unwrap();
+    keystore.add_key(&key_pair, deployer_account.id()).await?;
 
     println!(
         "Deployer account ID: {:?}",
@@ -67,10 +71,10 @@ pub async fn create_naming_account(
     let library = assembler.clone().assemble_library([module]).unwrap();
 
     let account_component = AccountComponent::new(
-        library,
+        (*library).clone(),
         naming_storage(),
-    )?
-    .with_supports_all_types();
+        AccountComponentMetadata::new("midenid-naming", [AccountType::RegularAccountImmutableCode]),
+    )?;
 
     let mut seed = [0_u8; 32];
     client.rng().fill_bytes(&mut seed);
@@ -93,12 +97,9 @@ pub async fn safe_account_import(
     account_id: AccountId,
 ) -> anyhow::Result<()> {
     if client.get_account(account_id).await?.is_none() {
-        match client.import_account_by_id(account_id).await {
-            std::result::Result::Ok(_) => {}
-            std::result::Result::Err(e) => {
-                eprintln!("Warning: Failed to import account: {:?}", e);
-            }
+        if let Err(e) = client.import_account_by_id(account_id).await {
+            eprintln!("Warning: Failed to import account: {:?}", e);
         }
     }
-    std::result::Result::Ok(())
+    Ok(())
 }

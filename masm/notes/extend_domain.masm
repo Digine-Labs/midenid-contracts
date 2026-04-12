@@ -8,7 +8,7 @@ const REG_LEN_PTR=8
 # Input (arguments): [TOKEN, DOMAIN, REG_LEN]
 begin
     push.0
-    exec.active_note::get_inputs
+    exec.active_note::get_storage
     drop drop
     padw mem_loadw_be.REG_LEN_PTR padw mem_loadw_be.DOMAIN_PTR padw mem_loadw_be.TOKEN_PTR
     # [TOKEN, DOMAIN, REG_LEN]
