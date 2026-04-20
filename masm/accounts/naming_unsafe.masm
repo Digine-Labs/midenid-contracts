@@ -102,13 +102,8 @@ pub proc register
     #exec._update_domain_map
     exec._clear_domain_mapping
 
-    #exec._calculate_domain_price
-    # [price]
-    #exec._increase_total_revenue
-    
-
     # []
-    #exec._after_domain_register
+    exec._after_domain_register
 end
 
 # Input: [DOMAIN]
