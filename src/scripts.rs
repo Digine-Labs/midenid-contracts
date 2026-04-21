@@ -32,7 +32,7 @@ fn midenscan_base_url(use_testnet: bool) -> &'static str {
 
 fn default_faucet_id(use_testnet: bool) -> &'static str {
     if use_testnet {
-        "0x37d5977a8e16d8205a360820f0230f"
+        "0x0a7d175ed63ec5200fb2ced86f6aa5"
     } else {
         "0x16f6c85d5652c9200879145bfdda93"
     }
@@ -378,10 +378,16 @@ pub async fn send_register_note(
     let price = get_price_by_length(&name);
 
     if price > balance {
+        for asset in full_account.vault().assets() {
+            if let miden_protocol::asset::Asset::Fungible(fa) = asset {
+                eprintln!("  Vault faucet: {} amount: {}", fa.faucet_id().to_hex(), fa.amount());
+            }
+        }
         return Err(anyhow::anyhow!(
-            "Insufficient balance: {} < price {}",
+            "Insufficient balance: {} < price {} (faucet: {})",
             balance,
-            price
+            price,
+            faucet_id.to_hex()
         ));
     }
 

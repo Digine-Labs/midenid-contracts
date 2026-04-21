@@ -13,6 +13,8 @@ pub async fn wait_for_tx(
     tx_id: TransactionId,
 ) -> Result<(), ClientError> {
     loop {
+        sleep(Duration::from_secs(5)).await;
+
         client.sync_state().await?;
 
         // Check transaction status
@@ -35,7 +37,6 @@ pub async fn wait_for_tx(
             "Transaction {} not yet committed. Waiting...",
             tx_id.to_hex()
         );
-        sleep(Duration::from_secs(2)).await;
     }
     Ok(())
 }
