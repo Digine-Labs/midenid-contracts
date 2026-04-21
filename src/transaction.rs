@@ -13,8 +13,6 @@ pub async fn wait_for_tx(
     tx_id: TransactionId,
 ) -> Result<(), ClientError> {
     loop {
-        sleep(Duration::from_secs(5)).await;
-
         client.sync_state().await?;
 
         // Check transaction status
