@@ -136,6 +136,19 @@ pub fn encode_domain(domain: String) -> Word {
     ])
 }
 
+/// Returns the domain Word in MASM stack order (reversed from Rust Word).
+/// Use this when querying storage maps that were set via mem_loadw_be in MASM.
+pub fn encode_domain_masm_key(domain: String) -> Word {
+    let w = encode_domain(domain);
+    reverse_word(w)
+}
+
+/// Reverses a Word's element order to match MASM's mem_loadw_be stack convention.
+/// Rust Word [a, b, c, d] becomes [d, c, b, a] which matches the MASM stack after mem_loadw_be.
+pub fn reverse_word(w: Word) -> Word {
+    Word::new([w[3], w[2], w[1], w[0]])
+}
+
 pub fn encode_domain_as_felts(domain: String) -> [Felt; 4] {
     let encoded_domain = encode_domain(domain).to_vec();
 
