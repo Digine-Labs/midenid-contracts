@@ -6,7 +6,10 @@ use miden_client::{
     Client,
     account::AccountId,
     keystore::FilesystemKeyStore,
-    note::{Note, NoteAssets, NoteMetadata, NoteRecipient, NoteStorage, NoteTag, NoteType},
+    note::{
+        Note, NoteAssets, NoteAttachments, NoteRecipient, NoteStorage, NoteTag, NoteType,
+        PartialNoteMetadata,
+    },
 };
 use miden_crypto::{Felt, Word};
 use miden_protocol::transaction::TransactionKernel;
@@ -21,6 +24,7 @@ pub async fn create_note_for_naming_with_client(
     sender: AccountId,
     target_id: AccountId,
     assets: NoteAssets,
+    is_network: bool,
     client: &mut Client<FilesystemKeyStore>,
 ) -> anyhow::Result<Note> {
     let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
@@ -28,10 +32,10 @@ pub async fn create_note_for_naming_with_client(
     let library = create_library(naming_code, "miden_name::naming")?;
 
     let serial_num = Word::new([
-        Felt::new(client.rng().next_u64()),
-        Felt::new(client.rng().next_u64()),
-        Felt::new(client.rng().next_u64()),
-        Felt::new(client.rng().next_u64()),
+        Felt::new(client.rng().next_u64())?,
+        Felt::new(client.rng().next_u64())?,
+        Felt::new(client.rng().next_u64())?,
+        Felt::new(client.rng().next_u64())?,
     ]);
 
     let note_script = CodeBuilder::default()
@@ -40,12 +44,16 @@ pub async fn create_note_for_naming_with_client(
 
     let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
     let tag = NoteTag::with_account_target(target_id);
-    let mut metadata = NoteMetadata::new(sender, NoteType::Public).with_tag(tag);
-    if target_id.is_network() {
+    // 0.15: metadata is built from PartialNoteMetadata; attachments (e.g. the network-account
+    // target) are now passed to the Note constructor instead of `NoteMetadata::with_attachment`.
+    let partial = PartialNoteMetadata::new(sender, NoteType::Public).with_tag(tag);
+    let note = if is_network {
         let network_target = NetworkAccountTarget::new(target_id, NoteExecutionHint::Always)?;
-        metadata = metadata.with_attachment(network_target.into());
-    }
-    let note = Note::new(assets, metadata, recipient);
+        let attachments = NoteAttachments::new(vec![network_target.into()])?;
+        Note::with_attachments(assets, partial, recipient, attachments)
+    } else {
+        Note::new(assets, partial, recipient)
+    };
     Ok(note)
 }
 
@@ -67,8 +75,8 @@ pub async fn create_note_for_naming(
 
     let recipient = NoteRecipient::new(serial, note_script, inputs.clone());
     let tag = NoteTag::with_account_target(target_id);
-    let metadata = NoteMetadata::new(sender, NoteType::Public).with_tag(tag);
-    let note = Note::new(assets, metadata, recipient);
+    let partial = PartialNoteMetadata::new(sender, NoteType::Public).with_tag(tag);
+    let note = Note::new(assets, partial, recipient);
     Ok(note)
 }
 
@@ -90,9 +98,9 @@ pub fn generate_random_serial_number() -> Word {
     let mut rng = rand::rng();
 
     Word::new([
-        Felt::new(rng.random::<u32>() as u64),
-        Felt::new(rng.random::<u32>() as u64),
-        Felt::new(rng.random::<u32>() as u64),
-        Felt::new(rng.random::<u32>() as u64),
+        Felt::from(rng.random::<u32>()),
+        Felt::from(rng.random::<u32>()),
+        Felt::from(rng.random::<u32>()),
+        Felt::from(rng.random::<u32>()),
     ])
 }

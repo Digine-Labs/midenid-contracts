@@ -33,7 +33,8 @@ const ERR_P2N_TARGET_NAME_MISMATCH="P2N's target name address and resolved addre
 #! - The same non-fungible asset already exists in the account.
 #! - Adding a fungible asset would result in amount overflow, i.e., the total amount would be
 #!   greater than 2^63.
-begin
+@note_script
+pub proc main
     # store the note inputs to memory starting at address 0
     padw push.0 exec.active_note::get_storage
     # => [num_inputs, inputs_ptr, EMPTY_WORD]

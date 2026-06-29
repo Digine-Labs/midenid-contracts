@@ -129,10 +129,11 @@ pub fn encode_domain(domain: String) -> Word {
     // Format: [felt1, felt2, felt3, length]
     // This is reversed for MASM storage (becomes [length, felt3, felt2, felt1] on stack)
     Word::new([
-        Felt::new(felt1),
-        Felt::new(felt2),
-        Felt::new(felt3),
-        Felt::new(len as u64),
+        // 0.15: Felt::new is fallible; packed values are < field modulus so unwrap is safe.
+        Felt::new(felt1).unwrap(),
+        Felt::new(felt2).unwrap(),
+        Felt::new(felt3).unwrap(),
+        Felt::new(len as u64).unwrap(),
     ])
 }
 
@@ -195,10 +196,11 @@ pub fn unsafe_encode_domain(domain: String) -> Word {
     // Format: [felt1, felt2, felt3, length]
     // This is reversed for MASM storage (becomes [length, felt3, felt2, felt1] on stack)
     Word::new([
-        Felt::new(felt1),
-        Felt::new(felt2),
-        Felt::new(felt3),
-        Felt::new(len as u64),
+        // 0.15: Felt::new is fallible; packed values are < field modulus so unwrap is safe.
+        Felt::new(felt1).unwrap(),
+        Felt::new(felt2).unwrap(),
+        Felt::new(felt3).unwrap(),
+        Felt::new(len as u64).unwrap(),
     ])
 }
 

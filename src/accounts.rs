@@ -1,6 +1,6 @@
 use miden_client::{
     Client,
-    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType},
+    account::{Account, AccountBuilder, AccountId, AccountType},
     auth::{AuthScheme, AuthSecretKey, NoAuth},
     keystore::{FilesystemKeyStore, Keystore},
 };
@@ -25,8 +25,8 @@ pub async fn create_deployer_account(
 
     // Build the account
     let deployer_account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountUpdatableCode)
-        .storage_mode(AccountStorageMode::Public)
+        // 0.15: storage mode is merged into AccountType (Public = on-chain state).
+        .account_type(AccountType::Public)
         .with_auth_component(AuthSingleSig::new(
             key_pair.public_key().to_commitment(),
             AuthScheme::Falcon512Poseidon2,
@@ -54,11 +54,11 @@ pub async fn create_naming_account(
 ) -> anyhow::Result<Account> {
     let account_code = fs::read_to_string(Path::new("./masm/accounts/naming_unsafe.masm")).unwrap();
 
-    let storage_mode = if is_network {
-        AccountStorageMode::Network
-    } else {
-        AccountStorageMode::Public
-    };
+    // 0.15: AccountStorageMode (incl. Network) is gone; storage mode is folded into
+    // AccountType. Both network and non-network deployments use on-chain (Public) state.
+    // NOTE: the dedicated network-account auth (NetworkAccountNoteAllowlist) component is a
+    // separate migration step; `is_network` is retained for note-targeting/consumption logic.
+    let _ = is_network;
 
     // Compile the account code using the assembler
     let source_manager = Arc::new(miden_assembly::DefaultSourceManager::default());
@@ -73,15 +73,14 @@ pub async fn create_naming_account(
     let account_component = AccountComponent::new(
         (*library).clone(),
         naming_storage(),
-        AccountComponentMetadata::new("midenid-naming", [AccountType::RegularAccountImmutableCode]),
+        AccountComponentMetadata::new("midenid-naming"),
     )?;
 
     let mut seed = [0_u8; 32];
     client.rng().fill_bytes(&mut seed);
 
     let account = AccountBuilder::new(seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(storage_mode)
+        .account_type(AccountType::Public)
         .with_auth_component(NoAuth)
         .with_component(account_component.clone())
         .build()?;

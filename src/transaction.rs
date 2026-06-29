@@ -6,7 +6,6 @@ use miden_client::{
     transaction::{TransactionId, TransactionScript, TransactionStatus},
 };
 use miden_standards::code_builder::CodeBuilder;
-use tokio::time::{Duration, sleep};
 
 pub async fn wait_for_tx(
     client: &mut Client<FilesystemKeyStore>,

@@ -48,6 +48,10 @@ enum Commands {
         /// Name to register
         #[arg(long)]
         name: String,
+
+        /// Target naming account is a network account (skips manual note consumption)
+        #[arg(long)]
+        as_network: bool,
     },
 
     /// Consume Note
@@ -93,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
             account,
             naming_account,
             faucet_id,
+            as_network,
         } => {
             println!("\n");
             println!("=================================================");
@@ -100,7 +105,8 @@ async fn main() -> anyhow::Result<()> {
             println!(
                 "Entered account needs to be funded and added to keystore to send the registration note."
             );
-            send_register_note(account, naming_account, faucet_id, name, cli.testnet).await?;
+            send_register_note(account, naming_account, faucet_id, name, as_network, cli.testnet)
+                .await?;
         }
         Commands::ConsumeNote {
             note_id,

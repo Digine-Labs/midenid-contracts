@@ -5,6 +5,7 @@ use miden::protocol::input_note
 use miden::protocol::output_note
 use miden::protocol::active_note
 use miden::protocol::tx
+use miden::protocol::asset
 use miden::standards::wallets::basic->basic_wallet
 
 # Storage Slots
@@ -204,9 +205,15 @@ pub proc claim_protocol_revenue
     exec._get_remaining_revenue
     # [claimable_revenue, note_idx]
     exec._get_asset
-    # [ASSET, note_idx]
+    # [ASSET_KEY, ASSET_VALUE, note_idx]
+    # 0.15: remove_asset and output_note::add_asset each consume the full (KEY, VALUE)
+    # pair, so duplicate it before removing from the vault.
+    dupw.1 dupw.1
+    # [ASSET_KEY, ASSET_VALUE, ASSET_KEY, ASSET_VALUE, note_idx]
     exec.native_account::remove_asset
-    # [ASSET, note_idx]
+    # [REMAINING_ASSET_VALUE, ASSET_KEY, ASSET_VALUE, note_idx]
+    dropw
+    # [ASSET_KEY, ASSET_VALUE, note_idx]
     exec.output_note::add_asset
     # []
     exec._set_claimed_to_total
@@ -228,9 +235,14 @@ pub proc withdraw_assets
     exec._get_balance
     # [balance, note_idx]
     exec._get_asset
-    # [ASSET, note_idx]
+    # [ASSET_KEY, ASSET_VALUE, note_idx]
+    # 0.15: duplicate the (KEY, VALUE) pair so it survives remove_asset for the output note.
+    dupw.1 dupw.1
+    # [ASSET_KEY, ASSET_VALUE, ASSET_KEY, ASSET_VALUE, note_idx]
     exec.native_account::remove_asset
-    # [ASSET, note_idx]
+    # [REMAINING_ASSET_VALUE, ASSET_KEY, ASSET_VALUE, note_idx]
+    dropw
+    # [ASSET_KEY, ASSET_VALUE, note_idx]
     exec.output_note::add_asset
     # []
 end
@@ -295,13 +307,16 @@ proc _set_claimed_to_total
 end
 
 # Input: [amt] Memory [PAYMENT_TOKEN]
-# Output: [ASSET] where ASSET = [prefix, suffix, 0, amt] on stack
-# Word format: [amt, 0, suffix, prefix] matching FungibleAsset encoding
+# Output: [ASSET_KEY, ASSET_VALUE]
+# 0.15: a fungible asset is an 8-felt (ASSET_KEY, ASSET_VALUE) pair built via the
+# asset helper, which encodes the composition metadata into the key.
 proc _get_asset
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
     # [prefix, suffix, amt]
-    push.0 movdn.2
-    # [prefix, suffix, 0, amt]
+    swap push.0
+    # [enable_callbacks=0, suffix, prefix, amt]
+    exec.asset::create_fungible_asset
+    # [ASSET_KEY, ASSET_VALUE]
 end
 
 # Input: [account_prefix, account_suffix] Memory [DOMAIN]
@@ -384,6 +399,12 @@ end
 proc _get_balance
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop swap
     # [suffix, prefix]
+    # 0.15: get_balance takes a full ASSET_KEY; build the fungible vault key
+    # (callbacks disabled) from the faucet id.
+    push.0
+    # [enable_callbacks=0, suffix, prefix]
+    exec.asset::create_fungible_key
+    # [ASSET_KEY]
     exec.active_account::get_balance
     # [balance]
 end

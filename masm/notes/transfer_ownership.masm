@@ -5,10 +5,11 @@ use miden::core::sys
 const NEW_OWNER_PTR=0
 
 # Input (arguments): [NEW_OWNER]
-begin
+@note_script
+pub proc main
     push.0
     exec.active_note::get_storage
-    drop drop
+    drop
     mem_loadw_be.NEW_OWNER_PTR
     # [NEW_OWNER]
     call.naming::update_registry_owner

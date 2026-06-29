@@ -5,9 +5,12 @@ use miden_assembly::{
     ast::{Module, ModuleKind},
 };
 use miden_client::{
-    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType},
+    account::{Account, AccountBuilder, AccountId, AccountType},
     asset::{Asset, FungibleAsset},
-    note::{Note, NoteAssets, NoteId, NoteMetadata, NoteRecipient, NoteStorage, NoteTag, NoteType},
+    note::{
+        Note, NoteAssets, NoteId, NoteRecipient, NoteStorage, NoteTag, NoteType,
+        PartialNoteMetadata,
+    },
     testing::account_id::ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1,
 };
 use miden_crypto::{Felt, Word};
@@ -39,15 +42,14 @@ pub fn create_test_naming_account() -> Account {
     let component = AccountComponent::new(
         (*library).clone(),
         storage_slots,
-        AccountComponentMetadata::new("midenid-naming", [AccountType::RegularAccountImmutableCode]),
+        AccountComponentMetadata::new("midenid-naming"),
     )
     .unwrap();
 
     let account = AccountBuilder::new(ChaCha20Rng::from_os_rng().random())
-        .account_type(AccountType::RegularAccountImmutableCode)
+        .account_type(AccountType::Public)
         .with_auth_component(auth::NoAuth)
         .with_component(component)
-        .storage_mode(AccountStorageMode::Public)
         .build_existing()
         .unwrap();
 
@@ -71,8 +73,8 @@ pub async fn create_note_for_naming(
 
     let recipient = NoteRecipient::new(Word::default(), note_script, inputs.clone());
     let tag = NoteTag::with_account_target(target_id);
-    let metadata = NoteMetadata::new(sender, NoteType::Public).with_tag(tag);
-    let note = Note::new(assets, metadata, recipient);
+    let partial = PartialNoteMetadata::new(sender, NoteType::Public).with_tag(tag);
+    let note = Note::new(assets, partial, recipient);
     Ok(note)
 }
 
@@ -94,8 +96,8 @@ pub async fn create_note_for_naming_with_custom_serial_num(
 
     let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
     let tag = NoteTag::with_account_target(target_id);
-    let metadata = NoteMetadata::new(sender, NoteType::Public).with_tag(tag);
-    let note = Note::new(assets, metadata, recipient);
+    let partial = PartialNoteMetadata::new(sender, NoteType::Public).with_tag(tag);
+    let note = Note::new(assets, partial, recipient);
     Ok(note)
 }
 
@@ -110,10 +112,10 @@ pub fn create_p2id_note_exact(
 
     let tag = NoteTag::with_account_target(target);
 
-    let metadata = NoteMetadata::new(sender, note_type).with_tag(tag);
+    let partial = PartialNoteMetadata::new(sender, note_type).with_tag(tag);
     let vault = NoteAssets::new(assets)?;
 
-    Ok(Note::new(vault, metadata, recipient))
+    Ok(Note::new(vault, partial, recipient))
 }
 
 pub fn build_p2id_recipient(target: AccountId, serial_num: Word) -> anyhow::Result<NoteRecipient> {
@@ -123,12 +125,12 @@ pub fn build_p2id_recipient(target: AccountId, serial_num: Word) -> anyhow::Resu
 
 pub fn get_test_prices() -> Vec<Felt> {
     vec![
-        Felt::new(0),
-        Felt::new(123123),
-        Felt::new(45645),
-        Felt::new(789),
-        Felt::new(555),
-        Felt::new(123),
+        Felt::new(0).unwrap(),
+        Felt::new(123123).unwrap(),
+        Felt::new(45645).unwrap(),
+        Felt::new(789).unwrap(),
+        Felt::new(555).unwrap(),
+        Felt::new(123).unwrap(),
     ]
 }
 
@@ -192,8 +194,8 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
         [
             owner_account.id().suffix(),
             owner_account.id().prefix().as_felt(),
-            Felt::new(0),
-            Felt::new(0),
+            Felt::new(0)?,
+            Felt::new(0)?,
         ]
         .to_vec(),
     )?;

@@ -1,7 +1,7 @@
 use miden_client::{
     Client,
     account::AccountId,
-    asset::FungibleAsset,
+    asset::{AssetCallbackFlag, AssetVaultKey, FungibleAsset},
     keystore::FilesystemKeyStore,
     note::{Note, NoteAssets, NoteFile, NoteId, NoteStorage},
     store::NoteFilter,
@@ -89,8 +89,8 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         [
             deployer_account.id().suffix(),
             deployer_account.id().prefix().as_felt(),
-            Felt::new(0),
-            Felt::new(0),
+            Felt::new(0)?,
+            Felt::new(0)?,
         ]
         .to_vec(),
     )?;
@@ -100,6 +100,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         deployer_account.id(),
         naming_account.id(),
         NoteAssets::new(vec![]).unwrap(),
+        is_network,
         &mut client,
     )
     .await?;
@@ -163,6 +164,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         deployer_account.id(),
         naming_account.id(),
         NoteAssets::new(vec![]).unwrap(),
+        is_network,
         &mut client,
     )
     .await?;
@@ -209,10 +211,10 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         let prices_slot = slot_name("naming::prices");
 
         let one_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
+            payment_token_id.suffix(),
             payment_token_id.prefix().as_felt(),
-            Felt::new(1),
-            Felt::new(0),
+            Felt::new(1)?,
+            Felt::new(0)?,
         ]);
         let one_letter_price: Word = account
             .storage()
@@ -222,10 +224,10 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         println!("one letter price value: {}", one_letter_price.to_string());
 
         let two_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
+            payment_token_id.suffix(),
             payment_token_id.prefix().as_felt(),
-            Felt::new(2),
-            Felt::new(0),
+            Felt::new(2)?,
+            Felt::new(0)?,
         ]);
         let two_letter_price: Word = account
             .storage()
@@ -235,10 +237,10 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         println!("two letter price value: {}", two_letter_price.to_string());
 
         let three_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
+            payment_token_id.suffix(),
             payment_token_id.prefix().as_felt(),
-            Felt::new(3),
-            Felt::new(0),
+            Felt::new(3)?,
+            Felt::new(0)?,
         ]);
         let three_letter_price: Word = account
             .storage()
@@ -251,10 +253,10 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         );
 
         let four_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
+            payment_token_id.suffix(),
             payment_token_id.prefix().as_felt(),
-            Felt::new(4),
-            Felt::new(0),
+            Felt::new(4)?,
+            Felt::new(0)?,
         ]);
         let four_letter_price: Word = account
             .storage()
@@ -264,10 +266,10 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         println!("four letter price value: {}", four_letter_price.to_string());
 
         let five_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
+            payment_token_id.suffix(),
             payment_token_id.prefix().as_felt(),
-            Felt::new(5),
-            Felt::new(0),
+            Felt::new(5)?,
+            Felt::new(0)?,
         ]);
         let five_letter_price: Word = account
             .storage()
@@ -350,6 +352,7 @@ pub async fn send_register_note(
     naming_account: String,
     faucet_id: String,
     name: String,
+    is_network: bool,
     use_testnet: bool,
 ) -> anyhow::Result<()> {
     println!("\n[Sending register note]");
@@ -367,13 +370,18 @@ pub async fn send_register_note(
     safe_account_import(&mut client, account).await?;
     safe_account_import(&mut client, naming_account).await?;
 
-    let is_network = naming_account.is_network();
+    // 0.15: network status is no longer encoded in the AccountId; it is supplied explicitly
+    // (matching the deploy-time `--as-network` flag).
 
     println!("Checking balance of sender account");
 
     let account_record = client.get_account(account).await?.unwrap();
     let full_account: miden_protocol::account::Account = account_record.try_into()?;
-    let balance = full_account.vault().get_balance(faucet_id)?;
+    // 0.15: get_balance takes an AssetVaultKey and returns AssetAmount.
+    let balance: u64 = full_account
+        .vault()
+        .get_balance(AssetVaultKey::new_fungible(faucet_id, AssetCallbackFlag::Disabled))?
+        .into();
 
     let price = get_price_by_length(&name);
 
@@ -400,8 +408,8 @@ pub async fn send_register_note(
         [
             faucet_id.suffix(),
             faucet_id.prefix().as_felt(),
-            Felt::new(0),
-            Felt::new(0),
+            Felt::new(0)?,
+            Felt::new(0)?,
             domain[0],
             domain[1],
             domain[2],
@@ -418,6 +426,7 @@ pub async fn send_register_note(
         account,
         naming_account,
         register_asset,
+        is_network,
         &mut client,
     )
     .await?;
