@@ -7,8 +7,8 @@ use miden_client::{
     account::AccountId,
     keystore::FilesystemKeyStore,
     note::{
-        Note, NoteAssets, NoteAttachments, NoteRecipient, NoteStorage, NoteTag, NoteType,
-        PartialNoteMetadata,
+        Note, NoteAssets, NoteAttachments, NoteRecipient, NoteScript, NoteStorage, NoteTag,
+        NoteType, PartialNoteMetadata,
     },
 };
 use miden_crypto::{Felt, Word};
@@ -17,6 +17,42 @@ use miden_standards::code_builder::CodeBuilder;
 use miden_standards::note::{NetworkAccountTarget, NoteExecutionHint};
 use rand::{Rng, RngCore};
 use std::{fs, path::Path, sync::Arc};
+
+/// The naming contract MASM the notes/account link against. Network deployments use the full
+/// `naming.masm`; the (non-network) devnet/testnet path uses `naming_unsafe.masm`.
+pub fn naming_masm_path(is_network: bool) -> &'static str {
+    if is_network {
+        "./masm/accounts/naming.masm"
+    } else {
+        "./masm/accounts/naming_unsafe.masm"
+    }
+}
+
+/// Compiles a note script (linking the naming contract library) so its script root can be read.
+/// Used to build the network account's note-script allowlist.
+pub fn compile_naming_note_script(name: &str, is_network: bool) -> anyhow::Result<NoteScript> {
+    let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
+    let naming_code = fs::read_to_string(Path::new(naming_masm_path(is_network)))?;
+    let library = create_library(naming_code, "miden_name::naming")?;
+    let note_script = CodeBuilder::default()
+        .with_dynamically_linked_library(&library)?
+        .compile_note_script(note_code)?;
+    Ok(note_script)
+}
+
+/// Compiles the `init_on_chain` transaction script (linking the naming library). Shared by the
+/// deploy flow and the network account's tx-script allowlist so the roots match.
+pub fn compile_init_on_chain_tx_script(
+    is_network: bool,
+) -> anyhow::Result<miden_client::transaction::TransactionScript> {
+    let script_code = fs::read_to_string(Path::new("./masm/scripts/init_on_chain.masm"))?;
+    let naming_code = fs::read_to_string(Path::new(naming_masm_path(is_network)))?;
+    let library = create_library(naming_code, "miden_name::naming")?;
+    let tx_script = CodeBuilder::default()
+        .with_dynamically_linked_library(&library)?
+        .compile_tx_script(script_code)?;
+    Ok(tx_script)
+}
 
 pub async fn create_note_for_naming_with_client(
     name: String,
@@ -28,7 +64,7 @@ pub async fn create_note_for_naming_with_client(
     client: &mut Client<FilesystemKeyStore>,
 ) -> anyhow::Result<Note> {
     let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
-    let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming_unsafe.masm")).unwrap();
+    let naming_code = fs::read_to_string(Path::new(naming_masm_path(is_network))).unwrap();
     let library = create_library(naming_code, "miden_name::naming")?;
 
     let serial_num = Word::new([

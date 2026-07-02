@@ -16,7 +16,7 @@ use crate::{
     accounts::{create_deployer_account, create_naming_account, safe_account_import},
     client::{create_keystore, initiate_client},
     domain::{encode_domain, reverse_word},
-    notes::{create_library, create_note_for_naming_with_client},
+    notes::create_note_for_naming_with_client,
     storage::slot_name,
     transaction::wait_for_tx,
     utils::get_price_by_length,
@@ -56,17 +56,9 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
     let deployer_account = create_deployer_account(&mut client, &mut keystore).await?;
     let naming_account = create_naming_account(&mut client, is_network).await?;
 
-    // Init note
-    let script_code = fs::read_to_string(Path::new("./masm/scripts/init_on_chain.masm")).unwrap();
-
-    let account_code = fs::read_to_string(Path::new("./masm/accounts/naming_unsafe.masm")).unwrap();
-    let library_path = "miden_name::naming";
-
-    let library = create_library(account_code, library_path)?;
-
-    let tx_script = CodeBuilder::default()
-        .with_dynamically_linked_library(&library)?
-        .compile_tx_script(script_code)?;
+    // Init note — compiled via the shared helper so its root matches the network account's
+    // tx-script allowlist.
+    let tx_script = crate::notes::compile_init_on_chain_tx_script(is_network)?;
 
     let tx_init_request = TransactionRequestBuilder::new()
         .custom_script(tx_script)
