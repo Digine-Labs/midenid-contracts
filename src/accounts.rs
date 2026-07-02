@@ -4,20 +4,15 @@ use miden_client::{
     auth::{AuthScheme, AuthSecretKey, NoAuth},
     keystore::{FilesystemKeyStore, Keystore},
 };
-use miden_protocol::{
-    account::{AccountComponent, AccountComponentMetadata},
-    transaction::TransactionKernel,
-};
+use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
 use miden_standards::{
     account::auth::{AuthNetworkAccount, AuthSingleSig},
     account::wallets::BasicWallet,
 };
 use rand::RngCore;
-use std::{collections::BTreeSet, fs, path::Path, sync::Arc};
+use std::{collections::BTreeSet, sync::Arc};
 
-use crate::notes::{
-    compile_init_on_chain_tx_script, compile_naming_note_script, naming_masm_path,
-};
+use crate::notes::{compile_init_on_chain_tx_script, compile_note_script_with_lib, naming_library};
 use crate::storage::naming_storage;
 
 /// Note scripts a deployed network naming account is allowed to auto-consume. Only notes whose
@@ -73,20 +68,12 @@ pub async fn create_naming_account(
     client: &mut Client<FilesystemKeyStore>,
     is_network: bool,
 ) -> anyhow::Result<Account> {
-    let account_code = fs::read_to_string(Path::new(naming_masm_path(is_network))).unwrap();
-
-    // Compile the account code using the assembler
-    let source_manager = Arc::new(miden_assembly::DefaultSourceManager::default());
-    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone())
-        .with_dynamic_library(miden_standards::StandardsLib::default())
-        .expect("failed to load standards lib");
-    let module = miden_assembly::ast::Module::parser(miden_assembly::ast::ModuleKind::Library)
-        .parse_str("naming", account_code, source_manager)
-        .unwrap();
-    let library = assembler.clone().assemble_library([module]).unwrap();
+    // Assemble the naming contract once and reuse it for the account component and every
+    // allowlisted note-script root.
+    let library = naming_library(is_network)?;
 
     let account_component = AccountComponent::new(
-        (*library).clone(),
+        library.clone(),
         naming_storage(),
         AccountComponentMetadata::new("midenid-naming"),
     )?;
@@ -100,7 +87,7 @@ pub async fn create_naming_account(
     let auth_component: AccountComponent = if is_network {
         let mut allowed_roots = BTreeSet::new();
         for name in NETWORK_ALLOWED_NOTES {
-            allowed_roots.insert(compile_naming_note_script(name, is_network)?.root());
+            allowed_roots.insert(compile_note_script_with_lib(name, &library)?.root());
         }
         // The deploy's init_on_chain self-transaction must also be allowlisted, otherwise the
         // network account rejects it (empty tx-script allowlist blocks all tx scripts).

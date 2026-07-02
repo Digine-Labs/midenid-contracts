@@ -28,14 +28,19 @@ pub fn naming_masm_path(is_network: bool) -> &'static str {
     }
 }
 
-/// Compiles a note script (linking the naming contract library) so its script root can be read.
-/// Used to build the network account's note-script allowlist.
-pub fn compile_naming_note_script(name: &str, is_network: bool) -> anyhow::Result<NoteScript> {
-    let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
+/// Assembles the naming contract as a linkable [`Library`]. Assembling is non-trivial, so callers
+/// that compile several scripts should build this once and reuse it.
+pub fn naming_library(is_network: bool) -> anyhow::Result<Library> {
     let naming_code = fs::read_to_string(Path::new(naming_masm_path(is_network)))?;
-    let library = create_library(naming_code, "miden_name::naming")?;
+    create_library(naming_code, "miden_name::naming")
+}
+
+/// Compiles a note script against a pre-built naming [`Library`]. Its script root can then be read
+/// (e.g. to build the network account's note-script allowlist).
+pub fn compile_note_script_with_lib(name: &str, library: &Library) -> anyhow::Result<NoteScript> {
+    let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
     let note_script = CodeBuilder::default()
-        .with_dynamically_linked_library(&library)?
+        .with_dynamically_linked_library(library)?
         .compile_note_script(note_code)?;
     Ok(note_script)
 }
@@ -46,10 +51,8 @@ pub fn compile_init_on_chain_tx_script(
     is_network: bool,
 ) -> anyhow::Result<miden_client::transaction::TransactionScript> {
     let script_code = fs::read_to_string(Path::new("./masm/scripts/init_on_chain.masm"))?;
-    let naming_code = fs::read_to_string(Path::new(naming_masm_path(is_network)))?;
-    let library = create_library(naming_code, "miden_name::naming")?;
     let tx_script = CodeBuilder::default()
-        .with_dynamically_linked_library(&library)?
+        .with_dynamically_linked_library(&naming_library(is_network)?)?
         .compile_tx_script(script_code)?;
     Ok(tx_script)
 }
@@ -63,10 +66,6 @@ pub async fn create_note_for_naming_with_client(
     is_network: bool,
     client: &mut Client<FilesystemKeyStore>,
 ) -> anyhow::Result<Note> {
-    let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
-    let naming_code = fs::read_to_string(Path::new(naming_masm_path(is_network))).unwrap();
-    let library = create_library(naming_code, "miden_name::naming")?;
-
     let serial_num = Word::new([
         Felt::new(client.rng().next_u64())?,
         Felt::new(client.rng().next_u64())?,
@@ -74,9 +73,7 @@ pub async fn create_note_for_naming_with_client(
         Felt::new(client.rng().next_u64())?,
     ]);
 
-    let note_script = CodeBuilder::default()
-        .with_dynamically_linked_library(&library)?
-        .compile_note_script(note_code)?;
+    let note_script = compile_note_script_with_lib(&name, &naming_library(is_network)?)?;
 
     let recipient = NoteRecipient::new(serial_num, note_script, inputs.clone());
     let tag = NoteTag::with_account_target(target_id);

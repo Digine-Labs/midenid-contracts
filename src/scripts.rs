@@ -81,8 +81,8 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         [
             deployer_account.id().suffix(),
             deployer_account.id().prefix().as_felt(),
-            Felt::new(0)?,
-            Felt::new(0)?,
+            Felt::from(0u32),
+            Felt::from(0u32),
         ]
         .to_vec(),
     )?;
@@ -202,73 +202,21 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         let account: miden_protocol::account::Account = record.try_into().unwrap();
         let prices_slot = slot_name("naming::prices");
 
-        let one_letter_word = Word::new([
-            payment_token_id.suffix(),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(1)?,
-            Felt::new(0)?,
-        ]);
-        let one_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, reverse_word(one_letter_word))
-            .unwrap()
-            .into();
-        println!("one letter price value: {}", one_letter_price.to_string());
-
-        let two_letter_word = Word::new([
-            payment_token_id.suffix(),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(2)?,
-            Felt::new(0)?,
-        ]);
-        let two_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, reverse_word(two_letter_word))
-            .unwrap()
-            .into();
-        println!("two letter price value: {}", two_letter_price.to_string());
-
-        let three_letter_word = Word::new([
-            payment_token_id.suffix(),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(3)?,
-            Felt::new(0)?,
-        ]);
-        let three_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, reverse_word(three_letter_word))
-            .unwrap()
-            .into();
-        println!(
-            "three letter price value: {}",
-            three_letter_price.to_string()
-        );
-
-        let four_letter_word = Word::new([
-            payment_token_id.suffix(),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(4)?,
-            Felt::new(0)?,
-        ]);
-        let four_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, reverse_word(four_letter_word))
-            .unwrap()
-            .into();
-        println!("four letter price value: {}", four_letter_price.to_string());
-
-        let five_letter_word = Word::new([
-            payment_token_id.suffix(),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(5)?,
-            Felt::new(0)?,
-        ]);
-        let five_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, reverse_word(five_letter_word))
-            .unwrap()
-            .into();
-        println!("five letter price value: {}", five_letter_price.to_string());
+        for len in 1..=5u32 {
+            // 0.15: map lookups use the reversed key, and the returned value is reversed too.
+            let key = Word::new([
+                payment_token_id.suffix(),
+                payment_token_id.prefix().as_felt(),
+                Felt::from(len),
+                Felt::from(0u32),
+            ]);
+            let price: Word = account
+                .storage()
+                .get_map_item(&prices_slot, reverse_word(key))
+                .unwrap()
+                .into();
+            println!("{len} letter price value: {price}");
+        }
     }
 
     Ok(())
@@ -400,8 +348,8 @@ pub async fn send_register_note(
         [
             faucet_id.suffix(),
             faucet_id.prefix().as_felt(),
-            Felt::new(0)?,
-            Felt::new(0)?,
+            Felt::from(0u32),
+            Felt::from(0u32),
             domain[0],
             domain[1],
             domain[2],
