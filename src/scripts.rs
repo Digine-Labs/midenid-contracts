@@ -15,7 +15,7 @@ use tokio::time::{Duration, sleep};
 use crate::{
     accounts::{create_deployer_account, create_naming_account, safe_account_import},
     client::{create_keystore, initiate_client},
-    domain::encode_domain,
+    domain::{encode_domain, reverse_word},
     notes::{create_library, create_note_for_naming_with_client},
     storage::slot_name,
     transaction::wait_for_tx,
@@ -32,7 +32,7 @@ fn midenscan_base_url(use_testnet: bool) -> &'static str {
 
 fn default_faucet_id(use_testnet: bool) -> &'static str {
     if use_testnet {
-        "0x0a7d175ed63ec5200fb2ced86f6aa5"
+        "0x2458e5446128e6b150b75b8ebd9ce1"
     } else {
         "0x16f6c85d5652c9200879145bfdda93"
     }
@@ -218,7 +218,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         ]);
         let one_letter_price: Word = account
             .storage()
-            .get_map_item(&prices_slot, one_letter_word)
+            .get_map_item(&prices_slot, reverse_word(one_letter_word))
             .unwrap()
             .into();
         println!("one letter price value: {}", one_letter_price.to_string());
@@ -231,7 +231,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         ]);
         let two_letter_price: Word = account
             .storage()
-            .get_map_item(&prices_slot, two_letter_word)
+            .get_map_item(&prices_slot, reverse_word(two_letter_word))
             .unwrap()
             .into();
         println!("two letter price value: {}", two_letter_price.to_string());
@@ -244,7 +244,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         ]);
         let three_letter_price: Word = account
             .storage()
-            .get_map_item(&prices_slot, three_letter_word)
+            .get_map_item(&prices_slot, reverse_word(three_letter_word))
             .unwrap()
             .into();
         println!(
@@ -260,7 +260,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         ]);
         let four_letter_price: Word = account
             .storage()
-            .get_map_item(&prices_slot, four_letter_word)
+            .get_map_item(&prices_slot, reverse_word(four_letter_word))
             .unwrap()
             .into();
         println!("four letter price value: {}", four_letter_price.to_string());
@@ -273,7 +273,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         ]);
         let five_letter_price: Word = account
             .storage()
-            .get_map_item(&prices_slot, five_letter_word)
+            .get_map_item(&prices_slot, reverse_word(five_letter_word))
             .unwrap()
             .into();
         println!("five letter price value: {}", five_letter_price.to_string());
