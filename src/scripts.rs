@@ -1,7 +1,7 @@
 use miden_client::{
     Client,
     account::AccountId,
-    asset::FungibleAsset,
+    asset::{AssetCallbackFlag, AssetVaultKey, FungibleAsset},
     keystore::FilesystemKeyStore,
     note::{Note, NoteAssets, NoteFile, NoteId, NoteStorage},
     store::NoteFilter,
@@ -15,8 +15,8 @@ use tokio::time::{Duration, sleep};
 use crate::{
     accounts::{create_deployer_account, create_naming_account, safe_account_import},
     client::{create_keystore, initiate_client},
-    domain::encode_domain,
-    notes::{create_library, create_note_for_naming_with_client},
+    domain::{encode_domain, reverse_word},
+    notes::create_note_for_naming_with_client,
     storage::slot_name,
     transaction::wait_for_tx,
     utils::get_price_by_length,
@@ -32,7 +32,7 @@ fn midenscan_base_url(use_testnet: bool) -> &'static str {
 
 fn default_faucet_id(use_testnet: bool) -> &'static str {
     if use_testnet {
-        "0x0a7d175ed63ec5200fb2ced86f6aa5"
+        "0x2458e5446128e6b150b75b8ebd9ce1"
     } else {
         "0x16f6c85d5652c9200879145bfdda93"
     }
@@ -56,17 +56,9 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
     let deployer_account = create_deployer_account(&mut client, &mut keystore).await?;
     let naming_account = create_naming_account(&mut client, is_network).await?;
 
-    // Init note
-    let script_code = fs::read_to_string(Path::new("./masm/scripts/init_on_chain.masm")).unwrap();
-
-    let account_code = fs::read_to_string(Path::new("./masm/accounts/naming_unsafe.masm")).unwrap();
-    let library_path = "miden_name::naming";
-
-    let library = create_library(account_code, library_path)?;
-
-    let tx_script = CodeBuilder::default()
-        .with_dynamically_linked_library(&library)?
-        .compile_tx_script(script_code)?;
+    // Init note — compiled via the shared helper so its root matches the network account's
+    // tx-script allowlist.
+    let tx_script = crate::notes::compile_init_on_chain_tx_script(is_network)?;
 
     let tx_init_request = TransactionRequestBuilder::new()
         .custom_script(tx_script)
@@ -89,8 +81,8 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         [
             deployer_account.id().suffix(),
             deployer_account.id().prefix().as_felt(),
-            Felt::new(0),
-            Felt::new(0),
+            Felt::from(0u32),
+            Felt::from(0u32),
         ]
         .to_vec(),
     )?;
@@ -100,6 +92,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         deployer_account.id(),
         naming_account.id(),
         NoteAssets::new(vec![]).unwrap(),
+        is_network,
         &mut client,
     )
     .await?;
@@ -163,6 +156,7 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         deployer_account.id(),
         naming_account.id(),
         NoteAssets::new(vec![]).unwrap(),
+        is_network,
         &mut client,
     )
     .await?;
@@ -208,73 +202,21 @@ pub async fn deploy(is_network: bool, use_testnet: bool) -> anyhow::Result<()> {
         let account: miden_protocol::account::Account = record.try_into().unwrap();
         let prices_slot = slot_name("naming::prices");
 
-        let one_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(1),
-            Felt::new(0),
-        ]);
-        let one_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, one_letter_word)
-            .unwrap()
-            .into();
-        println!("one letter price value: {}", one_letter_price.to_string());
-
-        let two_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(2),
-            Felt::new(0),
-        ]);
-        let two_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, two_letter_word)
-            .unwrap()
-            .into();
-        println!("two letter price value: {}", two_letter_price.to_string());
-
-        let three_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(3),
-            Felt::new(0),
-        ]);
-        let three_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, three_letter_word)
-            .unwrap()
-            .into();
-        println!(
-            "three letter price value: {}",
-            three_letter_price.to_string()
-        );
-
-        let four_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(4),
-            Felt::new(0),
-        ]);
-        let four_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, four_letter_word)
-            .unwrap()
-            .into();
-        println!("four letter price value: {}", four_letter_price.to_string());
-
-        let five_letter_word = Word::new([
-            Felt::new(payment_token_id.suffix().as_canonical_u64()),
-            payment_token_id.prefix().as_felt(),
-            Felt::new(5),
-            Felt::new(0),
-        ]);
-        let five_letter_price: Word = account
-            .storage()
-            .get_map_item(&prices_slot, five_letter_word)
-            .unwrap()
-            .into();
-        println!("five letter price value: {}", five_letter_price.to_string());
+        for len in 1..=5u32 {
+            // 0.15: map lookups use the reversed key, and the returned value is reversed too.
+            let key = Word::new([
+                payment_token_id.suffix(),
+                payment_token_id.prefix().as_felt(),
+                Felt::from(len),
+                Felt::from(0u32),
+            ]);
+            let price: Word = account
+                .storage()
+                .get_map_item(&prices_slot, reverse_word(key))
+                .unwrap()
+                .into();
+            println!("{len} letter price value: {price}");
+        }
     }
 
     Ok(())
@@ -350,6 +292,7 @@ pub async fn send_register_note(
     naming_account: String,
     faucet_id: String,
     name: String,
+    is_network: bool,
     use_testnet: bool,
 ) -> anyhow::Result<()> {
     println!("\n[Sending register note]");
@@ -367,13 +310,18 @@ pub async fn send_register_note(
     safe_account_import(&mut client, account).await?;
     safe_account_import(&mut client, naming_account).await?;
 
-    let is_network = naming_account.is_network();
+    // 0.15: network status is no longer encoded in the AccountId; it is supplied explicitly
+    // (matching the deploy-time `--as-network` flag).
 
     println!("Checking balance of sender account");
 
     let account_record = client.get_account(account).await?.unwrap();
     let full_account: miden_protocol::account::Account = account_record.try_into()?;
-    let balance = full_account.vault().get_balance(faucet_id)?;
+    // 0.15: get_balance takes an AssetVaultKey and returns AssetAmount.
+    let balance: u64 = full_account
+        .vault()
+        .get_balance(AssetVaultKey::new_fungible(faucet_id, AssetCallbackFlag::Disabled))?
+        .into();
 
     let price = get_price_by_length(&name);
 
@@ -400,8 +348,8 @@ pub async fn send_register_note(
         [
             faucet_id.suffix(),
             faucet_id.prefix().as_felt(),
-            Felt::new(0),
-            Felt::new(0),
+            Felt::from(0u32),
+            Felt::from(0u32),
             domain[0],
             domain[1],
             domain[2],
@@ -418,6 +366,7 @@ pub async fn send_register_note(
         account,
         naming_account,
         register_asset,
+        is_network,
         &mut client,
     )
     .await?;

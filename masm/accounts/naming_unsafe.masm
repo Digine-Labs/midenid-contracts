@@ -5,6 +5,7 @@ use miden::protocol::input_note
 use miden::protocol::output_note
 use miden::protocol::active_note
 use miden::protocol::tx
+use miden::protocol::asset
 use miden::standards::wallets::basic->basic_wallet
 
 # Storage Slots
@@ -348,6 +349,12 @@ end
 proc _get_balance
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop swap
     # [suffix, prefix]
+    # 0.15: get_balance takes a full ASSET_KEY; build the fungible vault key
+    # (callbacks disabled) from the faucet id.
+    push.0
+    # [enable_callbacks=0, suffix, prefix]
+    exec.asset::create_fungible_key
+    # [ASSET_KEY]
     exec.active_account::get_balance
     # [balance]
 end

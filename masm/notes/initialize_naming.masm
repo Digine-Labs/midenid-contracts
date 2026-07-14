@@ -6,11 +6,12 @@ const INITIALIZE_NOTE_INPUT_PTR=0
 const TIMESTAMP_INPUT_PTR=4
 
 # Input (arguments): [OWNER, TS]
-begin
+@note_script
+pub proc main
     push.INITIALIZE_NOTE_INPUT_PTR
     exec.active_note::get_storage
-    # [num_inputs, init_ptr]
-    drop drop padw mem_loadw_be.TIMESTAMP_INPUT_PTR
+    # [num_storage_items]
+    drop padw mem_loadw_be.TIMESTAMP_INPUT_PTR
     padw mem_loadw_be.INITIALIZE_NOTE_INPUT_PTR
     # [INPUTS]
     call.naming::init

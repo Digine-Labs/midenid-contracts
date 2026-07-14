@@ -5,10 +5,11 @@ use miden::core::sys
 const DOMAIN=0
 
 # Input (arguments): [DOMAIN]
-begin
+@note_script
+pub proc main
     push.0
     exec.active_note::get_storage
-    drop drop
+    drop
     mem_loadw_be.DOMAIN
     # [DOMAIN]
     call.naming::activate_domain

@@ -1,18 +1,34 @@
 use miden_client::{
     Client,
-    account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType},
+    account::{Account, AccountBuilder, AccountId, AccountType},
     auth::{AuthScheme, AuthSecretKey, NoAuth},
     keystore::{FilesystemKeyStore, Keystore},
 };
-use miden_protocol::{
-    account::{AccountComponent, AccountComponentMetadata},
-    transaction::TransactionKernel,
+use miden_protocol::account::{AccountComponent, AccountComponentMetadata};
+use miden_standards::{
+    account::auth::{AuthNetworkAccount, AuthSingleSig},
+    account::wallets::BasicWallet,
 };
-use miden_standards::{account::auth::AuthSingleSig, account::wallets::BasicWallet};
 use rand::RngCore;
-use std::{fs, path::Path, sync::Arc};
+use std::{collections::BTreeSet, sync::Arc};
 
+use crate::notes::{compile_init_on_chain_tx_script, compile_note_script_with_lib, naming_library};
 use crate::storage::naming_storage;
+
+/// Note scripts a deployed network naming account is allowed to auto-consume. Only notes whose
+/// `call.naming::*` target exists in `naming.masm` are included (excludes the referral notes and
+/// extend/clear notes, whose procedures live in `naming_discount.masm`).
+const NETWORK_ALLOWED_NOTES: &[&str] = &[
+    "initialize_naming",
+    "set_all_prices",
+    "set_all_prices_testnet",
+    "register_name",
+    "activate_domain",
+    "transfer_domain",
+    "transfer_ownership",
+    "claim_protocol_revenue",
+    "withdraw_assets",
+];
 
 pub async fn create_deployer_account(
     client: &mut Client<FilesystemKeyStore>,
@@ -25,8 +41,8 @@ pub async fn create_deployer_account(
 
     // Build the account
     let deployer_account = AccountBuilder::new(init_seed)
-        .account_type(AccountType::RegularAccountUpdatableCode)
-        .storage_mode(AccountStorageMode::Public)
+        // 0.15: storage mode is merged into AccountType (Public = on-chain state).
+        .account_type(AccountType::Public)
         .with_auth_component(AuthSingleSig::new(
             key_pair.public_key().to_commitment(),
             AuthScheme::Falcon512Poseidon2,
@@ -52,37 +68,41 @@ pub async fn create_naming_account(
     client: &mut Client<FilesystemKeyStore>,
     is_network: bool,
 ) -> anyhow::Result<Account> {
-    let account_code = fs::read_to_string(Path::new("./masm/accounts/naming_unsafe.masm")).unwrap();
-
-    let storage_mode = if is_network {
-        AccountStorageMode::Network
-    } else {
-        AccountStorageMode::Public
-    };
-
-    // Compile the account code using the assembler
-    let source_manager = Arc::new(miden_assembly::DefaultSourceManager::default());
-    let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone())
-        .with_dynamic_library(miden_standards::StandardsLib::default())
-        .expect("failed to load standards lib");
-    let module = miden_assembly::ast::Module::parser(miden_assembly::ast::ModuleKind::Library)
-        .parse_str("naming", account_code, source_manager)
-        .unwrap();
-    let library = assembler.clone().assemble_library([module]).unwrap();
+    // Assemble the naming contract once and reuse it for the account component and every
+    // allowlisted note-script root.
+    let library = naming_library(is_network)?;
 
     let account_component = AccountComponent::new(
-        (*library).clone(),
+        library.clone(),
         naming_storage(),
-        AccountComponentMetadata::new("midenid-naming", [AccountType::RegularAccountImmutableCode]),
+        AccountComponentMetadata::new("midenid-naming"),
     )?;
 
     let mut seed = [0_u8; 32];
     client.rng().fill_bytes(&mut seed);
 
+    // 0.15: a network account is defined by the standardized NetworkAccountNoteAllowlist slot,
+    // provided by the AuthNetworkAccount auth component. It pins the set of note-script roots the
+    // network may auto-consume against this account. Non-network deployments use NoAuth.
+    let auth_component: AccountComponent = if is_network {
+        let mut allowed_roots = BTreeSet::new();
+        for name in NETWORK_ALLOWED_NOTES {
+            allowed_roots.insert(compile_note_script_with_lib(name, &library)?.root());
+        }
+        // The deploy's init_on_chain self-transaction must also be allowlisted, otherwise the
+        // network account rejects it (empty tx-script allowlist blocks all tx scripts).
+        let mut allowed_tx_scripts = BTreeSet::new();
+        allowed_tx_scripts.insert(compile_init_on_chain_tx_script(is_network)?.root());
+        AuthNetworkAccount::with_allowed_notes(allowed_roots)?
+            .with_allowed_tx_scripts(allowed_tx_scripts)
+            .into()
+    } else {
+        NoAuth.into()
+    };
+
     let account = AccountBuilder::new(seed)
-        .account_type(AccountType::RegularAccountImmutableCode)
-        .storage_mode(storage_mode)
-        .with_auth_component(NoAuth)
+        .account_type(AccountType::Public)
+        .with_auth_component(auth_component)
         .with_component(account_component.clone())
         .build()?;
 
