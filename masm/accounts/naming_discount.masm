@@ -5,6 +5,8 @@ use miden::protocol::input_note
 use miden::protocol::output_note
 use miden::protocol::active_note
 use miden::protocol::tx
+use miden::protocol::asset
+use miden::core::math::u64->u64_math
 use miden::standards::wallets::basic->basic_wallet
 
 # Storage Slots
@@ -29,7 +31,6 @@ const ERR_ONLY_DOMAIN_OWNER="Only domain owner"
 const ERR_ALREADY_INITIALIZED="Contract already initialized"
 const ERR_PAYMENT_TOKEN_NOT_ALLOWED="This payment token not allowed"
 const ERR_PRICE_ZERO="Price zero for this length"
-const ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
 const ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less than price"
 const ERR_DOMAIN_NOT_AVAILABLE="Domain is already taken"
 const ERR_DOMAIN_LENGTH_TOO_HIGH="21 characters allowed"
@@ -45,10 +46,11 @@ const ERR_CALCULATE_DISCOUNT_UNDERFLOW="Underflow at discount calc"
 const ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH="Max 10 years"
 const ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH="Timestamp len overflow"
 const ERR_DOMAIN_NOT_EXPIRED="Domain not expired"
-const ERR_U32_OVERFLOW="U32 Overflow"
+const ERR_CLAIMED_REVENUE_EXCEEDS_TOTAL="Claimed revenue exceeds total revenue"
 const ERR_DOMAIN_EXPIRED="Domain expired"
 const ERR_UNDERFLOW_AT_FEE_CALC="Fee calculation underflow"
 const ERR_OVERFLOW_AT_FEE_CALC="Fee calculation overflow"
+const ERR_PRICE_TOO_HIGH="Price exceeds the safe range for fee arithmetic"
 
 # Memory Pointers
 
@@ -73,6 +75,13 @@ const THREE_YR_DISCOUNT=3000 # 30%
 const MAX_REF_RATE=10000 # Basis point
 const REF_RATE_LIMIT=2500 # %25
 const DOMAIN_LETTER_PRICE_BREAKPOINT=5 # After 5 letters constant price
+
+# Fee arithmetic runs on felts, not u32 — prices and balances are felt-width by protocol
+# construction. To keep every intermediate product inside the field, a price is required to fit in
+# 48 bits: price < 2^48 gives price * MAX_REF_RATE < 2^62 and price * MAX_REG_LEN < 2^52, both
+# comfortably below the field modulus (~2^64). The check is done on the high 32-bit limb, so the
+# limit is expressed as that limb's bound: 2^48 >> 32 = 2^16.
+const MAX_PRICE_HI_LIMB=65536 # price must be < 2^48
 
 const MAX_FELT_PART=0xFFFFFFFFFFFFFF # 8*7 bits
 
@@ -173,8 +182,8 @@ pub proc transfer
     exec._assert_only_domain_owner
     exec._clear_domain_mapping
 
-    padw mem_loadw_be.MEM_DOMAIN_NEW_OWNER drop drop
-    # [NEW_OWNER]
+    padw mem_loadw_be.MEM_DOMAIN_NEW_OWNER drop drop swap
+    # [suffix, prefix]
     exec._update_domain_owner
     # []
 end
@@ -295,30 +304,56 @@ pub proc claim_protocol_revenue
     mem_storew_be.MEM_NOTE_DETAILS dropw
     mem_storew_be.MEM_RECIPIENT dropw
     exec._assert_only_owner
-    # Create note
-
-
+    # Create output note
     padw mem_loadw_be.MEM_RECIPIENT
     padw mem_loadw_be.MEM_NOTE_DETAILS
-    #padw mem_loadw_be.MEM_PAYMENT_TOKEN
-    debug.stack.12
-    # Stack must be
-    # [tag, aux, note_type, exec_hint, RECIPIENT]
-    exec.output_note::create # TODO
-    debug.stack.8
-    # Create ASSET word
-    # []
+    drop drop
+    # [tag, note_type, RECIPIENT]
+    exec.output_note::create
+    # [note_idx]
     exec._get_remaining_revenue
-    # [claimable_revenue]
+    # [claimable_revenue, note_idx]
     exec._get_asset
-    # [ASSET]
+    # [ASSET_KEY, ASSET_VALUE, note_idx]
+    # 0.15: remove_asset and output_note::add_asset each consume the full (KEY, VALUE)
+    # pair, so duplicate it before removing from the vault.
+    dupw.1 dupw.1
+    # [ASSET_KEY, ASSET_VALUE, ASSET_KEY, ASSET_VALUE, note_idx]
+    exec.native_account::remove_asset
+    # [REMAINING_ASSET_VALUE, ASSET_KEY, ASSET_VALUE, note_idx]
+    dropw
+    # [ASSET_KEY, ASSET_VALUE, note_idx]
+    exec.output_note::add_asset
+    # []
+    exec._set_claimed_to_total
 end
 
-# Input: [TOKEN]
+# Input: [TOKEN, NOTE_DETAILS, RECIPIENT]
 pub proc withdraw_assets
     mem_storew_be.MEM_PAYMENT_TOKEN dropw
+    mem_storew_be.MEM_NOTE_DETAILS dropw
+    mem_storew_be.MEM_RECIPIENT dropw
     exec._assert_only_owner
-    nop
+    # Create output note
+    padw mem_loadw_be.MEM_RECIPIENT
+    padw mem_loadw_be.MEM_NOTE_DETAILS
+    drop drop
+    # [tag, note_type, RECIPIENT]
+    exec.output_note::create
+    # [note_idx]
+    exec._get_balance
+    # [balance, note_idx]
+    exec._get_asset
+    # [ASSET_KEY, ASSET_VALUE, note_idx]
+    # 0.15: duplicate the (KEY, VALUE) pair so it survives remove_asset for the output note.
+    dupw.1 dupw.1
+    # [ASSET_KEY, ASSET_VALUE, ASSET_KEY, ASSET_VALUE, note_idx]
+    exec.native_account::remove_asset
+    # [REMAINING_ASSET_VALUE, ASSET_KEY, ASSET_VALUE, note_idx]
+    dropw
+    # [ASSET_KEY, ASSET_VALUE, note_idx]
+    exec.output_note::add_asset
+    # []
 end
 
 # Internal Methods
@@ -330,11 +365,16 @@ proc _extend_existing_domain_length
     # [current_len]
     padw mem_loadw_be.MEM_REG_LEN drop drop drop
     # [extend_len_as_year, current_len]
+    dup lte.MAX_REG_LEN assert.err=ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH
     exec._get_one_year
-    u32assert2 u32overflowing_mul assertz.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
-    # [len * yr, current_len]
-    u32assert2 u32overflowing_add assertz.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
+    # [one_year, extend_len, current_len]
+    # Bounded inputs (extend_len <= MAX_REG_LEN, one_year and current_len are u32-width), so the
+    # felt arithmetic cannot wrap; the u32assert then enforces a valid u32 block timestamp.
+    mul
+    # [extend_len * yr, current_len]
+    add
     # [new_len]
+    u32assert.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
     push.0.0.0
     padw mem_loadw_be.MEM_DOMAIN
     push.DOMAIN_EXPIRY_DATES[0..2] exec.native_account::set_map_item dropw
@@ -376,17 +416,17 @@ proc _register_referrer_revenue
     # [ref_rate, total_amt]
     swap dup swap.2 swap
     # [total_amt, ref_rate, total_amt]
-    u32assert2 u32overflowing_mul assertz.err=ERR_OVERFLOW_AT_FEE_CALC 
-    u32assert2 u32div.10000
+    exec._apply_basis_points
     # [(rate * total) / 10000, total_amt]
-    sub 
+    sub
     # [total - ((rate * total) / 10000)]
     # [protocol_revenue]
     mem_store.MEM_PROTOCOL_FEE_AMT
     mem_load.MEM_PROTOCOL_FEE_AMT
     mem_load.MEM_TOTAL_PAID_AMT swap
     # [protocol, total]
-    u32assert2 u32overflowing_sub assertz.err=ERR_UNDERFLOW_AT_FEE_CALC
+    dup.1 dup.1 gte assert.err=ERR_UNDERFLOW_AT_FEE_CALC
+    sub
     mem_store.MEM_REFERRER_FEE_AMT
     # []
     ## Get current amt
@@ -395,7 +435,8 @@ proc _register_referrer_revenue
     # [current_amt]
     mem_load.MEM_REFERRER_FEE_AMT
     # [ref_revenue, current_amt]
-    u32assert2 u32overflowing_add assertz.err=ERR_OVERFLOW_AT_FEE_CALC
+    # Referrer revenue accumulates as a felt, same as protocol revenue.
+    add
     # [new_total]
     push.0.0.0
     padw mem_loadw_be.MEM_REFERRER
@@ -428,16 +469,64 @@ proc _get_remaining_revenue
     padw mem_loadw_be.MEM_PAYMENT_TOKEN
     push.CLAIMED_REVENUE_SLOT[0..2] exec.active_account::get_map_item drop drop drop
     # [claimed_revenue, total_revenue]
-    u32assert2 u32overflowing_sub assertz.err=ERR_U32_OVERFLOW
+    # Revenue accumulates as a felt, so this must not be a u32 subtraction: it would trap
+    # once cumulative revenue crosses u32::MAX, permanently bricking revenue claims.
+    dup.1 dup.1 gte assert.err=ERR_CLAIMED_REVENUE_EXCEEDS_TOTAL
+    sub
     # [claimable_revenue]
 end
 
 # Input: [amt] Memory [PAYMENT_TOKEN]
 # Output: [ASSET]
+# 0.15: a fungible asset is an 8-felt (ASSET_KEY, ASSET_VALUE) pair built via the
+# asset helper, which encodes the composition metadata into the key.
 proc _get_asset
-    push.0 swap
     padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
-    # [prefix, suffix, amt, 0]
+    # [prefix, suffix, amt]
+    swap push.0
+    # [enable_callbacks=0, suffix, prefix, amt]
+    exec.asset::create_fungible_asset
+    # [ASSET_KEY, ASSET_VALUE]
+end
+
+# Input: [] Memory [PAYMENT_TOKEN]
+# Output: []
+# Sets claimed_revenue = total_revenue for the token
+proc _set_claimed_to_total
+    padw mem_loadw_be.MEM_PAYMENT_TOKEN
+    push.TOTAL_REVENUE_SLOT[0..2] exec.active_account::get_map_item
+    # [TOTAL_VALUE]
+    padw mem_loadw_be.MEM_PAYMENT_TOKEN
+    push.CLAIMED_REVENUE_SLOT[0..2] exec.native_account::set_map_item dropw
+end
+
+# Input: [x, y]
+# Output: [x * y / MAX_REF_RATE]
+# Applies a basis-point rate to an amount. Both the multiply and the divide have to be felt-width:
+# a price of 375000000 times a 5000bp discount is 1.875e12, which is ~437x u32::MAX, so the u32
+# arithmetic this replaced trapped long before any realistic price. Callers must have already
+# bounded the amount via _assert_price_in_range, which keeps the product below the field modulus.
+proc _apply_basis_points
+    mul
+    # [x * y]
+    u32split
+    # [lo, hi] — u32split emits the low limb on top, which is the u64 helper's convention
+    push.0.MAX_REF_RATE
+    # [divisor_lo, divisor_hi, lo, hi]
+    exec.u64_math::div
+    # [q_lo, q_hi]
+    swap mul.4294967296 add
+    # [x * y / MAX_REF_RATE]
+end
+
+# Input: [price]
+# Output: [price]
+# Guards the felt fee arithmetic. See MAX_PRICE_HI_LIMB.
+proc _assert_price_in_range
+    dup u32split drop
+    # [price_hi, price]
+    lt.MAX_PRICE_HI_LIMB assert.err=ERR_PRICE_TOO_HIGH
+    # [price]
 end
 
 # Input: [account_prefix, account_suffix] Memory [DOMAIN]
@@ -504,11 +593,16 @@ proc _update_domain_length
     dup lte.MAX_REG_LEN assert.err=ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH
     # [reg_len]
     exec._get_one_year
-    u32overflowing_mul assertz.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
-    # [len * year]
+    # [one_year, reg_len]
+    # Bounded inputs (reg_len <= MAX_REG_LEN, one_year and the block timestamp are u32-width), so
+    # the felt arithmetic cannot wrap; the u32assert then enforces a valid u32 block timestamp.
+    mul
+    # [reg_len * year]
     exec.tx::get_block_timestamp
-    # [timestamp, len * yr]
-    u32overflowing_add assertz.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
+    # [timestamp, reg_len * yr]
+    add
+    # [expiry]
+    u32assert.err=ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH
     push.0.0.0
     # [END_TIME]
     padw mem_loadw_be.MEM_DOMAIN
@@ -552,12 +646,16 @@ proc _calculate_domain_price
     push.0
     push.PRICES_SLOT[0..2] exec.active_account::get_map_item drop drop drop
     # [price]
+    exec._assert_price_in_range
+    # [price]
     exec._calculate_discount
     # [discounted_price]
     padw mem_loadw_be.MEM_REG_LEN drop drop drop
     # [reg_len, discounted_price]
-    u32assert2 u32overflowing_mul assertz.err=ERR_CALCULATE_DISCOUNT_OVERFLOW
-
+    dup lte.MAX_REG_LEN assert.err=ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH
+    # discounted_price < 2^48 and reg_len <= MAX_REG_LEN, so the product stays under 2^52.
+    mul
+    # [price]
 end
 
 # Input: [price] Memory [REG_LEN]
@@ -570,23 +668,22 @@ proc _calculate_discount
         # [reg_len, price]
         drop dup 
         # [price, price]
-        push.FIVE_YR_DISCOUNT u32assert2 u32overflowing_mul
-        assertz.err=ERR_CALCULATE_DISCOUNT_OVERFLOW
-        u32assert2 u32div.10000
-        u32assert2 u32overflowing_sub assertz.err=ERR_CALCULATE_DISCOUNT_UNDERFLOW
+        push.FIVE_YR_DISCOUNT exec._apply_basis_points
+        # [discount_amt, price]
+        dup.1 dup.1 gte assert.err=ERR_CALCULATE_DISCOUNT_UNDERFLOW
+        sub
         # [discounted_price]
-        
+
     else
         # [reg_len, price]
         gte.3
         if.true
             # [price]
             dup
-            push.THREE_YR_DISCOUNT 
-            u32assert2 u32overflowing_mul
-            assertz.err=ERR_CALCULATE_DISCOUNT_OVERFLOW
-            u32assert2 u32div.10000
-            u32assert2 u32overflowing_sub assertz.err=ERR_CALCULATE_DISCOUNT_UNDERFLOW
+            push.THREE_YR_DISCOUNT exec._apply_basis_points
+            # [discount_amt, price]
+            dup.1 dup.1 gte assert.err=ERR_CALCULATE_DISCOUNT_UNDERFLOW
+            sub
             # [discounted price]
         else
             # [price]
@@ -598,7 +695,14 @@ end
 # Input: [] Memory [PAYMENT_TOKEN]
 # Output: [balance]
 proc _get_balance
-    padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop
+    padw mem_loadw_be.MEM_PAYMENT_TOKEN drop drop swap
+    # [suffix, prefix]
+    # 0.15: get_balance takes a full ASSET_KEY; build the fungible vault key
+    # (callbacks disabled) from the faucet id.
+    push.0
+    # [enable_callbacks=0, suffix, prefix]
+    exec.asset::create_fungible_key
+    # [ASSET_KEY]
     exec.active_account::get_balance
     # [balance]
 end
@@ -611,7 +715,11 @@ proc _receive_payment
     exec.basic_wallet::add_assets_to_account
     exec._get_balance
     # [after_bal, before_bal, min_amt]
-    swap u32overflowing_sub assertz.err=ERR_VALIDATE_PAYMENT_SUB_OVERFLOW
+    # Balances are felts (the protocol caps asset amounts at 2^63 - 2^31), so this must not be
+    # a u32 subtraction: it would trap once the vault balance crosses u32::MAX. No underflow
+    # guard is needed — add_assets_to_account can only increase the balance.
+    swap sub
+    # [received, min_amt]
     lte assert.err=ERR_INSUFFICIENT_AMOUNT_PAID
     # []
 end
@@ -635,12 +743,12 @@ end
 # Output: []
 proc _assert_only_owner
     push.0 exec.input_note::get_sender
-    # [caller_prefix, caller_suffix]
+    # [caller_suffix, caller_prefix]
     push.OWNER_SLOT[0..2]
     exec.active_account::get_item
-    # [0, 0, owner_prefix, owner_suffix, caller_prefix, caller_suffix]
-    drop drop
-    # [owner_prefix, owner_suffix, caller_prefix, caller_suffix]
+    # [0, 0, owner_prefix, owner_suffix, caller_suffix, caller_prefix]
+    drop drop swap
+    # [owner_suffix, owner_prefix, caller_suffix, caller_prefix]
     exec.account_id::is_equal assert.err=ERR_ONLY_OWNER
     # []
 end
