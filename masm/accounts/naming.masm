@@ -31,7 +31,6 @@ const ERR_ONLY_DOMAIN_OWNER="Only domain owner"
 const ERR_ALREADY_INITIALIZED="Contract already initialized"
 const ERR_PAYMENT_TOKEN_NOT_ALLOWED="This payment token not allowed"
 const ERR_PRICE_ZERO="Price zero for this length"
-const ERR_VALIDATE_PAYMENT_SUB_OVERFLOW="Validating payment sub overflow"
 const ERR_INSUFFICIENT_AMOUNT_PAID="Paid amount less than price"
 const ERR_DOMAIN_NOT_AVAILABLE="Domain is already taken"
 const ERR_DOMAIN_LENGTH_TOO_HIGH="21 characters allowed"
@@ -47,7 +46,7 @@ const ERR_CALCULATE_DISCOUNT_UNDERFLOW="Underflow at discount calc"
 const ERR_DOMAIN_REGISTRATION_LENGTH_TOO_HIGH="Max 10 years"
 const ERR_OVERFLOW_AT_DOMAIN_TIMESTAMP_LENGTH="Timestamp len overflow"
 const ERR_DOMAIN_NOT_EXPIRED="Domain not expired"
-const ERR_U32_OVERFLOW="U32 Overflow"
+const ERR_CLAIMED_REVENUE_EXCEEDS_TOTAL="Claimed revenue exceeds total revenue"
 const ERR_DOMAIN_EXPIRED="Domain expired"
 const ERR_UNDERFLOW_AT_FEE_CALC="Fee calculation underflow"
 const ERR_OVERFLOW_AT_FEE_CALC="Fee calculation overflow"
@@ -291,7 +290,10 @@ proc _get_remaining_revenue
     padw mem_loadw_be.MEM_PAYMENT_TOKEN
     push.CLAIMED_REVENUE_SLOT[0..2] exec.active_account::get_map_item drop drop drop
     # [claimed_revenue, total_revenue]
-    u32assert2 u32overflowing_sub assertz.err=ERR_U32_OVERFLOW
+    # Revenue accumulates as a felt, so this must not be a u32 subtraction: it would trap
+    # once cumulative revenue crosses u32::MAX, permanently bricking revenue claims.
+    dup.1 dup.1 gte assert.err=ERR_CLAIMED_REVENUE_EXCEEDS_TOTAL
+    sub
     # [claimable_revenue]
 end
 
@@ -417,7 +419,11 @@ proc _receive_payment
     exec.basic_wallet::add_assets_to_account
     exec._get_balance
     # [after_bal, before_bal, min_amt]
-    swap u32overflowing_sub assertz.err=ERR_VALIDATE_PAYMENT_SUB_OVERFLOW
+    # Balances are felts (the protocol caps asset amounts at 2^63 - 2^31), so this must not be
+    # a u32 subtraction: it would trap once the vault balance crosses u32::MAX. No underflow
+    # guard is needed — add_assets_to_account can only increase the balance.
+    swap sub
+    # [received, min_amt]
     lte assert.err=ERR_INSUFFICIENT_AMOUNT_PAID
     # []
 end

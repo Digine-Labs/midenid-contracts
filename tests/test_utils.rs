@@ -26,9 +26,19 @@ use midenname_contracts::storage::naming_storage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
+/// Path of the contract variant the plain (non-`_with_contract`) helpers build against.
+pub const NAMING_CONTRACT: &str = "./masm/accounts/naming.masm";
+pub const NAMING_DISCOUNT_CONTRACT: &str = "./masm/accounts/naming_discount.masm";
+
 pub fn create_test_naming_account() -> Account {
+    create_test_account_from(NAMING_CONTRACT)
+}
+
+/// Builds a test account from any of the naming contract variants. They all share
+/// [`naming_storage`], so only the code differs.
+pub fn create_test_account_from(contract_path: &str) -> Account {
     let storage_slots = naming_storage();
-    let code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
+    let code = fs::read_to_string(Path::new(contract_path)).unwrap();
 
     let source_manager = Arc::new(DefaultSourceManager::default());
     let assembler = TransactionKernel::assembler_with_source_manager(source_manager.clone())
@@ -63,8 +73,22 @@ pub async fn create_note_for_naming(
     target_id: AccountId,
     assets: NoteAssets,
 ) -> anyhow::Result<Note> {
+    create_note_for_naming_with_contract(name, inputs, sender, target_id, assets, NAMING_CONTRACT)
+        .await
+}
+
+/// Same as [`create_note_for_naming`] but links the note script against a chosen contract
+/// variant, so notes can target the discount contract's procedure signatures.
+pub async fn create_note_for_naming_with_contract(
+    name: String,
+    inputs: NoteStorage,
+    sender: AccountId,
+    target_id: AccountId,
+    assets: NoteAssets,
+    contract_path: &str,
+) -> anyhow::Result<Note> {
     let note_code = fs::read_to_string(Path::new(&format!("./masm/notes/{}.masm", name)))?;
-    let naming_code = fs::read_to_string(Path::new("./masm/accounts/naming.masm")).unwrap();
+    let naming_code = fs::read_to_string(Path::new(contract_path)).unwrap();
     let library = create_library(naming_code, "miden_name::naming")?;
 
     let note_script = CodeBuilder::default()
@@ -148,10 +172,19 @@ pub struct TestingContext {
 }
 
 pub async fn init_naming() -> anyhow::Result<TestingContext> {
+    init_naming_with(100000, "set_all_prices").await
+}
+
+/// Same as [`init_naming`] but lets a test choose how much registrar_1 is funded with and which
+/// price-table note is used. Needed to exercise balances and prices above `u32::MAX`.
+pub async fn init_naming_with(
+    registrar_1_funding: u64,
+    prices_note: &str,
+) -> anyhow::Result<TestingContext> {
     let mut builder = MockChain::builder();
     let fungible_asset_1 = FungibleAsset::new(
         ACCOUNT_ID_PUBLIC_FUNGIBLE_FAUCET_1.try_into().unwrap(),
-        100000,
+        registrar_1_funding,
     )
     .unwrap();
     let fungible_asset_2 = FungibleAsset::new(
@@ -218,7 +251,7 @@ pub async fn init_naming() -> anyhow::Result<TestingContext> {
         .to_vec(),
     )?;
     let set_prices_note = create_note_for_naming(
-        "set_all_prices".to_string(),
+        prices_note.to_string(),
         note_inputs,
         owner_account.id(),
         naming_account.id(),
